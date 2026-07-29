@@ -1,0 +1,237 @@
+from tests.conftest import register_and_verify, auth_headers
+
+
+def create_profile(client, headers, **overrides):
+    payload = {"display_name": "Test Talent", "category": "acting", "city": "Colombo"}
+    payload.update(overrides)
+    resp = client.post("/api/v1/talents/me", json=payload, headers=headers)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def test_create_profile(client, talent_headers):
+    body = create_profile(client, talent_headers, display_name="Ishara", category="singing")
+    assert body["display_name"] == "Ishara"
+    assert body["category"] == "singing"
+    assert body["tier"] == "free"
+    assert body["is_verified"] is False
+    assert body["job_alert_emails"] is True
+    assert body["media"] == []
+    assert body["credits"] == []
+
+
+def test_create_profile_twice_rejected(client, talent_headers):
+    create_profile(client, talent_headers)
+    resp = client.post(
+        "/api/v1/talents/me",
+        json={"display_name": "Again", "category": "acting"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_create_profile_requires_talent_role(client, recruiter_headers):
+    resp = client.post(
+        "/api/v1/talents/me",
+        json={"display_name": "Recruiter as talent", "category": "acting"},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 403
+
+
+def test_read_my_profile_requires_profile_to_exist(client, talent_headers):
+    resp = client.get("/api/v1/talents/me", headers=talent_headers)
+    assert resp.status_code == 404
+
+
+def test_get_talent_by_id(client, talent_headers):
+    created = create_profile(client, talent_headers)
+    resp = client.get(f"/api/v1/talents/{created['id']}")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == created["id"]
+
+
+def test_get_talent_unknown_id_404(client):
+    resp = client.get("/api/v1/talents/00000000-0000-0000-0000-000000000000")
+    assert resp.status_code == 404
+
+
+def test_update_profile_bio_city_and_attributes(client, talent_headers):
+    create_profile(client, talent_headers, category="singing")
+    resp = client.patch(
+        "/api/v1/talents/me",
+        json={
+            "bio": "Playback vocalist",
+            "city": "Kandy",
+            "attributes": {"vocal_range": "Mezzo-soprano"},
+            "intro_video_url": "https://www.youtube.com/watch?v=abc123",
+        },
+        headers=talent_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["bio"] == "Playback vocalist"
+    assert body["city"] == "Kandy"
+    assert body["attributes"] == {"vocal_range": "Mezzo-soprano"}
+    assert body["intro_video_url"] == "https://www.youtube.com/watch?v=abc123"
+
+
+def test_update_job_alert_emails_preference(client, talent_headers):
+    create_profile(client, talent_headers)
+    resp = client.patch("/api/v1/talents/me", json={"job_alert_emails": False}, headers=talent_headers)
+    assert resp.status_code == 200
+    assert resp.json()["job_alert_emails"] is False
+
+
+def test_request_verification_sets_timestamp(client, talent_headers):
+    create_profile(client, talent_headers)
+    resp = client.post("/api/v1/talents/me/request-verification", headers=talent_headers)
+    assert resp.status_code == 200
+    assert resp.json()["verification_requested_at"] is not None
+
+
+def test_upgrade_tier_sets_premium(client, talent_headers):
+    create_profile(client, talent_headers)
+    resp = client.post("/api/v1/talents/me/upgrade", headers=talent_headers)
+    assert resp.status_code == 200
+    assert resp.json()["tier"] == "premium"
+
+
+def test_add_media_within_free_tier_limit(client, talent_headers):
+    create_profile(client, talent_headers)
+    for i in range(3):
+        resp = client.post(
+            "/api/v1/talents/me/media",
+            json={"url": f"https://example.com/{i}.jpg", "media_type": "photo", "title": f"Photo {i}"},
+            headers=talent_headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+
+def test_add_media_beyond_free_tier_limit_rejected(client, talent_headers):
+    create_profile(client, talent_headers)
+    for i in range(3):
+        resp = client.post(
+            "/api/v1/talents/me/media",
+            json={"url": f"https://example.com/{i}.jpg", "media_type": "photo"},
+            headers=talent_headers,
+        )
+        assert resp.status_code == 201
+
+    resp = client.post(
+        "/api/v1/talents/me/media",
+        json={"url": "https://example.com/4th.jpg", "media_type": "photo"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 403
+    assert "premium" in resp.json()["detail"].lower()
+
+
+def test_premium_tier_bypasses_media_limit(client, talent_headers):
+    create_profile(client, talent_headers)
+    client.post("/api/v1/talents/me/upgrade", headers=talent_headers)
+    for i in range(5):
+        resp = client.post(
+            "/api/v1/talents/me/media",
+            json={"url": f"https://example.com/{i}.jpg", "media_type": "photo"},
+            headers=talent_headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+
+def test_add_and_delete_credit(client, talent_headers):
+    create_profile(client, talent_headers)
+    resp = client.post(
+        "/api/v1/talents/me/credits",
+        json={"project_type": "film", "title": "Short film lead", "role": "Lead actor"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    credit_id = resp.json()["id"]
+
+    resp = client.delete(f"/api/v1/talents/me/credits/{credit_id}", headers=talent_headers)
+    assert resp.status_code == 204
+
+    resp = client.delete(f"/api/v1/talents/me/credits/{credit_id}", headers=talent_headers)
+    assert resp.status_code == 404
+
+
+def test_cannot_delete_another_talents_credit(client, db_session):
+    from tests.conftest import DEFAULT_PASSWORD
+
+    token_a = register_and_verify(client, db_session, "talent-a@example.com", role="talent")
+    token_b = register_and_verify(client, db_session, "talent-b@example.com", role="talent")
+    headers_a = auth_headers(token_a)
+    headers_b = auth_headers(token_b)
+
+    create_profile(client, headers_a, display_name="Talent A")
+    create_profile(client, headers_b, display_name="Talent B")
+
+    resp = client.post(
+        "/api/v1/talents/me/credits",
+        json={"project_type": "film", "title": "A's credit"},
+        headers=headers_a,
+    )
+    credit_id = resp.json()["id"]
+
+    resp = client.delete(f"/api/v1/talents/me/credits/{credit_id}", headers=headers_b)
+    assert resp.status_code == 404
+
+
+def test_browse_filters_by_category(client, talent_headers, db_session):
+    create_profile(client, talent_headers, category="singing")
+    token_b = register_and_verify(client, db_session, "actor@example.com", role="talent")
+    create_profile(client, auth_headers(token_b), category="acting")
+
+    resp = client.get("/api/v1/talents", params={"category": "singing"})
+    assert resp.status_code == 200
+    categories = {t["category"] for t in resp.json()}
+    assert categories == {"singing"}
+
+
+def test_browse_filters_by_city(client, talent_headers, db_session):
+    create_profile(client, talent_headers, city="Colombo")
+    token_b = register_and_verify(client, db_session, "galletown@example.com", role="talent")
+    create_profile(client, auth_headers(token_b), display_name="Galle Talent", city="Galle")
+
+    resp = client.get("/api/v1/talents", params={"city": "Galle"})
+    assert resp.status_code == 200
+    cities = {t["city"] for t in resp.json()}
+    assert cities == {"Galle"}
+
+
+def test_browse_search_matches_skills(client, talent_headers):
+    create_profile(client, talent_headers, skills=["carnatic classical", "playback singing"])
+    resp = client.get("/api/v1/talents", params={"q": "carnatic"})
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
+
+
+def test_browse_filters_by_experience_range(client, talent_headers, db_session):
+    create_profile(client, talent_headers, experience_years=2)
+    token_b = register_and_verify(client, db_session, "veteran@example.com", role="talent")
+    create_profile(client, auth_headers(token_b), display_name="Veteran", experience_years=10)
+
+    resp = client.get("/api/v1/talents", params={"experience_min": 5})
+    assert resp.status_code == 200
+    names = {t["display_name"] for t in resp.json()}
+    assert names == {"Veteran"}
+
+
+def test_browse_verified_only_filter(client, talent_headers, db_session):
+    from app.models.talent_profile import TalentProfile
+
+    create_profile(client, talent_headers, display_name="Unverified")
+
+    token_b = register_and_verify(client, db_session, "verified@example.com", role="talent")
+    verified = create_profile(client, auth_headers(token_b), display_name="Verified")
+
+    # Approving verification isn't exposed over the API (manual review only) — flip it directly.
+    profile = db_session.query(TalentProfile).filter(TalentProfile.id == verified["id"]).first()
+    profile.is_verified = True
+    db_session.commit()
+
+    resp = client.get("/api/v1/talents", params={"verified_only": True})
+    assert resp.status_code == 200
+    names = {t["display_name"] for t in resp.json()}
+    assert names == {"Verified"}

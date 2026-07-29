@@ -1,0 +1,171 @@
+import pytest
+
+from tests.conftest import register_and_verify, auth_headers
+
+
+def create_talent_profile(client, headers, **overrides):
+    payload = {"display_name": "Applicant", "category": "acting"}
+    payload.update(overrides)
+    resp = client.post("/api/v1/talents/me", json=payload, headers=headers)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def test_apply_to_a_role(client, talent_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    resp = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications",
+        json={"role_id": role_id, "message": "I'd love this role"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["role_id"] == role_id
+    assert body["status"] == "pending"
+
+
+def test_apply_requires_talent_role(client, recruiter_headers, casting_call):
+    role_id = casting_call["roles"][0]["id"]
+    resp = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications",
+        json={"role_id": role_id},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 403
+
+
+def test_apply_to_unknown_casting_call_404(client, talent_headers):
+    create_talent_profile(client, talent_headers)
+    resp = client.post(
+        "/api/v1/casting-calls/00000000-0000-0000-0000-000000000000/applications",
+        json={"role_id": "00000000-0000-0000-0000-000000000000"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 404
+
+
+def test_apply_with_role_from_a_different_casting_call_rejected(client, talent_headers, recruiter_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    other_call = client.post(
+        "/api/v1/casting-calls",
+        json={"title": "Other call", "description": "x", "category": "acting", "roles": [{"title": "x"}]},
+        headers=recruiter_headers,
+    ).json()
+
+    resp = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications",
+        json={"role_id": other_call["roles"][0]["id"]},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_duplicate_application_to_same_role_rejected(client, talent_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    payload = {"role_id": role_id}
+    resp1 = client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json=payload, headers=talent_headers)
+    assert resp1.status_code == 201
+    resp2 = client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json=payload, headers=talent_headers)
+    assert resp2.status_code == 400
+
+
+def test_apply_to_two_different_roles_on_same_call(client, talent_headers, recruiter_headers, recruiter_profile):
+    create_talent_profile(client, talent_headers, category="modeling")
+    call = client.post(
+        "/api/v1/casting-calls",
+        json={
+            "title": "Multi-role shoot",
+            "description": "x",
+            "category": "modeling",
+            "roles": [{"title": "Models"}, {"title": "Actors"}],
+        },
+        headers=recruiter_headers,
+    ).json()
+
+    for role in call["roles"]:
+        resp = client.post(
+            f"/api/v1/casting-calls/{call['id']}/applications",
+            json={"role_id": role["id"]},
+            headers=talent_headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+
+def test_recruiter_can_list_applications_for_own_call(client, talent_headers, recruiter_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers)
+
+    resp = client.get(f"/api/v1/casting-calls/{casting_call['id']}/applications", headers=recruiter_headers)
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
+
+
+def test_other_recruiter_cannot_list_applications(client, talent_headers, casting_call, db_session):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers)
+
+    other_token = register_and_verify(client, db_session, "otherrecruiter@example.com", role="recruiter")
+    other_headers = auth_headers(other_token)
+    client.post("/api/v1/recruiters/me", json={"company_name": "Other Co"}, headers=other_headers)
+
+    resp = client.get(f"/api/v1/casting-calls/{casting_call['id']}/applications", headers=other_headers)
+    assert resp.status_code == 404
+
+
+def test_talent_can_list_own_applications(client, talent_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers)
+
+    resp = client.get("/api/v1/talents/me/applications", headers=talent_headers)
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
+
+
+def test_recruiter_updates_application_status(client, talent_headers, recruiter_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    application = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers
+    ).json()
+
+    resp = client.patch(
+        f"/api/v1/applications/{application['id']}", json={"status": "shortlisted"}, headers=recruiter_headers
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "shortlisted"
+
+
+def test_non_owning_recruiter_cannot_update_status(client, talent_headers, casting_call, db_session):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    application = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers
+    ).json()
+
+    other_token = register_and_verify(client, db_session, "notowner@example.com", role="recruiter")
+    other_headers = auth_headers(other_token)
+    client.post("/api/v1/recruiters/me", json={"company_name": "Not Owner Co"}, headers=other_headers)
+
+    resp = client.patch(
+        f"/api/v1/applications/{application['id']}", json={"status": "accepted"}, headers=other_headers
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.parametrize("bad_status", ["not-a-status", "", "PENDING"])
+def test_update_status_rejects_invalid_values(client, talent_headers, recruiter_headers, casting_call, bad_status):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    application = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers
+    ).json()
+
+    resp = client.patch(
+        f"/api/v1/applications/{application['id']}", json={"status": bad_status}, headers=recruiter_headers
+    )
+    assert resp.status_code == 422

@@ -1,0 +1,110 @@
+import { Page, expect } from "@playwright/test";
+import { getVerificationCode } from "./db";
+
+export const PASSWORD = "TestPass123!";
+
+export async function registerAndVerify(
+  page: Page,
+  opts: { email: string; fullName: string; role: "talent" | "recruiter"; password?: string }
+) {
+  const password = opts.password ?? PASSWORD;
+
+  await page.goto("/register");
+  await page.getByRole("button", { name: opts.role, exact: true }).click();
+  await page.getByLabel("Full name").fill(opts.fullName);
+  await page.getByLabel("Email").fill(opts.email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  await expect(page.getByText("Check your email")).toBeVisible();
+  const code = await getVerificationCode(opts.email);
+  await page.getByLabel("Verification code").fill(code);
+  await page.getByRole("button", { name: "Verify email" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard/);
+}
+
+export async function login(page: Page, email: string, password = PASSWORD) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+}
+
+export async function logout(page: Page) {
+  await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page.getByRole("navigation").getByRole("link", { name: "Log in" })).toBeVisible();
+}
+
+export async function createTalentProfile(
+  page: Page,
+  opts: { displayName: string; category?: string; city?: string; bio?: string }
+) {
+  await page.goto("/dashboard");
+  await page.getByLabel("Display name").fill(opts.displayName);
+  if (opts.category) {
+    await page.getByLabel("Category").selectOption(opts.category);
+  }
+  if (opts.city) {
+    await page.getByLabel("City").fill(opts.city);
+  }
+  if (opts.bio) {
+    await page.getByLabel("Bio").fill(opts.bio);
+  }
+  await page.getByRole("button", { name: "Create profile" }).click();
+  await expect(page.getByText("Membership")).toBeVisible();
+}
+
+export async function postCastingCall(
+  page: Page,
+  opts: {
+    title: string;
+    description: string;
+    category?: string;
+    roles?: { title: string; criteria?: string }[];
+  }
+) {
+  await page.goto("/dashboard");
+  const form = sectionByHeading(page, "Post a talent hunt");
+  await form.getByLabel("Title").fill(opts.title);
+  if (opts.category) {
+    await form.getByLabel("Category").selectOption(opts.category);
+  }
+  await form.getByLabel("Description").fill(opts.description);
+
+  const extraRoles = (opts.roles ?? []).slice(1);
+  const firstRole = opts.roles?.[0];
+  if (firstRole?.title) {
+    await form.locator('input[placeholder^="Role title"]').first().fill(firstRole.title);
+  }
+  if (firstRole?.criteria) {
+    await form.locator('input[placeholder^="Criteria"]').first().fill(firstRole.criteria);
+  }
+  for (const role of extraRoles) {
+    await form.getByRole("button", { name: "+ Add another role" }).click();
+    const roleInputs = form.locator('input[placeholder^="Role title"]');
+    await roleInputs.last().fill(role.title);
+    if (role.criteria) {
+      await form.locator('input[placeholder^="Criteria"]').last().fill(role.criteria);
+    }
+  }
+
+  await form.getByRole("button", { name: "Post talent hunt" }).click();
+  await expect(page.getByText(opts.title).first()).toBeVisible();
+}
+
+export function sectionByHeading(page: Page, heading: string) {
+  return page.locator("section").filter({ has: page.getByRole("heading", { name: heading, exact: true }) });
+}
+
+export async function createRecruiterProfile(page: Page, opts: { companyName: string; industry?: string }) {
+  await page.goto("/dashboard");
+  await page.getByLabel("Company / agency name").fill(opts.companyName);
+  if (opts.industry) {
+    await page.getByLabel("Industry").fill(opts.industry);
+  }
+  await page.getByRole("button", { name: "Create profile" }).click();
+  await expect(page.getByText("Post a talent hunt")).toBeVisible();
+}
