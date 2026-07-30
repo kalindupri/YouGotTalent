@@ -169,3 +169,71 @@ def test_update_status_rejects_invalid_values(client, talent_headers, recruiter_
         f"/api/v1/applications/{application['id']}", json={"status": bad_status}, headers=recruiter_headers
     )
     assert resp.status_code == 422
+
+
+def apply_with_upload(client, headers, casting_call, role_id, file_bytes, filename, content_type, media_type, *, message=None):
+    data = {"role_id": role_id, "media_type": media_type}
+    if message:
+        data["message"] = message
+    return client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications/upload",
+        data=data,
+        files={"file": (filename, file_bytes, content_type)},
+        headers=headers,
+    )
+
+
+def test_apply_with_video_upload(client, talent_headers, casting_call, sample_video_bytes):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    resp = apply_with_upload(
+        client, talent_headers, casting_call, role_id, sample_video_bytes, "take.mp4", "video/mp4", "video",
+        message="Here's my take",
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["role_id"] == role_id
+    assert body["submission_url"]
+    assert body["message"] == "Here's my take"
+
+
+def test_apply_with_audio_upload(client, talent_headers, casting_call, sample_audio_bytes):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    resp = apply_with_upload(
+        client, talent_headers, casting_call, role_id, sample_audio_bytes, "take.mp3", "audio/mpeg", "audio",
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["submission_url"]
+
+
+def test_apply_with_upload_rejects_unsupported_media_type(client, talent_headers, casting_call, sample_video_bytes):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    resp = apply_with_upload(
+        client, talent_headers, casting_call, role_id, sample_video_bytes, "take.jpg", "image/jpeg", "photo",
+    )
+    assert resp.status_code == 400
+
+
+def test_apply_with_upload_rejects_corrupt_file(client, talent_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    resp = apply_with_upload(
+        client, talent_headers, casting_call, role_id, b"not a real video file", "take.mp4", "video/mp4", "video",
+    )
+    assert resp.status_code == 400
+
+
+def test_apply_with_upload_still_rejects_duplicate_role(client, talent_headers, casting_call, sample_video_bytes):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    first = apply_with_upload(
+        client, talent_headers, casting_call, role_id, sample_video_bytes, "take.mp4", "video/mp4", "video",
+    )
+    assert first.status_code == 201
+
+    second = apply_with_upload(
+        client, talent_headers, casting_call, role_id, sample_video_bytes, "take.mp4", "video/mp4", "video",
+    )
+    assert second.status_code == 400

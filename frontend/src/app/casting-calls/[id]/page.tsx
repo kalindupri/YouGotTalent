@@ -38,7 +38,9 @@ function CastingCallDetailContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState(searchParams.get("role") ?? "");
   const [message, setMessage] = useState("");
+  const [submissionMode, setSubmissionMode] = useState<"upload" | "link">("upload");
   const [submissionUrl, setSubmissionUrl] = useState("");
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -61,11 +63,20 @@ function CastingCallDetailContent() {
     setApplyError(null);
     setSubmitting(true);
     try {
-      await api.applyToCastingCall(
-        params.id,
-        { role_id: selectedRoleId, message: message || undefined, submission_url: submissionUrl || undefined },
-        token
-      );
+      if (submissionMode === "upload" && submissionFile) {
+        const mediaType = submissionFile.type.startsWith("audio/") ? "audio" : "video";
+        await api.applyToCastingCallWithUpload(
+          params.id,
+          { role_id: selectedRoleId, media_type: mediaType, file: submissionFile, message: message || undefined },
+          token
+        );
+      } else {
+        await api.applyToCastingCall(
+          params.id,
+          { role_id: selectedRoleId, message: message || undefined, submission_url: submissionUrl || undefined },
+          token
+        );
+      }
       setApplied(true);
     } catch (err) {
       setApplyError(err instanceof ApiError ? err.message : "Could not submit your application.");
@@ -228,16 +239,50 @@ function CastingCallDetailContent() {
               </label>
             )}
             {call.audition_brief && (
-              <label className={labelClass}>
-                Link to your performed take
-                <input
-                  type="url"
-                  value={submissionUrl}
-                  onChange={(e) => setSubmissionUrl(e.target.value)}
-                  placeholder="https://… (video, audio, or wherever you've hosted it)"
-                  className={inputClass}
-                />
-              </label>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Your performed take</span>
+                <fieldset className="grid grid-cols-2 gap-2">
+                  {(["upload", "link"] as const).map((mode) => (
+                    <button
+                      type="button"
+                      key={mode}
+                      onClick={() => setSubmissionMode(mode)}
+                      className={`rounded-md border-2 px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                        submissionMode === mode
+                          ? "border-rose-600 bg-rose-600 text-white"
+                          : "border-zinc-200 text-zinc-700 hover:border-rose-300 hover:bg-rose-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950"
+                      }`}
+                    >
+                      {mode === "upload" ? "Upload a file" : "Paste a link"}
+                    </button>
+                  ))}
+                </fieldset>
+                {submissionMode === "upload" ? (
+                  <label key="submission-file" className={labelClass}>
+                    Video or audio file
+                    <input
+                      type="file"
+                      accept="video/*,audio/*"
+                      onChange={(e) => setSubmissionFile(e.target.files?.[0] ?? null)}
+                      className={inputClass}
+                    />
+                    <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
+                      We&apos;ll compress it automatically.
+                    </span>
+                  </label>
+                ) : (
+                  <label key="submission-url" className={labelClass}>
+                    URL
+                    <input
+                      type="url"
+                      value={submissionUrl}
+                      onChange={(e) => setSubmissionUrl(e.target.value)}
+                      placeholder="https://… (YouTube, Spotify, or wherever you've hosted it)"
+                      className={inputClass}
+                    />
+                  </label>
+                )}
+              </div>
             )}
             <label className={labelClass}>
               Message to the recruiter (optional)

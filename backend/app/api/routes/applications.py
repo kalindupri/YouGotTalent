@@ -1,12 +1,17 @@
+import os
+import tempfile
 import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_recruiter_profile, get_current_talent_profile
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.media_processing import MediaProcessingError, compress_audio, compress_video
+from app.core.storage import upload_media_file
 from app.crud.application import (
     create_application,
     get_application,
@@ -22,14 +27,15 @@ from app.schemas.application import ApplicationCreate, ApplicationRead, Applicat
 
 router = APIRouter(tags=["applications"])
 
+UPLOADABLE_SUBMISSION_TYPES = {"video", "audio"}
 
-@router.post("/casting-calls/{casting_call_id}/applications", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)
-def apply_to_casting_call(
-    casting_call_id: uuid.UUID,
-    application_in: ApplicationCreate,
+
+def _create_application_and_notify(
+    db: Session,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    talent: TalentProfile = Depends(get_current_talent_profile),
+    casting_call_id: uuid.UUID,
+    talent: TalentProfile,
+    application_in: ApplicationCreate,
 ):
     call = get_casting_call(db, casting_call_id)
     if call is None:
@@ -51,6 +57,68 @@ def apply_to_casting_call(
         f"Review it here: {settings.FRONTEND_URL}/dashboard/casting-calls/{call.id}",
     )
     return application
+
+
+@router.post("/casting-calls/{casting_call_id}/applications", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)
+def apply_to_casting_call(
+    casting_call_id: uuid.UUID,
+    application_in: ApplicationCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    talent: TalentProfile = Depends(get_current_talent_profile),
+):
+    return _create_application_and_notify(db, background_tasks, casting_call_id, talent, application_in)
+
+
+@router.post("/casting-calls/{casting_call_id}/applications/upload", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)
+def apply_to_casting_call_with_upload(
+    casting_call_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    role_id: uuid.UUID = Form(...),
+    media_type: str = Form(...),
+    message: str | None = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    talent: TalentProfile = Depends(get_current_talent_profile),
+):
+    if media_type not in UPLOADABLE_SUBMISSION_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only video or audio files can be uploaded directly")
+
+    file.file.seek(0, os.SEEK_END)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > settings.MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
+        )
+
+    raw_suffix = Path(file.filename or "").suffix or (".mp4" if media_type == "video" else ".m4a")
+    out_suffix = ".mp4" if media_type == "video" else ".m4a"
+    content_type = "video/mp4" if media_type == "video" else "audio/mp4"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw_path = os.path.join(tmpdir, f"raw{raw_suffix}")
+        with open(raw_path, "wb") as out:
+            out.write(file.file.read())
+
+        compressed_path = os.path.join(tmpdir, f"compressed{out_suffix}")
+        try:
+            if media_type == "video":
+                compress_video(raw_path, compressed_path)
+            else:
+                compress_audio(raw_path, compressed_path)
+        except MediaProcessingError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not process this file — make sure it's a valid video/audio file.",
+            )
+
+        compressed_bytes = Path(compressed_path).read_bytes()
+
+    url = upload_media_file(compressed_bytes, out_suffix, content_type)
+    application_in = ApplicationCreate(role_id=role_id, message=message or None, submission_url=url)
+    return _create_application_and_notify(db, background_tasks, casting_call_id, talent, application_in)
 
 
 @router.get("/casting-calls/{casting_call_id}/applications", response_model=list[ApplicationRead])

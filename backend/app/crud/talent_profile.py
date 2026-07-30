@@ -115,6 +115,15 @@ def count_media_by_type(db: Session, talent_profile_id: uuid.UUID, media_type: M
     )
 
 
+def get_cover_media(db: Session, talent_profile_id: uuid.UUID) -> Media | None:
+    return db.query(Media).filter(Media.talent_profile_id == talent_profile_id, Media.is_cover.is_(True)).first()
+
+
+def delete_media(db: Session, media: Media) -> None:
+    db.delete(media)
+    db.commit()
+
+
 def request_verification(db: Session, profile: TalentProfile) -> TalentProfile:
     profile.verification_requested_at = func.now()
     db.commit()

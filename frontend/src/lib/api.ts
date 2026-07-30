@@ -469,6 +469,27 @@ export const api = {
     request<TalentProfile>("/talents/me", { method: "POST", body: JSON.stringify(data) }, token),
   updateMyTalentProfile: (data: Partial<TalentProfileInput>, token: string) =>
     request<TalentProfile>("/talents/me", { method: "PATCH", body: JSON.stringify(data) }, token),
+  uploadMyIntroVideo: async (file: File, token: string): Promise<TalentProfile> => {
+    const form = new FormData();
+    form.set("file", file);
+
+    const res = await fetch(`${API_URL}/talents/me/intro-video`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === "string") detail = body.detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json();
+  },
   addMyMedia: (data: { url: string; media_type: MediaType; title?: string; is_cover?: boolean }, token: string) =>
     request<Media>("/talents/me/media", { method: "POST", body: JSON.stringify(data) }, token),
   uploadMyMedia: async (
@@ -481,6 +502,27 @@ export const api = {
     form.set("file", data.file);
 
     const res = await fetch(`${API_URL}/talents/me/media/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === "string") detail = body.detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json();
+  },
+  uploadMyCoverPhoto: async (file: Blob, token: string): Promise<Media> => {
+    const form = new FormData();
+    form.set("file", file, "headshot.jpg");
+
+    const res = await fetch(`${API_URL}/talents/me/cover-photo`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,
@@ -569,6 +611,34 @@ export const api = {
       { method: "POST", body: JSON.stringify(data) },
       token
     ),
+  applyToCastingCallWithUpload: async (
+    castingCallId: string,
+    data: { role_id: string; media_type: "video" | "audio"; file: File; message?: string },
+    token: string
+  ): Promise<Application> => {
+    const form = new FormData();
+    form.set("role_id", data.role_id);
+    form.set("media_type", data.media_type);
+    if (data.message) form.set("message", data.message);
+    form.set("file", data.file);
+
+    const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/applications/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === "string") detail = body.detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json();
+  },
   listApplicationsForCastingCall: (castingCallId: string, token: string) =>
     request<Application[]>(`/casting-calls/${castingCallId}/applications`, {}, token),
   listMyApplications: (token: string) => request<Application[]>("/talents/me/applications", {}, token),

@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_recruiter_profile, get_current_talent_profile, require_talent
 from app.core.config import settings
-from app.core.media_processing import MediaProcessingError, compress_audio, compress_video
-from app.core.storage import upload_media_file
+from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video
+from app.core.storage import delete_media_file, upload_media_file
 from app.crud.credit import create_credit, delete_credit, get_credit
 from app.crud.review import get_talent_review_summary
 from app.crud.saved_talent import get_saved_talent, save_talent, unsave_talent
@@ -18,6 +18,8 @@ from app.crud.talent_profile import (
     count_media,
     count_media_by_type,
     create_talent_profile,
+    delete_media,
+    get_cover_media,
     get_talent_profile,
     get_talent_profile_by_user,
     list_talent_profiles,
@@ -177,6 +179,103 @@ def upload_my_media(
     url = upload_media_file(compressed_bytes, out_suffix, content_type)
     media_in = MediaCreate(url=url, media_type=MediaType(media_type), title=title or None)
     return add_media(db, profile.id, media_in)
+
+
+@router.post("/me/cover-photo", response_model=MediaRead, status_code=status.HTTP_201_CREATED)
+def upload_my_cover_photo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    existing_cover = get_cover_media(db, profile.id)
+
+    # Only gate on the free-tier limit the first time a cover photo is set — replacing an
+    # existing one deletes the old row first, so it never costs an extra slot.
+    if existing_cover is None and profile.tier != "premium" and count_media(db, profile.id) >= settings.FREE_TIER_MEDIA_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Free accounts can add up to {settings.FREE_TIER_MEDIA_LIMIT} portfolio items. Upgrade to Premium for unlimited auditions.",
+        )
+
+    file.file.seek(0, os.SEEK_END)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > settings.MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
+        )
+
+    raw_suffix = Path(file.filename or "").suffix or ".jpg"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw_path = os.path.join(tmpdir, f"raw{raw_suffix}")
+        with open(raw_path, "wb") as out:
+            out.write(file.file.read())
+
+        compressed_path = os.path.join(tmpdir, "compressed.jpg")
+        try:
+            compress_photo(raw_path, compressed_path)
+        except MediaProcessingError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not process this file — make sure it's a valid image file.",
+            )
+
+        compressed_bytes = Path(compressed_path).read_bytes()
+
+    url = upload_media_file(compressed_bytes, ".jpg", "image/jpeg")
+
+    if existing_cover is not None:
+        delete_media_file(existing_cover.url)
+        delete_media(db, existing_cover)
+
+    media_in = MediaCreate(url=url, media_type=MediaType.PHOTO, title="Profile photo", is_cover=True)
+    return add_media(db, profile.id, media_in)
+
+
+@router.post("/me/intro-video", response_model=TalentProfileRead, status_code=status.HTTP_201_CREATED)
+def upload_my_intro_video(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    file.file.seek(0, os.SEEK_END)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > settings.MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
+        )
+
+    raw_suffix = Path(file.filename or "").suffix or ".mp4"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw_path = os.path.join(tmpdir, f"raw{raw_suffix}")
+        with open(raw_path, "wb") as out:
+            out.write(file.file.read())
+
+        compressed_path = os.path.join(tmpdir, "compressed.mp4")
+        try:
+            compress_video(raw_path, compressed_path)
+        except MediaProcessingError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not process this file — make sure it's a valid video file.",
+            )
+
+        compressed_bytes = Path(compressed_path).read_bytes()
+
+    url = upload_media_file(compressed_bytes, ".mp4", "video/mp4")
+
+    previous_url = profile.intro_video_url
+    updated = update_talent_profile(db, profile, TalentProfileUpdate(intro_video_url=url))
+
+    if previous_url:
+        delete_media_file(previous_url)
+
+    return updated
 
 
 @router.post("/me/request-verification", response_model=TalentProfileRead)

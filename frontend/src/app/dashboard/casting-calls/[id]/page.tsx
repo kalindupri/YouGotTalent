@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Play } from "lucide-react";
 import { Application, ApplicationStatus, CastingCall, Invitation, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { badgeClass, eyebrowClass, invitationStatusTone } from "@/lib/ui";
+import SubmissionPreview from "@/components/SubmissionPreview";
 
 const COLUMNS: { status: ApplicationStatus; label: string; accent: string }[] = [
   { status: "pending", label: "Pending review", accent: "bg-amber-500" },
@@ -142,16 +142,7 @@ function ApplicationCard({
       <Link href={`/talents/${application.talent_id}`} className="text-sm font-semibold text-rose-600 hover:underline">
         View talent profile
       </Link>
-      {application.submission_url && (
-        <a
-          href={application.submission_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-1 flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
-        >
-          <Play className="h-3 w-3" fill="currentColor" strokeWidth={0} /> View their submission
-        </a>
-      )}
+      {application.submission_url && <SubmissionPreview url={application.submission_url} />}
       {application.message && (
         <p className="mt-2 line-clamp-3 text-xs text-zinc-600 dark:text-zinc-400">{application.message}</p>
       )}

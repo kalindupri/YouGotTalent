@@ -1,13 +1,40 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api";
 import { btnSmall } from "@/lib/ui";
 
+const UNREAD_POLL_INTERVAL_MS = 30_000;
+
 export default function Header() {
-  const { user, loading, logout } = useAuth();
+  const { user, token, loading, logout } = useAuth();
   const router = useRouter();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!token) {
+      setUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    function refresh() {
+      api
+        .listConversations(token!)
+        .then((conversations) => {
+          if (!cancelled) setUnreadCount(conversations.reduce((sum, c) => sum + c.unread_count, 0));
+        })
+        .catch(() => {});
+    }
+    refresh();
+    const interval = setInterval(refresh, UNREAD_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [token]);
 
   function handleLogout() {
     logout();
@@ -34,8 +61,13 @@ export default function Header() {
           </Link>
           {loading ? null : user ? (
             <>
-              <Link href="/messages" className="text-zinc-300 hover:text-rose-500">
+              <Link href="/messages" className="relative text-zinc-300 hover:text-rose-500">
                 Messages
+                {unreadCount > 0 && (
+                  <span className="absolute -right-3 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
               </Link>
               <Link href="/dashboard" className="text-zinc-300 hover:text-rose-500">
                 Dashboard

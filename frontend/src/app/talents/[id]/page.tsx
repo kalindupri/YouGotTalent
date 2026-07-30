@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Bookmark, Check, Crown, Play, Share2, ShieldCheck, Star } from "lucide-react";
+import { Bookmark, Check, Crown, Share2, ShieldCheck, Star } from "lucide-react";
 import { ApiError, Credit, TalentProfile, TalentReviewSummary, api } from "@/lib/api";
 import {
   CREDIT_PROJECT_TYPES,
@@ -14,7 +14,6 @@ import {
   categoryBadgeClass,
   categoryShowsIntroVideo,
   coverPhotoUrl,
-  detectEmbed,
   formatCategory,
   premiumBadgeClass,
   verifiedBadgeClass,
@@ -25,6 +24,7 @@ import MessageTalentButton from "@/components/MessageTalentButton";
 import InviteToRoleButton from "@/components/InviteToRoleButton";
 import BookingRequestButton from "@/components/BookingRequestButton";
 import MediaCard from "@/components/MediaCard";
+import SubmissionPreview from "@/components/SubmissionPreview";
 
 export default function TalentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -237,33 +237,11 @@ export default function TalentDetailPage() {
 
 function IntroVideoSection({ talent }: { talent: TalentProfile }) {
   if (!talent.intro_video_url || !categoryShowsIntroVideo(talent.category)) return null;
-  const embed = detectEmbed(talent.intro_video_url);
-
-  if (embed?.type === "youtube") {
-    return (
-      <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-        <div className="aspect-video">
-          <iframe
-            src={embed.embedUrl}
-            title={`${talent.display_name}'s intro video`}
-            className="h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <a
-      href={talent.intro_video_url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-6 inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-3 text-sm font-semibold text-rose-600 hover:underline dark:border-zinc-800"
-    >
-      <Play className="h-4 w-4" fill="currentColor" strokeWidth={0} /> Watch intro video
-    </a>
+    <div className="mt-6">
+      <SubmissionPreview url={talent.intro_video_url} />
+    </div>
   );
 }
 

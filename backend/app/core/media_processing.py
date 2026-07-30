@@ -34,6 +34,18 @@ def compress_audio(input_path: str, output_path: str) -> None:
     _run_ffmpeg(["-i", input_path, "-vn", "-c:a", "aac", "-b:a", "128k", output_path])
 
 
+def compress_photo(input_path: str, output_path: str) -> None:
+    _run_ffmpeg(
+        [
+            "-i", input_path,
+            # Downscale anything wider than 1600px; never upscale.
+            "-vf", "scale='min(1600,iw)':-1",
+            "-q:v", "4",
+            output_path,
+        ]
+    )
+
+
 def _run_ffmpeg(args: list[str]) -> None:
     try:
         result = subprocess.run(

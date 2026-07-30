@@ -221,6 +221,18 @@ def sample_audio_bytes() -> bytes:
         return path.read_bytes()
 
 
+@pytest.fixture(scope="session")
+def sample_photo_bytes() -> bytes:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.jpg"
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=320x240", "-frames:v", "1", str(path)],
+            check=True,
+            capture_output=True,
+        )
+        return path.read_bytes()
+
+
 @pytest.fixture()
 def casting_call(client, recruiter_headers, recruiter_profile):
     resp = client.post(

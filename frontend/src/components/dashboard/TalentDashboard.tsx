@@ -2,7 +2,7 @@
 
 import { FormEvent, createElement, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Crown, FileCheck2, Play, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { Check, Crown, FileCheck2, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import {
   Application,
   ApiError,
@@ -12,6 +12,7 @@ import {
   CreditProjectType,
   Follow,
   Invitation,
+  Media,
   MediaType,
   TALENT_CATEGORIES,
   TalentCategory,
@@ -36,7 +37,6 @@ import {
   coverPhotoUrl,
   creditProjectTypeIcon,
   creditProjectTypeLabel,
-  detectEmbed,
   formatCategory,
   formatTimeOfDay,
   inputClass,
@@ -51,6 +51,8 @@ import {
 import TalentAvatar from "@/components/TalentAvatar";
 import BookingReviewForm from "@/components/BookingReviewForm";
 import MediaCard from "@/components/MediaCard";
+import HeadshotUploader from "@/components/HeadshotUploader";
+import SubmissionPreview from "@/components/SubmissionPreview";
 
 function parseSkills(raw: string): string[] {
   return raw
@@ -367,8 +369,15 @@ function ProfileSummary({
     <section className={sectionClass}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl">
-            <TalentAvatar name={profile.display_name} coverUrl={coverUrl} className="h-full w-full text-lg" />
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl">
+              <TalentAvatar name={profile.display_name} coverUrl={coverUrl} className="h-full w-full text-lg" />
+            </div>
+            <HeadshotUploader
+              token={token}
+              hasExisting={!!coverUrl}
+              onUploaded={(m) => onUpdated({ ...profile, media: [...profile.media.filter((x) => !x.is_cover), m] })}
+            />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -904,11 +913,11 @@ function IntroVideoCard({
   token: string;
 }) {
   const [editing, setEditing] = useState(false);
+  const [mode, setMode] = useState<"upload" | "link">("upload");
   const [url, setUrl] = useState(profile.intro_video_url ?? "");
+  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const embed = profile.intro_video_url ? detectEmbed(profile.intro_video_url) : null;
 
   if (!categoryShowsIntroVideo(profile.category)) return null;
 
@@ -917,9 +926,15 @@ function IntroVideoCard({
     setError(null);
     setSubmitting(true);
     try {
-      const updated = await api.updateMyTalentProfile({ intro_video_url: url.trim() || null }, token);
-      onUpdated({ ...updated, media: profile.media, credits: profile.credits });
+      if (mode === "upload" && file) {
+        const updated = await api.uploadMyIntroVideo(file, token);
+        onUpdated({ ...updated, media: profile.media, credits: profile.credits });
+      } else {
+        const updated = await api.updateMyTalentProfile({ intro_video_url: url.trim() || null }, token);
+        onUpdated({ ...updated, media: profile.media, credits: profile.credits });
+      }
       setEditing(false);
+      setFile(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save your intro video.");
     } finally {
@@ -941,34 +956,51 @@ function IntroVideoCard({
         </button>
       </div>
 
-      {!editing && profile.intro_video_url && embed?.type === "youtube" && (
-        <div className="mt-4 aspect-video overflow-hidden rounded-lg">
-          <iframe src={embed.embedUrl} title="Intro video" className="h-full w-full" allowFullScreen />
-        </div>
-      )}
-      {!editing && profile.intro_video_url && embed?.type !== "youtube" && (
-        <a
-          href={profile.intro_video_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-rose-600 hover:underline"
-        >
-          <Play className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} /> View intro video
-        </a>
-      )}
+      {!editing && profile.intro_video_url && <SubmissionPreview url={profile.intro_video_url} />}
 
       {editing && (
         <form onSubmit={handleSubmit} className="mt-4 flex max-w-md flex-col gap-4">
-          <label className={labelClass}>
-            Video URL
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://youtube.com/watch?v=…"
-              className={inputClass}
-            />
-          </label>
+          <fieldset className="grid grid-cols-2 gap-2">
+            {(["upload", "link"] as const).map((m) => (
+              <button
+                type="button"
+                key={m}
+                onClick={() => setMode(m)}
+                className={`rounded-md border-2 px-3 py-2 text-sm font-medium transition-colors ${
+                  mode === m
+                    ? "border-rose-600 bg-rose-600 text-white"
+                    : "border-zinc-200 text-zinc-700 hover:border-rose-300 hover:bg-rose-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950"
+                }`}
+              >
+                {m === "upload" ? "Upload a file" : "Paste a link"}
+              </button>
+            ))}
+          </fieldset>
+          {mode === "upload" ? (
+            <label key="intro-file" className={labelClass}>
+              Video file
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className={inputClass}
+              />
+              <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
+                We&apos;ll compress it automatically.
+              </span>
+            </label>
+          ) : (
+            <label key="intro-url" className={labelClass}>
+              Video URL
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=…"
+                className={inputClass}
+              />
+            </label>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button type="submit" disabled={submitting} className={`w-fit ${btnSecondary}`}>
             {submitting ? "Saving…" : "Save intro video"}

@@ -26,3 +26,22 @@ def upload_media_file(data: bytes, extension: str, content_type: str) -> str:
     LOCAL_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     (LOCAL_MEDIA_DIR / blob_name).write_bytes(data)
     return f"{settings.BACKEND_PUBLIC_URL}/media/{blob_name}"
+
+
+def delete_media_file(url: str) -> None:
+    """Best-effort cleanup of a previously-uploaded file — failures here shouldn't block the
+    request that's replacing it (e.g. a stale/already-deleted blob, or a URL that was never
+    ours to begin with, like a pasted external link).
+    """
+    try:
+        if settings.AZURE_STORAGE_CONNECTION_STRING and settings.AZURE_STORAGE_CONTAINER in url:
+            from azure.storage.blob import BlobServiceClient
+
+            blob_name = url.rsplit("/", 1)[-1]
+            service = BlobServiceClient.from_connection_string(settings.AZURE_STORAGE_CONNECTION_STRING)
+            service.get_container_client(settings.AZURE_STORAGE_CONTAINER).get_blob_client(blob_name).delete_blob()
+        elif url.startswith(f"{settings.BACKEND_PUBLIC_URL}/media/"):
+            blob_name = url.rsplit("/", 1)[-1]
+            (LOCAL_MEDIA_DIR / blob_name).unlink(missing_ok=True)
+    except Exception:
+        pass
