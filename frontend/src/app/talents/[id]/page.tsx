@@ -13,6 +13,7 @@ import {
   btnSmallPrimary,
   categoryAttributeFields,
   categoryBadgeClass,
+  categoryShowsIntroVideo,
   coverPhotoUrl,
   detectEmbed,
   formatCategory,
@@ -124,7 +125,7 @@ export default function TalentDetailPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={handleShare} className={btnSmall}>
             {copied ? (
               <>
@@ -235,7 +236,7 @@ export default function TalentDetailPage() {
 }
 
 function IntroVideoSection({ talent }: { talent: TalentProfile }) {
-  if (!talent.intro_video_url) return null;
+  if (!talent.intro_video_url || !categoryShowsIntroVideo(talent.category)) return null;
   const embed = detectEmbed(talent.intro_video_url);
 
   if (embed?.type === "youtube") {

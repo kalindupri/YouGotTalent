@@ -426,6 +426,14 @@ export const api = {
   resendVerification: (email: string) =>
     request<void>("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) }),
 
+  forgotPassword: (email: string) =>
+    request<void>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (email: string, code: string, new_password: string) =>
+    request<{ access_token: string; token_type: string }>(
+      "/auth/reset-password",
+      { method: "POST", body: JSON.stringify({ email, code, new_password }) }
+    ),
+
   listTalents: (
     params: {
       category?: TalentCategory;
@@ -454,6 +462,32 @@ export const api = {
     request<TalentProfile>("/talents/me", { method: "PATCH", body: JSON.stringify(data) }, token),
   addMyMedia: (data: { url: string; media_type: MediaType; title?: string; is_cover?: boolean }, token: string) =>
     request<Media>("/talents/me/media", { method: "POST", body: JSON.stringify(data) }, token),
+  uploadMyMedia: async (
+    data: { file: File; media_type: "video" | "audio"; title?: string },
+    token: string
+  ): Promise<Media> => {
+    const form = new FormData();
+    form.set("media_type", data.media_type);
+    if (data.title) form.set("title", data.title);
+    form.set("file", data.file);
+
+    const res = await fetch(`${API_URL}/talents/me/media/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === "string") detail = body.detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json();
+  },
   saveTalent: (talentId: string, token: string) =>
     request<void>(`/talents/${talentId}/save`, { method: "POST" }, token),
   unsaveTalent: (talentId: string, token: string) =>

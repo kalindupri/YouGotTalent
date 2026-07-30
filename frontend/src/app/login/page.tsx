@@ -154,6 +154,10 @@ export default function LoginPage() {
           />
         </label>
 
+        <Link href="/forgot-password" className="-mt-2 self-end text-xs font-semibold text-rose-600 hover:underline">
+          Forgot password?
+        </Link>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <button type="submit" disabled={submitting} className={`mt-2 ${btnPrimary}`}>

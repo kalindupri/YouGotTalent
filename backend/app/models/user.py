@@ -34,6 +34,11 @@ class User(Base):
     verification_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
     verification_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Separate from verification_code above so a password-reset request can't clobber a pending
+    # email-verification code (and vice versa) if a user triggers both around the same time.
+    password_reset_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    password_reset_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     talent_profile: Mapped["TalentProfile | None"] = relationship("TalentProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")

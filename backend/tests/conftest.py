@@ -1,3 +1,7 @@
+import subprocess
+import tempfile
+from pathlib import Path
+
 import pytest
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session
@@ -108,6 +112,13 @@ def register_and_verify(client, db_session, email: str, *, password: str = DEFAU
     return verify_email(client, db_session, email)
 
 
+def get_password_reset_code(db_session, email: str) -> str:
+    user = db_session.query(User).filter(User.email == email).first()
+    assert user is not None, f"no user found for {email}"
+    assert user.password_reset_code, f"no password reset code set for {email}"
+    return user.password_reset_code
+
+
 def auth_headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
@@ -178,6 +189,36 @@ def admin_token(db_session):
 @pytest.fixture()
 def admin_headers(admin_token):
     return auth_headers(admin_token)
+
+
+@pytest.fixture(scope="session")
+def sample_video_bytes() -> bytes:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.mp4"
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", "testsrc=duration=1:size=320x240:rate=10",
+                "-f", "lavfi", "-i", "sine=frequency=1000:duration=1",
+                "-shortest", "-pix_fmt", "yuv420p",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        return path.read_bytes()
+
+
+@pytest.fixture(scope="session")
+def sample_audio_bytes() -> bytes:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.mp3"
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", str(path)],
+            check=True,
+            capture_output=True,
+        )
+        return path.read_bytes()
 
 
 @pytest.fixture()

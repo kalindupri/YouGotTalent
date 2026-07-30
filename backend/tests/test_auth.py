@@ -1,6 +1,13 @@
 from datetime import datetime, timedelta, timezone
 
-from tests.conftest import get_verification_code, register_user, verify_email, DEFAULT_PASSWORD
+from tests.conftest import (
+    DEFAULT_PASSWORD,
+    get_password_reset_code,
+    get_verification_code,
+    register_and_verify,
+    register_user,
+    verify_email,
+)
 
 
 def test_register_returns_unverified_user(client):
@@ -131,3 +138,87 @@ def test_resend_verification_silent_for_already_verified(client, db_session):
 def test_me_requires_authentication(client):
     resp = client.get("/api/v1/auth/me")
     assert resp.status_code == 401
+
+
+def test_forgot_password_silent_for_unknown_email(client):
+    resp = client.post("/api/v1/auth/forgot-password", json={"email": "doesnotexist@example.com"})
+    assert resp.status_code == 204
+
+
+def test_forgot_password_issues_usable_code(client, db_session):
+    register_and_verify(client, db_session, "forgot@example.com")
+    resp = client.post("/api/v1/auth/forgot-password", json={"email": "forgot@example.com"})
+    assert resp.status_code == 204
+    assert get_password_reset_code(db_session, "forgot@example.com")
+
+
+def test_reset_password_wrong_code_rejected(client, db_session):
+    register_and_verify(client, db_session, "resetwrong@example.com")
+    client.post("/api/v1/auth/forgot-password", json={"email": "resetwrong@example.com"})
+    resp = client.post(
+        "/api/v1/auth/reset-password",
+        json={"email": "resetwrong@example.com", "code": "000000", "new_password": "NewPass123!"},
+    )
+    assert resp.status_code == 400
+    assert "invalid" in resp.json()["detail"].lower()
+
+
+def test_reset_password_expired_code_rejected(client, db_session):
+    register_and_verify(client, db_session, "resetexpired@example.com")
+    client.post("/api/v1/auth/forgot-password", json={"email": "resetexpired@example.com"})
+    from app.models.user import User
+
+    user = db_session.query(User).filter(User.email == "resetexpired@example.com").first()
+    code = user.password_reset_code
+    user.password_reset_code_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+
+    resp = client.post(
+        "/api/v1/auth/reset-password",
+        json={"email": "resetexpired@example.com", "code": code, "new_password": "NewPass123!"},
+    )
+    assert resp.status_code == 400
+
+
+def test_reset_password_correct_code_updates_password_and_returns_token(client, db_session):
+    register_and_verify(client, db_session, "resetok@example.com")
+    client.post("/api/v1/auth/forgot-password", json={"email": "resetok@example.com"})
+    code = get_password_reset_code(db_session, "resetok@example.com")
+
+    resp = client.post(
+        "/api/v1/auth/reset-password",
+        json={"email": "resetok@example.com", "code": code, "new_password": "NewPass123!"},
+    )
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
+
+    # Old password no longer works, new password does.
+    old_login = client.post(
+        "/api/v1/auth/login",
+        data={"username": "resetok@example.com", "password": DEFAULT_PASSWORD},
+    )
+    assert old_login.status_code == 401
+
+    new_login = client.post(
+        "/api/v1/auth/login",
+        data={"username": "resetok@example.com", "password": "NewPass123!"},
+    )
+    assert new_login.status_code == 200
+
+
+def test_reset_password_code_is_single_use(client, db_session):
+    register_and_verify(client, db_session, "resetreuse@example.com")
+    client.post("/api/v1/auth/forgot-password", json={"email": "resetreuse@example.com"})
+    code = get_password_reset_code(db_session, "resetreuse@example.com")
+
+    first = client.post(
+        "/api/v1/auth/reset-password",
+        json={"email": "resetreuse@example.com", "code": code, "new_password": "FirstPass123!"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/api/v1/auth/reset-password",
+        json={"email": "resetreuse@example.com", "code": code, "new_password": "SecondPass123!"},
+    )
+    assert second.status_code == 400

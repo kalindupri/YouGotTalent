@@ -11,6 +11,9 @@ backend/.pytest_cache/
 .env
 backend/.env
 
+# Local media upload fallback (used when Azure Blob Storage isn't configured)
+backend/media_uploads/
+
 # Node / Next.js
 frontend/node_modules/
 frontend/.next/

@@ -4,7 +4,7 @@ from functools import reduce
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
-from app.models.media import Media
+from app.models.media import Media, MediaType
 from app.models.talent_profile import TalentCategory, TalentProfile
 from app.schemas.talent_profile import MediaCreate, TalentProfileCreate, TalentProfileUpdate
 
@@ -105,6 +105,14 @@ def add_media(db: Session, talent_profile_id: uuid.UUID, media_in: MediaCreate) 
 
 def count_media(db: Session, talent_profile_id: uuid.UUID) -> int:
     return db.query(Media).filter(Media.talent_profile_id == talent_profile_id).count()
+
+
+def count_media_by_type(db: Session, talent_profile_id: uuid.UUID, media_type: MediaType) -> int:
+    return (
+        db.query(Media)
+        .filter(Media.talent_profile_id == talent_profile_id, Media.media_type == media_type)
+        .count()
+    )
 
 
 def request_verification(db: Session, profile: TalentProfile) -> TalentProfile:

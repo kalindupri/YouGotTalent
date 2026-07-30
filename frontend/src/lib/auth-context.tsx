@@ -10,6 +10,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterInput) => Promise<void>;
   verifyEmail: (email: string, code: string) => Promise<void>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -59,6 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await api.me(access_token));
   }
 
+  async function resetPassword(email: string, code: string, newPassword: string) {
+    const { access_token } = await api.resetPassword(email, code, newPassword);
+    localStorage.setItem(STORAGE_KEY, access_token);
+    setToken(access_token);
+    setUser(await api.me(access_token));
+  }
+
   function logout() {
     localStorage.removeItem(STORAGE_KEY);
     setToken(null);
@@ -66,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, verifyEmail, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, verifyEmail, resetPassword, logout }}>
       {children}
     </AuthContext.Provider>
   );

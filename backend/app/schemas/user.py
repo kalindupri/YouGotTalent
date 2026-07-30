@@ -32,6 +32,16 @@ class ResendVerificationRequest(BaseModel):
     email: EmailStr
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

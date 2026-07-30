@@ -32,6 +32,7 @@ import {
   btnSmall,
   categoryAttributeFields,
   categoryBadgeClass,
+  categoryShowsIntroVideo,
   coverPhotoUrl,
   creditProjectTypeIcon,
   creditProjectTypeLabel,
@@ -117,7 +118,11 @@ export default function TalentDashboard() {
       <SocialLinksCard profile={profile} onUpdated={setProfile} token={token!} />
       <AttributesCard profile={profile} onUpdated={setProfile} token={token!} />
       <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
-      <AddMediaForm token={token!} onAdded={(m) => setProfile({ ...profile, media: [...profile.media, m] })} />
+      <AddMediaForm
+        token={token!}
+        profile={profile}
+        onAdded={(m) => setProfile({ ...profile, media: [...profile.media, m] })}
+      />
 
       <section className={sectionClass}>
         <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Invitations</h2>
@@ -903,6 +908,8 @@ function IntroVideoCard({
 
   const embed = profile.intro_video_url ? detectEmbed(profile.intro_video_url) : null;
 
+  if (!categoryShowsIntroVideo(profile.category)) return null;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -1297,27 +1304,45 @@ const MEDIA_TYPES: { value: MediaType; label: string }[] = [
   { value: "document", label: "Document" },
 ];
 
+// Mirrors backend/app/core/config.py's FREE_TIER_VIDEO_LIMIT / PREMIUM_TIER_VIDEO_LIMIT — used
+// here only to show quota messaging before hitting the server; the server enforces the real limit.
+const FREE_TIER_VIDEO_LIMIT = 1;
+const PREMIUM_TIER_VIDEO_LIMIT = 5;
+
+const UPLOAD_MEDIA_TYPES: MediaType[] = ["video", "audio"];
+
 function AddMediaForm({
   token,
+  profile,
   onAdded,
 }: {
   token: string;
+  profile: TalentProfile;
   onAdded: (m: { id: string; url: string; media_type: MediaType; title: string | null; is_cover: boolean }) => void;
 }) {
   const [url, setUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("photo");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const isUpload = UPLOAD_MEDIA_TYPES.includes(mediaType);
+  const videoCount = profile.media.filter((m) => m.media_type === "video").length;
+  const videoLimit = profile.tier === "premium" ? PREMIUM_TIER_VIDEO_LIMIT : FREE_TIER_VIDEO_LIMIT;
+  const videoLimitReached = mediaType === "video" && videoCount >= videoLimit;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      const media = await api.addMyMedia({ url, media_type: mediaType, title: title || undefined }, token);
+      const media = isUpload
+        ? await api.uploadMyMedia({ file: file!, media_type: mediaType as "video" | "audio", title: title || undefined }, token)
+        : await api.addMyMedia({ url, media_type: mediaType, title: title || undefined }, token);
       onAdded(media);
       setUrl("");
+      setFile(null);
       setTitle("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not add this audition.");
@@ -1330,9 +1355,9 @@ function AddMediaForm({
     <section className={sectionClass}>
       <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Add an audition</h2>
       <p className="mt-1 text-sm text-zinc-500">
-        Link a photo, video, audio recording, or document that shows off your skill. YouTube
-        video links and Spotify track/album links play right on your profile. File uploads
-        aren&apos;t supported yet — paste a link to somewhere it&apos;s hosted.
+        Upload a video or audio file directly — we&apos;ll compress it automatically. Photos and
+        documents are still linked from wherever they&apos;re hosted (YouTube and Spotify links
+        also play right on your profile).
       </p>
       <form onSubmit={handleSubmit} className="mt-5 flex max-w-md flex-col gap-4">
         <label className={labelClass}>
@@ -1344,17 +1369,7 @@ function AddMediaForm({
             className={inputClass}
           />
         </label>
-        <label className={labelClass}>
-          URL
-          <input
-            required
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
-            className={inputClass}
-          />
-        </label>
+
         <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {MEDIA_TYPES.map((t) => (
             <button
@@ -1371,9 +1386,46 @@ function AddMediaForm({
             </button>
           ))}
         </fieldset>
+
+        {mediaType === "video" && (
+          <p className="text-xs text-zinc-500">
+            {videoCount}/{videoLimit} audition video{videoLimit === 1 ? "" : "s"} used
+            {profile.tier !== "premium" && " — upgrade to Premium for more"}
+          </p>
+        )}
+
+        {isUpload ? (
+          <label key="file-input" className={labelClass}>
+            {mediaType === "video" ? "Video file" : "Audio file"}
+            <input
+              required
+              type="file"
+              accept={mediaType === "video" ? "video/*" : "audio/*"}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className={inputClass}
+            />
+          </label>
+        ) : (
+          <label key="url-input" className={labelClass}>
+            URL
+            <input
+              required
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://…"
+              className={inputClass}
+            />
+          </label>
+        )}
+
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={submitting} className={`w-fit ${btnSecondary}`}>
-          {submitting ? "Adding…" : "Add audition"}
+        <button
+          type="submit"
+          disabled={submitting || videoLimitReached || (isUpload && !file)}
+          className={`w-fit ${btnSecondary}`}
+        >
+          {submitting ? (isUpload ? "Uploading & compressing…" : "Adding…") : videoLimitReached ? "Video limit reached" : "Add audition"}
         </button>
       </form>
     </section>

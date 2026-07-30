@@ -1,0 +1,6 @@
+# Ensure shell scripts always use LF line endings, even when edited on Windows
+*.sh text eol=lf
+
+# Docker files
+Dockerfile text eol=lf
+*.dockerfile text eol=lf

@@ -9,13 +9,22 @@ from app.core.security import create_access_token, verify_password
 from app.crud.user import (
     create_user,
     get_user_by_email,
+    reset_password_with_code,
     set_new_verification_code,
+    set_password_reset_code,
     verify_email_code,
 )
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.token import Token
-from app.schemas.user import EmailVerifyRequest, ResendVerificationRequest, UserCreate, UserRead
+from app.schemas.user import (
+    EmailVerifyRequest,
+    ForgotPasswordRequest,
+    ResendVerificationRequest,
+    ResetPasswordRequest,
+    UserCreate,
+    UserRead,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -62,6 +71,32 @@ def resend_verification(payload: ResendVerificationRequest, background_tasks: Ba
         return
     code = set_new_verification_code(db, user)
     _send_verification_email(background_tasks, user, code)
+
+
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    user = get_user_by_email(db, payload.email)
+    # Stay silent on unknown emails so this endpoint can't be used to probe which addresses
+    # have registered (same reasoning as resend-verification above).
+    if user is None:
+        return
+    code = set_password_reset_code(db, user)
+    background_tasks.add_task(
+        send_email,
+        user.email,
+        "Reset your YouGotTalent password",
+        f"Your password reset code is {code}. It expires in 15 minutes.\n\n"
+        f"Enter it here: {settings.FRONTEND_URL}/reset-password",
+    )
+
+
+@router.post("/reset-password", response_model=Token)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = get_user_by_email(db, payload.email)
+    if user is None or not reset_password_with_code(db, user, payload.code, payload.new_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired code")
+    token = create_access_token(subject=str(user.id))
+    return Token(access_token=token)
 
 
 @router.post("/login", response_model=Token)

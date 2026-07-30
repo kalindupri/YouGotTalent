@@ -1,0 +1,117 @@
+# Triggered on every push to main, or manually via "Run workflow"
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# OIDC token needed for passwordless Azure login (no stored credentials)
+permissions:
+  contents: read
+  packages: write   # push images to GHCR
+  id-token: write   # request OIDC JWT for Azure login
+
+env:
+  RESOURCE_GROUP:    rg-ygt-dev
+  BACKEND_APP_NAME:  ygt-backend
+  FRONTEND_APP_NAME: ygt-frontend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # GITHUB_TOKEN is auto-provisioned — no extra secret needed for GHCR
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # -------------------------------------------------------
+      # Backend — no build-args needed; migrations run at container startup
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ygt-backend:latest
+            ghcr.io/${{ github.repository_owner }}/ygt-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      # -------------------------------------------------------
+      # Passwordless Azure login via OIDC federated credential.
+      # Setup guide: https://learn.microsoft.com/azure/developer/github/connect-from-azure-oidc
+      # Required GitHub secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update backend container app
+        run: |
+          az containerapp update \
+            --name            ${{ env.BACKEND_APP_NAME }} \
+            --resource-group  ${{ env.RESOURCE_GROUP }} \
+            --image           ghcr.io/${{ github.repository_owner }}/ygt-backend:${{ github.sha }}
+
+      # -------------------------------------------------------
+      # Fetch the backend's stable FQDN so we can bake it into the frontend bundle
+      - name: Get backend FQDN
+        id: backend
+        run: |
+          FQDN=$(az containerapp show \
+            --name           ${{ env.BACKEND_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query          "properties.configuration.ingress.fqdn" \
+            --output         tsv)
+          echo "fqdn=$FQDN" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------
+      # NEXT_PUBLIC_* vars are baked into the bundle at build time,
+      # so the backend URL must be a --build-arg, not a runtime env var
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ygt-frontend:latest
+            ghcr.io/${{ github.repository_owner }}/ygt-frontend:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://${{ steps.backend.outputs.fqdn }}/api/v1
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      - name: Update frontend container app
+        run: |
+          az containerapp update \
+            --name            ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group  ${{ env.RESOURCE_GROUP }} \
+            --image           ghcr.io/${{ github.repository_owner }}/ygt-frontend:${{ github.sha }}
+
+      # -------------------------------------------------------
+      - name: Print deployed URLs
+        run: |
+          BACKEND_URL="https://${{ steps.backend.outputs.fqdn }}"
+          FRONTEND_URL=$(az containerapp show \
+            --name           ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query          "properties.configuration.ingress.fqdn" \
+            --output         tsv)
+          echo "Backend:   $BACKEND_URL"
+          echo "Frontend:  https://$FRONTEND_URL"
