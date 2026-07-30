@@ -50,6 +50,7 @@ import {
 } from "@/lib/ui";
 import TalentAvatar from "@/components/TalentAvatar";
 import BookingReviewForm from "@/components/BookingReviewForm";
+import MediaCard from "@/components/MediaCard";
 
 function parseSkills(raw: string): string[] {
   return raw
@@ -118,6 +119,7 @@ export default function TalentDashboard() {
       <SocialLinksCard profile={profile} onUpdated={setProfile} token={token!} />
       <AttributesCard profile={profile} onUpdated={setProfile} token={token!} />
       <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
+      <MediaGalleryCard profile={profile} />
       <AddMediaForm
         token={token!}
         profile={profile}
@@ -1293,6 +1295,22 @@ function CreditsCard({
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function MediaGalleryCard({ profile }: { profile: TalentProfile }) {
+  if (profile.media.length === 0) return null;
+
+  return (
+    <section className={sectionClass}>
+      <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Your auditions</h2>
+      <p className="mt-1 text-sm text-zinc-500">Preview and play back what you&apos;ve added so far.</p>
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {profile.media.map((m) => (
+          <MediaCard key={m.id} media={m} />
+        ))}
+      </div>
     </section>
   );
 }

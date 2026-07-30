@@ -63,6 +63,23 @@ def test_talent_reviews_recruiter(client, talent_headers, talent_profile, recrui
     assert resp.json()[0]["rating"] == 4
 
 
+def test_recruiter_reviews_visible_publicly(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+    booking = create_accepted_booking(client, talent_headers, talent_profile, recruiter_headers)
+    client.post(
+        f"/api/v1/bookings/{booking['id']}/reviews",
+        json={"rating": 4, "comment": "Professional and on time"},
+        headers=talent_headers,
+    )
+
+    resp = client.get(f"/api/v1/recruiters/{recruiter_profile['id']}/reviews")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["review_count"] == 1
+    assert body["average_rating"] == 4.0
+    assert body["reviews"][0]["comment"] == "Professional and on time"
+    assert body["reviews"][0]["reviewer_name"] == talent_profile["display_name"]
+
+
 def test_average_rating_across_multiple_reviews(client, db_session, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
     from tests.conftest import auth_headers, register_and_verify
 

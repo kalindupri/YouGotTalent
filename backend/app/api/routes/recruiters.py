@@ -7,11 +7,12 @@ from app.api.deps import get_current_recruiter_profile, require_recruiter
 from app.crud.casting_call import get_recruiter_analytics
 from app.crud.recruiter_profile import (
     create_recruiter_profile,
+    get_recruiter_profile,
     get_recruiter_profile_by_user,
     request_verification,
     set_tier,
 )
-from app.crud.review import list_reviews_for_recruiter
+from app.crud.review import get_recruiter_review_summary, list_reviews_for_recruiter
 from app.crud.saved_search import create_saved_search, delete_saved_search, get_saved_search, list_saved_searches
 from app.crud.saved_talent import list_saved_talents
 from app.db.session import get_db
@@ -19,7 +20,7 @@ from app.models.recruiter_profile import RecruiterProfile
 from app.models.user import User
 from app.schemas.analytics import RecruiterAnalytics
 from app.schemas.recruiter_profile import RecruiterProfileCreate, RecruiterProfileRead
-from app.schemas.review import ReviewRead
+from app.schemas.review import RecruiterReviewSummary, ReviewRead
 from app.schemas.saved_search import SavedSearchCreate, SavedSearchRead
 from app.schemas.talent_profile import TalentProfileRead
 
@@ -122,3 +123,21 @@ def delete_my_saved_search(
     if saved_search is None or saved_search.recruiter_id != recruiter.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saved search not found")
     delete_saved_search(db, saved_search)
+
+
+# These two routes must stay below every /me* route above — {recruiter_id} would otherwise
+# swallow "/me" as an invalid UUID path param before the literal route gets a chance to match.
+@router.get("/{recruiter_id}", response_model=RecruiterProfileRead)
+def get_recruiter(recruiter_id: uuid.UUID, db: Session = Depends(get_db)):
+    profile = get_recruiter_profile(db, recruiter_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruiter profile not found")
+    return profile
+
+
+@router.get("/{recruiter_id}/reviews", response_model=RecruiterReviewSummary)
+def get_recruiter_reviews(recruiter_id: uuid.UUID, db: Session = Depends(get_db)):
+    profile = get_recruiter_profile(db, recruiter_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruiter profile not found")
+    return get_recruiter_review_summary(db, recruiter_id)

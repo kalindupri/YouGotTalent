@@ -9,6 +9,7 @@ import {
   CastingCall,
   RecruiterAnalytics,
   RecruiterProfile,
+  RecruiterType,
   Review,
   SavedSearch,
   TALENT_CATEGORIES,
@@ -29,7 +30,9 @@ import {
   formatCategory,
   inputClass,
   labelClass,
+  neutralBadgeClass,
   premiumBadgeClass,
+  recruiterTypeLabel,
   sectionClass,
   statusTone,
   verifiedBadgeClass,
@@ -103,26 +106,32 @@ export default function RecruiterDashboard() {
   return (
     <div className="flex flex-col gap-6">
       <section className={sectionClass}>
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-rose-600 text-lg font-black text-white">
-            {profile.company_name.slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">{profile.company_name}</h2>
-              {profile.is_verified && (
-                <span className={verifiedBadgeClass}>
-                  <ShieldCheck className="h-3 w-3" /> Verified
-                </span>
-              )}
-              {profile.tier === "premium" && (
-                <span className={premiumBadgeClass}>
-                  <Crown className="h-3 w-3" fill="currentColor" strokeWidth={0} /> Premium
-                </span>
-              )}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-rose-600 text-lg font-black text-white">
+              {profile.company_name.slice(0, 2).toUpperCase()}
             </div>
-            {profile.industry && <p className="mt-0.5 text-sm text-zinc-500">{profile.industry}</p>}
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">{profile.company_name}</h2>
+                <span className={neutralBadgeClass}>{recruiterTypeLabel(profile.recruiter_type)}</span>
+                {profile.is_verified && (
+                  <span className={verifiedBadgeClass}>
+                    <ShieldCheck className="h-3 w-3" /> Verified
+                  </span>
+                )}
+                {profile.tier === "premium" && (
+                  <span className={premiumBadgeClass}>
+                    <Crown className="h-3 w-3" fill="currentColor" strokeWidth={0} /> Premium
+                  </span>
+                )}
+              </div>
+              {profile.industry && <p className="mt-0.5 text-sm text-zinc-500">{profile.industry}</p>}
+            </div>
           </div>
+          <Link href={`/recruiters/${profile.id}`} className={btnSmall}>
+            View public page
+          </Link>
         </div>
       </section>
 
@@ -542,6 +551,7 @@ function CreateRecruiterProfileForm({
   token: string;
   onCreated: (p: RecruiterProfile) => void;
 }) {
+  const [recruiterType, setRecruiterType] = useState<RecruiterType>("agency");
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -553,7 +563,7 @@ function CreateRecruiterProfileForm({
     setSubmitting(true);
     try {
       const profile = await api.createMyRecruiterProfile(
-        { company_name: companyName, industry: industry || undefined },
+        { company_name: companyName, recruiter_type: recruiterType, industry: industry || undefined },
         token
       );
       onCreated(profile);
@@ -569,8 +579,24 @@ function CreateRecruiterProfileForm({
       <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Set up your organizer profile</h2>
       <p className="mt-1 text-sm text-zinc-500">This is required before you can post talent hunts.</p>
       <form onSubmit={handleSubmit} className="mt-5 flex max-w-md flex-col gap-4">
+        <fieldset className="grid grid-cols-2 gap-2">
+          {(["individual", "agency"] as const).map((t) => (
+            <button
+              type="button"
+              key={t}
+              onClick={() => setRecruiterType(t)}
+              className={`rounded-md border-2 px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                recruiterType === t
+                  ? "border-rose-600 bg-rose-600 text-white"
+                  : "border-zinc-200 text-zinc-700 hover:border-rose-300 hover:bg-rose-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </fieldset>
         <label className={labelClass}>
-          Company / agency name
+          {recruiterType === "individual" ? "Your name" : "Company / agency name"}
           <input required value={companyName} onChange={(e) => setCompanyName(e.target.value)} className={inputClass} />
         </label>
         <label className={labelClass}>

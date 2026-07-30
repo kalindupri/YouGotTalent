@@ -27,3 +27,9 @@ class TalentReviewSummary(BaseModel):
     average_rating: float | None
     review_count: int
     reviews: list[ReviewRead]
+
+
+class RecruiterReviewSummary(BaseModel):
+    average_rating: float | None
+    review_count: int
+    reviews: list[ReviewRead]

@@ -77,6 +77,13 @@ export const premiumBadgeClass =
 export const verifiedBadgeClass =
   "inline-flex items-center gap-1 rounded-sm bg-blue-600 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white";
 
+export const neutralBadgeClass =
+  "inline-flex items-center gap-1 rounded-sm bg-zinc-100 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+
+export function recruiterTypeLabel(recruiterType: string): string {
+  return recruiterType === "individual" ? "Individual" : "Agency";
+}
+
 export function statusTone(status: string): "neutral" | "success" | "warning" | "info" {
   if (status === "open" || status === "accepted") return "success";
   if (status === "shortlisted") return "info";

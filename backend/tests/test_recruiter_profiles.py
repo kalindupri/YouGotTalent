@@ -9,6 +9,36 @@ def test_create_recruiter_profile(client, recruiter_headers):
     assert body["company_name"] == "Panthera Model Management"
     assert body["tier"] == "free"
     assert body["is_verified"] is False
+    assert body["recruiter_type"] == "agency"
+
+
+def test_create_individual_recruiter_profile(client, recruiter_headers):
+    resp = client.post(
+        "/api/v1/recruiters/me",
+        json={"company_name": "Nadeesha Perera", "recruiter_type": "individual"},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["recruiter_type"] == "individual"
+
+
+def test_get_recruiter_public_profile(client, recruiter_headers):
+    created = client.post(
+        "/api/v1/recruiters/me",
+        json={"company_name": "Solo Casting", "recruiter_type": "individual"},
+        headers=recruiter_headers,
+    ).json()
+
+    resp = client.get(f"/api/v1/recruiters/{created['id']}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["company_name"] == "Solo Casting"
+    assert body["recruiter_type"] == "individual"
+
+
+def test_get_recruiter_public_profile_unknown_id_404(client):
+    resp = client.get("/api/v1/recruiters/00000000-0000-0000-0000-000000000000")
+    assert resp.status_code == 404
 
 
 def test_create_recruiter_profile_twice_rejected(client, recruiter_headers):

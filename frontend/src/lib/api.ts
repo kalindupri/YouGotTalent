@@ -136,10 +136,13 @@ export interface TalentProfileInput {
   job_alert_emails?: boolean;
 }
 
+export type RecruiterType = "individual" | "agency";
+
 export interface RecruiterProfile {
   id: string;
   user_id: string;
   company_name: string;
+  recruiter_type: RecruiterType;
   industry: string | null;
   is_verified: boolean;
   verification_requested_at: string | null;
@@ -270,6 +273,12 @@ export interface Review {
 }
 
 export interface TalentReviewSummary {
+  average_rating: number | null;
+  review_count: number;
+  reviews: Review[];
+}
+
+export interface RecruiterReviewSummary {
   average_rating: number | null;
   review_count: number;
   reviews: Review[];
@@ -501,9 +510,11 @@ export const api = {
   deleteMyCredit: (creditId: string, token: string) =>
     request<void>(`/talents/me/credits/${creditId}`, { method: "DELETE" }, token),
 
-  createMyRecruiterProfile: (data: { company_name: string; industry?: string }, token: string) =>
+  createMyRecruiterProfile: (data: { company_name: string; recruiter_type?: RecruiterType; industry?: string }, token: string) =>
     request<RecruiterProfile>("/recruiters/me", { method: "POST", body: JSON.stringify(data) }, token),
   getMyRecruiterProfile: (token: string) => request<RecruiterProfile>("/recruiters/me", {}, token),
+  getRecruiter: (id: string) => request<RecruiterProfile>(`/recruiters/${id}`),
+  getRecruiterReviews: (id: string) => request<RecruiterReviewSummary>(`/recruiters/${id}/reviews`),
   requestRecruiterVerification: (token: string) =>
     request<RecruiterProfile>("/recruiters/me/request-verification", { method: "POST" }, token),
   upgradeRecruiterTier: (token: string) => request<RecruiterProfile>("/recruiters/me/upgrade", { method: "POST" }, token),

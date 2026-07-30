@@ -4,7 +4,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, Clapperboard, Paperclip, Star } from "lucide-react";
-import { ApiError, CastingCall, CastingCallRole, api } from "@/lib/api";
+import { ApiError, CastingCall, CastingCallRole, RecruiterProfile, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import CategoryIcon from "@/components/CategoryIcon";
 import FollowRecruiterButton from "@/components/FollowRecruiterButton";
@@ -34,6 +34,7 @@ function CastingCallDetailContent() {
   const { user, token } = useAuth();
 
   const [call, setCall] = useState<CastingCall | null>(null);
+  const [recruiter, setRecruiter] = useState<RecruiterProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState(searchParams.get("role") ?? "");
   const [message, setMessage] = useState("");
@@ -48,6 +49,7 @@ function CastingCallDetailContent() {
       .then((c) => {
         setCall(c);
         setSelectedRoleId((prev) => prev || c.roles[0]?.id || "");
+        api.getRecruiter(c.recruiter_id).then(setRecruiter).catch(() => {});
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this casting call."));
     api.trackCastingCallView(params.id).catch(() => {});
@@ -106,6 +108,14 @@ function CastingCallDetailContent() {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className={categoryBadgeClass(call.category)}>{formatCategory(call.category)}</span>
         <span className="text-sm text-zinc-500">{call.location || "Worldwide"}</span>
+        {recruiter && (
+          <span className="text-sm text-zinc-500">
+            · Posted by{" "}
+            <Link href={`/recruiters/${recruiter.id}`} className="font-semibold text-rose-600 hover:underline">
+              {recruiter.company_name}
+            </Link>
+          </span>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-sm text-zinc-600 dark:text-zinc-400">

@@ -51,3 +51,9 @@ def get_talent_review_summary(db: Session, talent_id: uuid.UUID) -> dict:
     reviews = list_reviews_for_talent(db, talent_id)
     average = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else None
     return {"average_rating": average, "review_count": len(reviews), "reviews": reviews}
+
+
+def get_recruiter_review_summary(db: Session, recruiter_id: uuid.UUID) -> dict:
+    reviews = list_reviews_for_recruiter(db, recruiter_id)
+    average = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else None
+    return {"average_rating": average, "review_count": len(reviews), "reviews": reviews}
