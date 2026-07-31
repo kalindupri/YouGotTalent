@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouGotTalent — Product Overview</title>
+<style>
+  :root {
+    --ink: #121214;
+    --ink-soft: #52525b;
+    --ink-faint: #8a8a92;
+    --paper: #faf9f7;
+    --paper-raised: #ffffff;
+    --paper-sunk: #f1efec;
+    --line: #e7e5e4;
+    --accent: #e11d48;
+    --accent-fill: #e11d48;
+    --accent-fill-ink: #ffffff;
+    --accent-soft-bg: #fff1f2;
+    --accent-soft-text: #9f1239;
+    --cover-bg: #121214;
+    --cover-ink: #f7f6f4;
+    --cover-ink-soft: #a8a8ae;
+    --shadow: 0 1px 2px rgba(18,18,20,0.04), 0 8px 24px rgba(18,18,20,0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f0;
+      --ink-soft: #b0b0b6;
+      --ink-faint: #77777d;
+      --paper: #0b0b0d;
+      --paper-raised: #15161a;
+      --paper-sunk: #1c1d21;
+      --line: #2b2c30;
+      --accent: #fb7185;
+      --accent-fill: #fb7185;
+      --accent-fill-ink: #1a0508;
+      --accent-soft-bg: #2a1418;
+      --accent-soft-text: #fda4af;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #f2f2f0;
+    --ink-soft: #b0b0b6;
+    --ink-faint: #77777d;
+    --paper: #0b0b0d;
+    --paper-raised: #15161a;
+    --paper-sunk: #1c1d21;
+    --line: #2b2c30;
+    --accent: #fb7185;
+    --accent-fill: #fb7185;
+    --accent-fill-ink: #1a0508;
+    --accent-soft-bg: #2a1418;
+    --accent-soft-text: #fda4af;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --ink: #121214;
+    --ink-soft: #52525b;
+    --ink-faint: #8a8a92;
+    --paper: #faf9f7;
+    --paper-raised: #ffffff;
+    --paper-sunk: #f1efec;
+    --line: #e7e5e4;
+    --accent: #e11d48;
+    --accent-fill: #e11d48;
+    --accent-fill-ink: #ffffff;
+    --accent-soft-bg: #fff1f2;
+    --accent-soft-text: #9f1239;
+    --shadow: 0 1px 2px rgba(18,18,20,0.04), 0 8px 24px rgba(18,18,20,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: var(--accent-fill-ink); }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .display {
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .eyebrow {
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 800;
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+  .prose-wrap { max-width: 760px; margin: 0 auto; padding: 0 28px; }
+
+  /* ---------- top nav ---------- */
+  .topnav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topnav-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 28px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topnav-inner::-webkit-scrollbar { display: none; }
+  .topnav-brand {
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 900;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+  .topnav-links { display: flex; gap: 18px; white-space: nowrap; }
+  .topnav-links a {
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .topnav-links a:hover { color: var(--accent); }
+
+  /* ---------- cover ---------- */
+  .cover {
+    background: var(--cover-bg);
+    color: var(--cover-ink);
+    padding: 72px 0 64px;
+    border-bottom: 1px solid var(--line);
+  }
+  .cover-meta {
+    color: var(--cover-ink-soft);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  .cover-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 48px;
+    align-items: end;
+  }
+  .cover h1 {
+    margin: 0;
+    color: var(--cover-ink);
+    font-size: clamp(2.6rem, 6vw, 4.4rem);
+    line-height: 0.98;
+  }
+  .cover h1 span { color: #fb7185; }
+  .cover p.dek {
+    margin: 22px 0 0;
+    max-width: 46ch;
+    color: var(--cover-ink-soft);
+    font-size: 1.05rem;
+    line-height: 1.6;
+    font-weight: 400;
+  }
+  .stat-rail {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .stat {
+    background: var(--cover-bg);
+    padding: 18px 20px;
+  }
+  .stat .n {
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 900;
+    font-size: 1.9rem;
+    color: #fb7185;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .stat .l {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: var(--cover-ink-soft);
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- section shell ---------- */
+  section.area { padding: 64px 0; border-bottom: 1px solid var(--line); }
+  section.area:last-of-type { border-bottom: none; }
+  .area-head { max-width: 700px; margin-bottom: 36px; }
+  .area-head .eyebrow { color: var(--accent); margin-bottom: 10px; display: block; }
+  .area-head h2 {
+    margin: 0;
+    font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+    color: var(--ink);
+  }
+  .area-head p {
+    margin: 12px 0 0;
+    color: var(--ink-soft);
+    font-size: 1rem;
+    max-width: 62ch;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h3 {
+    margin: 0 0 8px;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+  .card p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+  .card .path {
+    display: inline-block;
+    margin-top: 12px;
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--paper-sunk);
+    color: var(--ink-faint);
+    border: 1px solid var(--line);
+  }
+  .card .tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--accent-soft-bg);
+    color: var(--accent-soft-text);
+    margin-bottom: 10px;
+  }
+
+  /* ---------- pricing note ---------- */
+  .callout {
+    margin-top: 28px;
+    padding: 18px 22px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    background: var(--paper-sunk);
+    border-radius: 0 4px 4px 0;
+  }
+  .callout p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+  .callout strong { color: var(--ink); }
+
+  /* ---------- tech section ---------- */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .tech-chip {
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    border-radius: 4px;
+    padding: 12px 14px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+  }
+  .tech-chip b { color: var(--ink); display: block; font-size: 0.85rem; margin-bottom: 2px; font-weight: 700;}
+
+  .sitemap-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 24px;
+    margin-top: 8px;
+  }
+  .sitemap-cols h4 {
+    margin: 0 0 10px;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 800;
+  }
+  .sitemap-cols ul { margin: 0; padding: 0; list-style: none; }
+  .sitemap-cols li {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    padding: 5px 0;
+    border-bottom: 1px dotted var(--line);
+  }
+
+  /* ---------- roadmap ---------- */
+  .road-list { display: flex; flex-direction: column; gap: 2px; }
+  .road-item {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 18px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: start;
+  }
+  .road-item:last-child { border-bottom: none; }
+  .road-status {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    text-align: center;
+    height: fit-content;
+    background: var(--accent-soft-bg);
+    color: var(--accent-soft-text);
+  }
+  .road-item h4 { margin: 0 0 4px; font-size: 0.95rem; color: var(--ink); }
+  .road-item p { margin: 0; color: var(--ink-soft); font-size: 0.88rem; }
+
+  footer {
+    padding: 40px 0 60px;
+    text-align: center;
+  }
+  footer p { margin: 0; color: var(--ink-faint); font-size: 0.8rem; }
+
+  @media (max-width: 760px) {
+    .cover-grid { grid-template-columns: 1fr; gap: 32px; }
+    .stat-rail { grid-template-columns: 1fr 1fr; }
+    section.area { padding: 44px 0; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a class="topnav-brand" href="#top">YOUGOTTALENT</a>
+    <div class="topnav-links">
+      <a href="#talent">Talent</a>
+      <a href="#recruiters">Recruiters</a>
+      <a href="#casting">Casting</a>
+      <a href="#messaging">Messaging &amp; Bookings</a>
+      <a href="#community">Community</a>
+      <a href="#trust">Trust &amp; Safety</a>
+      <a href="#billing">Billing</a>
+      <a href="#admin">Admin</a>
+      <a href="#tech">Under the hood</a>
+      <a href="#roadmap">Roadmap</a>
+    </div>
+  </div>
+</nav>
+
+<div id="top"></div>
+<header class="cover">
+  <div class="wrap">
+    <div class="cover-meta">Internal product overview · For team review &amp; investor discussion</div>
+    <div class="cover-grid">
+      <div>
+        <h1 class="display">You Got<br><span>Talent.</span></h1>
+        <p class="dek">A marketplace where Sri Lankan creative talent — actors, singers, dancers, painters, writers, photographers, musicians, and more — build a profile and get discovered, and where productions post talent hunts and find exactly who they need.</p>
+      </div>
+      <div class="stat-rail">
+        <div class="stat"><div class="n">25</div><div class="l">data models</div></div>
+        <div class="stat"><div class="n">30</div><div class="l">pages shipped</div></div>
+        <div class="stat"><div class="n">15</div><div class="l">API route groups</div></div>
+        <div class="stat"><div class="n">3</div><div class="l">payment gateways</div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="area" id="talent">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">For talent</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Build a profile, get discovered</h2>
+        <p>Any creative category — not just modeling. Acting, singing, dancing, painting, script writing, photography, music, choreography, comedy, voice over, direction, design, and more, each with its own relevant profile fields.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>Portfolio &amp; audition media</h3>
+          <p>Photos, videos, audio, or documents — with video/audio automatically compressed on upload to keep storage costs down. Plus a dedicated intro video and a cover photo.</p>
+          <span class="path mono">/talents/[id]</span>
+        </div>
+        <div class="card">
+          <h3>Category-specific attributes</h3>
+          <p>An actor's height/build/eye colour has no equivalent for a script writer — each category gets its own structured detail fields and a tailored "special skills" question.</p>
+        </div>
+        <div class="card">
+          <h3>Credits &amp; experience history</h3>
+          <p>A résumé of past projects (film, TV, theatre, commercial, voice, music, event, online) that shows up right on the public profile.</p>
+        </div>
+        <div class="card">
+          <h3>Verification badge</h3>
+          <p>Talent can request verification; admins review the queue and approve or reject — a visible trust signal on search results and profiles.</p>
+        </div>
+        <div class="card">
+          <h3>Premium tier</h3>
+          <p>Free tier has sensible limits (3 portfolio items, 1 audition video); Premium unlocks unlimited items, 5 videos, boosted search placement, and verification priority.</p>
+        </div>
+        <div class="card">
+          <h3>Availability &amp; bookings</h3>
+          <p>Talent sets weekly availability windows; recruiters book engagements directly against open slots.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="recruiters">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">For recruiters &amp; productions</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Find exactly who you need</h2>
+        <p>Individuals and agencies alike post talent hunts, search the full talent pool, and run their hiring pipeline without leaving the platform.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>Advanced talent search</h3>
+          <p>Filter by category, city, keyword, experience range, and verified-only — ranked by relevance, not just recency.</p>
+          <span class="path mono">/talents</span>
+        </div>
+        <div class="card">
+          <h3>Saved searches with alerts</h3>
+          <p>Save a filter set once; get notified by email when new talent matching it joins.</p>
+        </div>
+        <div class="card">
+          <h3>Shortlisting</h3>
+          <p>Bookmark promising talent to a private saved list, separate from any specific casting call.</p>
+        </div>
+        <div class="card">
+          <h3>Direct invitations</h3>
+          <p>Invite a specific talent to apply or audition for a role, rather than waiting for them to find the listing.</p>
+        </div>
+        <div class="card">
+          <h3>Applicant tracking board</h3>
+          <p>Every application to a posting in one board — shortlist, reject, or accept, per role.</p>
+          <span class="path mono">/dashboard/casting-calls/[id]</span>
+        </div>
+        <div class="card">
+          <h3>Recruiter analytics</h3>
+          <p>Views, applications, and response rate per posting — a read on what's actually working.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="casting">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">The core loop</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Casting calls &amp; applications</h2>
+        <p>A single posting can carry several distinct roles at once — a feature film casting call might need three different characters, each tracked and applied to separately.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>Multi-role postings</h3>
+          <p>Each role has its own criteria and compensation; applicants apply to a specific role, not the posting as a whole.</p>
+        </div>
+        <div class="card">
+          <h3>Rich posting detail</h3>
+          <p>Audition brief (what to perform), shoot dates &amp; locations, compensation, application deadline, and free-text tags for discovery.</p>
+        </div>
+        <div class="card">
+          <h3>Apply with upload</h3>
+          <p>Submit an application with an optional file upload or external submission link, tracked through pending → shortlisted → accepted/rejected.</p>
+        </div>
+        <div class="card">
+          <h3>Featured &amp; view-tracked</h3>
+          <p>Premium recruiters get automatic "Featured" placement; every posting tracks its own view count.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="messaging">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">Once you're in touch</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Messaging &amp; bookings</h2>
+        <p>The relationship doesn't end at "applied" — talent and recruiters can talk, schedule, and rate each other afterward.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>Direct messaging</h3>
+          <p>1:1 conversations between a talent and a recruiter, optionally tied to a specific casting call, with read receipts and an unread badge in the header.</p>
+          <span class="path mono">/messages</span>
+        </div>
+        <div class="card">
+          <h3>Scheduled bookings</h3>
+          <p>Book an engagement against a talent's open availability, with a response/cancel flow and an agreement-status field.</p>
+        </div>
+        <div class="card">
+          <h3>Post-booking reviews</h3>
+          <p>Either side can rate and comment after a booking completes — a reputation layer independent of the casting-call system.</p>
+        </div>
+        <div class="card">
+          <h3>Follows</h3>
+          <p>Talent can follow a recruiter or agency to keep an eye on their future postings.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="community">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">Newest addition — growth play</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Community: rate, critique, discuss</h2>
+        <p>Sri Lanka doesn't have a strong home-grown film/TV/song rating &amp; critique site. Built to fill that gap and pull in visitors who aren't here to hire or be hired yet — open to browse, login required to contribute.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <span class="tag">Rate &amp; critique</span>
+          <h3>Film / TV / song catalog</h3>
+          <p>Anyone with an account (talent or recruiter) can add a title and rate it 1–5 stars with an optional written critique.</p>
+          <span class="path mono">/community/titles</span>
+        </div>
+        <div class="card">
+          <span class="tag">Rate &amp; critique</span>
+          <h3>IMDb-style score display</h3>
+          <p>Poster grid, top-rated/newest/most-reviewed sorting, and a detail page with a big aggregate score plus a full 5-to-1-star rating breakdown.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Discussions</span>
+          <h3>Industry discussion board</h3>
+          <p>Threaded discussions tagged Films, TV, Music, Industry News, or General — optionally linked to a specific catalog title.</p>
+          <span class="path mono">/community/discussions</span>
+        </div>
+        <div class="card">
+          <span class="tag">Discussions</span>
+          <h3>Author attribution</h3>
+          <p>Every post shows the author's real talent or recruiter identity and role — no anonymous drive-by content.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="trust">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">Keeping the platform clean</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Trust &amp; safety</h2>
+        <p>One moderation system, reused everywhere — a profile, a posting, a message, a title, a critique, a discussion thread, or a reply can all be reported through the same flow.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>User-submitted reports</h3>
+          <p>A report button on reportable content, plus a separate bug-report path for site issues — both land in one admin queue.</p>
+        </div>
+        <div class="card">
+          <h3>Verification queues</h3>
+          <p>Separate approve/reject queues for talent and recruiter verification requests.</p>
+        </div>
+        <div class="card">
+          <h3>One-click content removal</h3>
+          <p>Admins can delete the exact reported item — a title, a critique, a thread, a reply — directly from the report, no separate hunt needed.</p>
+        </div>
+        <div class="card">
+          <h3>Discord alerts</h3>
+          <p>New reports and unhandled application errors post straight to a Discord channel, so nothing waits for someone to check a dashboard.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="billing">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">How the business makes money</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Billing &amp; subscriptions</h2>
+        <p>A free tier that's genuinely usable, and a premium tier priced to convert early — with the pricing machinery built to change over time without ever surprising an existing subscriber.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>Founding-member pricing</h3>
+          <p>Currently LKR 490/mo for talent, LKR 1,500/mo for recruiters (10 months charged annually — "2 months free").</p>
+          <span class="path mono">/pricing</span>
+        </div>
+        <div class="card">
+          <h3>Admin-configurable, versioned</h3>
+          <p>Admins change the current price from the dashboard, with a full history of every change and who made it.</p>
+          <span class="path mono">/admin/pricing</span>
+        </div>
+        <div class="card">
+          <h3>Cancel anytime, no surprises</h3>
+          <p>Access continues through the period already paid for; a one-time 10%-off-for-3-months offer is shown before a cancellation is finalized, and the reason is recorded.</p>
+        </div>
+        <div class="card">
+          <h3>Failed-payment handling</h3>
+          <p>A grace period with a reminder email before quietly downgrading to free — no account gets cut off mid-cycle without warning.</p>
+        </div>
+        <div class="card">
+          <h3>Pluggable payment gateway</h3>
+          <p>Mock for local testing, PayHere for Sri Lankan LKR payments today, Stripe wired in and ready for international expansion.</p>
+        </div>
+        <div class="card">
+          <h3>Full payment ledger</h3>
+          <p>Every charge and failure is recorded per subscriber — visible to that subscriber as billing history, and to admins in the subscriptions view.</p>
+        </div>
+      </div>
+      <div class="callout">
+        <p><strong>The one guarantee we built in on purpose:</strong> a subscriber's price is locked in at the moment they sign up and never changes for them, even if we raise prices later for new signups. Verified by test and by hand before this was ever shipped.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="admin">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">Running the platform</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">A real admin console</h2>
+        <p>Split entirely away from the public site — its own URL, its own sidebar, no public header or navigation — so day-to-day operations never feel bolted onto the customer-facing product.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h3>Overview</h3><p>Platform-wide counts at a glance.</p><span class="path mono">/admin</span></div>
+        <div class="card"><h3>Users</h3><p>Search, inspect, suspend, or reactivate any account.</p><span class="path mono">/admin/users</span></div>
+        <div class="card"><h3>Verification</h3><p>Approve or reject pending badge requests.</p><span class="path mono">/admin/verification</span></div>
+        <div class="card"><h3>Talent hunts</h3><p>Moderate postings; close or reopen any listing.</p><span class="path mono">/admin/casting-calls</span></div>
+        <div class="card"><h3>Community</h3><p>Browse and remove any title, critique, thread, or reply directly.</p><span class="path mono">/admin/community</span></div>
+        <div class="card"><h3>Reports</h3><p>The unified moderation queue, with one-click content removal.</p><span class="path mono">/admin/reports</span></div>
+        <div class="card"><h3>Subscriptions</h3><p>Every subscriber, their payment history, and a manual dunning-sweep trigger.</p><span class="path mono">/admin/subscriptions</span></div>
+        <div class="card"><h3>Pricing</h3><p>Set current prices and review the full change history.</p><span class="path mono">/admin/pricing</span></div>
+        <div class="card"><h3>Financial</h3><p>Real vs. projected monthly revenue, and why customers cancel.</p><span class="path mono">/admin/financial</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="tech">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">For the technically curious</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Under the hood</h2>
+        <p>Nothing exotic — a conventional, well-tested stack chosen for speed of iteration and low hosting cost while pre-launch.</p>
+      </div>
+      <div class="tech-grid">
+        <div class="tech-chip"><b>FastAPI</b>Python backend</div>
+        <div class="tech-chip"><b>SQLAlchemy 2.0</b>ORM + Alembic migrations</div>
+        <div class="tech-chip"><b>PostgreSQL</b>primary database</div>
+        <div class="tech-chip"><b>Next.js 16</b>App Router frontend</div>
+        <div class="tech-chip"><b>TypeScript</b>end-to-end typed</div>
+        <div class="tech-chip"><b>Tailwind CSS</b>design system</div>
+        <div class="tech-chip"><b>Docker</b>local dev &amp; deploy image</div>
+        <div class="tech-chip"><b>Azure Container Apps</b>hosting</div>
+        <div class="tech-chip"><b>JWT auth</b>OAuth2 password flow</div>
+        <div class="tech-chip"><b>Azure Blob Storage</b>media, w/ local fallback</div>
+        <div class="tech-chip"><b>PayHere + Stripe</b>payment gateways</div>
+        <div class="tech-chip"><b>Discord webhooks</b>error &amp; report alerts</div>
+      </div>
+
+      <div style="margin-top:40px;">
+        <h4 style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:800;margin-bottom:14px;">Full site map</h4>
+        <div class="sitemap-cols">
+          <div><h4>Public &amp; auth</h4><ul>
+            <li>/</li><li>/pricing</li><li>/login</li><li>/register</li>
+            <li>/forgot-password</li><li>/reset-password</li>
+          </ul></div>
+          <div><h4>Talent &amp; recruiters</h4><ul>
+            <li>/talents</li><li>/talents/[id]</li><li>/recruiters/[id]</li>
+            <li>/casting-calls</li><li>/casting-calls/[id]</li>
+          </ul></div>
+          <div><h4>Messaging &amp; dashboard</h4><ul>
+            <li>/messages</li><li>/messages/[id]</li><li>/dashboard</li>
+            <li>/dashboard/casting-calls/[id]</li><li>/billing/success</li>
+          </ul></div>
+          <div><h4>Community</h4><ul>
+            <li>/community</li><li>/community/titles</li><li>/community/titles/new</li>
+            <li>/community/titles/[id]</li><li>/community/discussions</li>
+            <li>/community/discussions/new</li><li>/community/discussions/[id]</li>
+          </ul></div>
+          <div><h4>Admin</h4><ul>
+            <li>/admin</li><li>/admin/users</li><li>/admin/verification</li>
+            <li>/admin/casting-calls</li><li>/admin/community</li><li>/admin/reports</li>
+            <li>/admin/subscriptions</li><li>/admin/pricing</li><li>/admin/financial</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="area" id="roadmap">
+    <div class="wrap">
+      <div class="area-head">
+        <span class="eyebrow">Worth raising in the room</span>
+        <h2 class="display" style="text-transform:none;font-weight:800;">Roadmap &amp; open questions</h2>
+        <p>Not gaps hiding from anyone — the honest list of what's next, useful for a brainstorm or an investor conversation about where funding or headcount would go first.</p>
+      </div>
+      <div class="road-list">
+        <div class="road-item">
+          <span class="road-status">Blocked</span>
+          <div><h4>Automatic deploys</h4><p>The CI/CD pipeline is built but blocked on a one-time GitHub permissions grant — deploys are manual until then.</p></div>
+        </div>
+        <div class="road-item">
+          <span class="road-status">Gap</span>
+          <div><h4>Stripe pricing isn't versioned</h4><p>The Sri Lanka (PayHere) pricing path has full grandfathering; the international Stripe path doesn't yet — a real decision point before expanding beyond Sri Lanka.</p></div>
+        </div>
+        <div class="road-item">
+          <span class="road-status">Compliance</span>
+          <div><h4>Guardian consent for minors</h4><p>Under-18 talent submitting auditions will need a guardian-consent flow before this can be publicly marketed — flagged since the first PDPA review.</p></div>
+        </div>
+        <div class="road-item">
+          <span class="road-status">Discuss</span>
+          <div><h4>What's the growth wedge?</h4><p>Community (rate &amp; critique) exists specifically to bring in visitors who aren't yet looking to hire or be hired. Worth a real conversation on how hard to lean into it versus the core marketplace.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>Internal document — built for team review and investor conversation, not public distribution.</p>
+</footer>
+
+</body>
+</html>
