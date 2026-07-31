@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouGotTalent — Screen-by-Screen Walkthrough</title>
+<style>
+  :root {
+    --ink: #121214;
+    --ink-soft: #52525b;
+    --ink-faint: #8a8a92;
+    --paper: #faf9f7;
+    --paper-raised: #ffffff;
+    --paper-sunk: #f1efec;
+    --line: #e7e5e4;
+    --accent: #e11d48;
+    --accent-soft-bg: #fff1f2;
+    --accent-soft-text: #9f1239;
+    --cover-bg: #121214;
+    --cover-ink: #f7f6f4;
+    --cover-ink-soft: #a8a8ae;
+    --chrome-bar: #efeeec;
+    --chrome-dot1: #e7e5e4;
+    --chrome-dot2: #e7e5e4;
+    --chrome-dot3: #e7e5e4;
+    --shadow: 0 1px 2px rgba(18,18,20,0.04), 0 12px 32px rgba(18,18,20,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f0;
+      --ink-soft: #b0b0b6;
+      --ink-faint: #77777d;
+      --paper: #0b0b0d;
+      --paper-raised: #15161a;
+      --paper-sunk: #1c1d21;
+      --line: #2b2c30;
+      --accent: #fb7185;
+      --accent-soft-bg: #2a1418;
+      --accent-soft-text: #fda4af;
+      --chrome-bar: #1c1d21;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 40px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #f2f2f0; --ink-soft: #b0b0b6; --ink-faint: #77777d;
+    --paper: #0b0b0d; --paper-raised: #15161a; --paper-sunk: #1c1d21; --line: #2b2c30;
+    --accent: #fb7185; --accent-soft-bg: #2a1418; --accent-soft-text: #fda4af;
+    --chrome-bar: #1c1d21; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 40px rgba(0,0,0,0.4);
+  }
+  :root[data-theme="light"] {
+    --ink: #121214; --ink-soft: #52525b; --ink-faint: #8a8a92;
+    --paper: #faf9f7; --paper-raised: #ffffff; --paper-sunk: #f1efec; --line: #e7e5e4;
+    --accent: #e11d48; --accent-soft-bg: #fff1f2; --accent-soft-text: #9f1239;
+    --chrome-bar: #efeeec; --shadow: 0 1px 2px rgba(18,18,20,0.04), 0 12px 32px rgba(18,18,20,0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: #fff; }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .display {
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .eyebrow {
+    font-weight: 800;
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 28px; }
+
+  .topnav {
+    position: sticky; top: 0; z-index: 40;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topnav-inner {
+    max-width: 980px; margin: 0 auto; padding: 0 28px; height: 52px;
+    display: flex; align-items: center; gap: 22px; overflow-x: auto; scrollbar-width: none;
+  }
+  .topnav-inner::-webkit-scrollbar { display: none; }
+  .topnav-brand { font-weight: 900; font-size: 0.8rem; color: var(--ink); white-space: nowrap; flex-shrink: 0; text-decoration: none; }
+  .topnav-links { display: flex; gap: 18px; white-space: nowrap; }
+  .topnav-links a { color: var(--ink-soft); font-size: 0.8rem; font-weight: 600; text-decoration: none; }
+  .topnav-links a:hover { color: var(--accent); }
+
+  .cover { background: var(--cover-bg); color: var(--cover-ink); padding: 60px 0 48px; border-bottom: 1px solid var(--line); }
+  .cover-meta { color: var(--cover-ink-soft); font-weight: 700; font-size: 0.6875rem; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 20px; }
+  .cover h1 { margin: 0; color: var(--cover-ink); font-size: clamp(2.2rem, 5.2vw, 3.4rem); line-height: 1.02; }
+  .cover h1 span { color: #fb7185; }
+  .cover p.dek { margin: 18px 0 0; max-width: 62ch; color: var(--cover-ink-soft); font-size: 1.05rem; }
+  .cover .count { margin-top: 22px; display: inline-flex; align-items: baseline; gap: 8px; font-size: 0.85rem; color: var(--cover-ink-soft); }
+  .cover .count b { font-size: 1.4rem; color: #fb7185; font-weight: 900; }
+
+  section.group { padding: 56px 0 8px; }
+  .group-head { margin-bottom: 8px; }
+  .group-head .eyebrow { color: var(--accent); }
+  .group-head h2 { margin: 6px 0 0; font-size: clamp(1.4rem, 2.8vw, 1.9rem); }
+  .group-head p { margin: 8px 0 0; color: var(--ink-soft); max-width: 62ch; }
+
+  .step { padding: 40px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 64px 1fr; gap: 24px; }
+  .step-num { font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace; font-weight: 800; font-size: 0.95rem; color: var(--ink-faint); padding-top: 4px; }
+  .step-body h3 { margin: 0 0 8px; font-size: 1.15rem; }
+  .step-body p.desc { margin: 0 0 18px; color: var(--ink-soft); max-width: 66ch; }
+  .step-path { display: inline-block; margin-bottom: 18px; font-size: 0.76rem; padding: 3px 9px; border-radius: 3px; background: var(--paper-sunk); color: var(--ink-faint); border: 1px solid var(--line); }
+
+  .frame {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    background: var(--paper-raised);
+  }
+  .frame-bar {
+    height: 30px;
+    background: var(--chrome-bar);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .frame-bar .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+  .frame-bar .url {
+    margin-left: 10px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 8px;
+  }
+  .frame img { display: block; width: 100%; height: auto; }
+
+  footer { padding: 40px 0 60px; text-align: center; border-top: 1px solid var(--line); margin-top: 40px; }
+  footer p { margin: 0; color: var(--ink-faint); font-size: 0.8rem; }
+
+  @media (max-width: 640px) {
+    .step { grid-template-columns: 1fr; }
+    .step-num { padding-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a class="topnav-brand" href="#top">YOUGOTTALENT</a>
+    <div class="topnav-links">
+      <a href="#getting-started">Getting started</a>
+      <a href="#talent-side">Talent side</a>
+      <a href="#recruiter-side">Recruiter side</a>
+      <a href="#community-side">Community</a>
+      <a href="#admin-side">Admin console</a>
+    </div>
+  </div>
+</nav>
+
+<div id="top"></div>
+<header class="cover">
+  <div class="wrap">
+    <div class="cover-meta">Screen-by-screen walkthrough</div>
+    <h1 class="display">Every screen<br><span>we built.</span></h1>
+    <p class="dek">A guided tour through the live app — captured straight from the running dev environment, in the order a real visitor would encounter them: landing, browsing, signing up, then each role's dashboard, and finally the admin console.</p>
+    <div class="count"><b>27</b> screens across 5 stops</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="group" id="getting-started">
+    <div class="group-head">
+      <span class="eyebrow">Stop 1 of 5</span>
+      <h2>Getting started</h2>
+      <p>What anyone sees before they've logged in — the pitch, the browse experience, and the doors in.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h3>Homepage</h3>
+        <span class="step-path mono">/</span>
+        <p class="desc">The front door. States the pitch in one line, shows live counts (talent profiles, open opportunities, skill categories), and routes straight into browsing or posting.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk</span></div><img src="screenshots/01-home.png" alt="Homepage"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h3>Browse talent</h3>
+        <span class="step-path mono">/talents</span>
+        <p class="desc">Every talent profile, filterable by category, city, keyword, experience, and verified-only — open to the public, no account required.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/talents</span></div><img src="screenshots/02-browse-talent.png" alt="Browse talent listing"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h3>Talent public profile</h3>
+        <span class="step-path mono">/talents/[id]</span>
+        <p class="desc">What a recruiter sees when they click through — portfolio media, category-specific details, credits, and (if requested and approved) a verification badge.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/talents/…</span></div><img src="screenshots/03-talent-profile.png" alt="Talent public profile"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-body">
+        <h3>Recruiter public profile</h3>
+        <span class="step-path mono">/recruiters/[id]</span>
+        <p class="desc">Talent can check out who's hiring before applying — the agency or individual's name, industry, and reputation.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/recruiters/…</span></div><img src="screenshots/04-recruiter-profile.png" alt="Recruiter public profile"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">05</div>
+      <div class="step-body">
+        <h3>Talent hunts listing</h3>
+        <span class="step-path mono">/casting-calls</span>
+        <p class="desc">Every open casting call, browsable without an account — the demand side of the marketplace.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/casting-calls</span></div><img src="screenshots/05-casting-calls.png" alt="Casting calls listing"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">06</div>
+      <div class="step-body">
+        <h3>Talent hunt detail</h3>
+        <span class="step-path mono">/casting-calls/[id]</span>
+        <p class="desc">One posting can list several distinct roles at once, each with its own criteria and its own "apply" — this one shows three.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/casting-calls/…</span></div><img src="screenshots/06-casting-call-detail.png" alt="Casting call detail"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">07</div>
+      <div class="step-body">
+        <h3>Log in</h3>
+        <span class="step-path mono">/login</span>
+        <p class="desc">Standard email/password sign-in, plus a forgot-password path.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/login</span></div><img src="screenshots/07-login.png" alt="Login page"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">08</div>
+      <div class="step-body">
+        <h3>Register</h3>
+        <span class="step-path mono">/register</span>
+        <p class="desc">Signing up picks talent or recruiter up front, since the two dashboards are completely different from here on.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/register</span></div><img src="screenshots/08-register.png" alt="Register page"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">09</div>
+      <div class="step-body">
+        <h3>Pricing</h3>
+        <span class="step-path mono">/pricing</span>
+        <p class="desc">Free vs. Premium, side by side, for both account types — prices are fetched live from the backend, not hardcoded on the page.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/pricing</span></div><img src="screenshots/09-pricing.png" alt="Pricing page"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group" id="talent-side">
+    <div class="group-head">
+      <span class="eyebrow">Stop 2 of 5</span>
+      <h2>The talent side</h2>
+      <p>Once a talent account logs in — managing the profile, and staying in touch.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-num">10</div>
+      <div class="step-body">
+        <h3>Talent dashboard</h3>
+        <span class="step-path mono">/dashboard</span>
+        <p class="desc">Profile summary, membership status with an upgrade path, notification preferences, and the intro-video pitch — all in one place.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/dashboard</span></div><img src="screenshots/15-talent-dashboard.png" alt="Talent dashboard"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">11</div>
+      <div class="step-body">
+        <h3>Messages</h3>
+        <span class="step-path mono">/messages</span>
+        <p class="desc">Every conversation with a recruiter in one inbox, with an unread badge that shows up right in the header nav.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/messages</span></div><img src="screenshots/16-messages.png" alt="Messages inbox"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group" id="recruiter-side">
+    <div class="group-head">
+      <span class="eyebrow">Stop 3 of 5</span>
+      <h2>The recruiter side</h2>
+      <p>Posting talent hunts and running the hiring pipeline.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-num">12</div>
+      <div class="step-body">
+        <h3>Recruiter dashboard</h3>
+        <span class="step-path mono">/dashboard</span>
+        <p class="desc">Same URL as the talent dashboard — the content is entirely different because it's driven by the logged-in account's role. This one leads straight into posting a new talent hunt.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/dashboard</span></div><img src="screenshots/17-recruiter-dashboard.png" alt="Recruiter dashboard"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">13</div>
+      <div class="step-body">
+        <h3>Applicant tracking board</h3>
+        <span class="step-path mono">/dashboard/casting-calls/[id]</span>
+        <p class="desc">Every application to one posting, grouped by role and by status — shortlist, accept, or reject with one click, no spreadsheet needed.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/dashboard/casting-calls/…</span></div><img src="screenshots/18-applicant-tracking.png" alt="Applicant tracking board"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group" id="community-side">
+    <div class="group-head">
+      <span class="eyebrow">Stop 4 of 5</span>
+      <h2>Community — rate, critique, discuss</h2>
+      <p>The newest part of the product, built to bring in visitors who aren't here to hire or be hired — yet.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-num">14</div>
+      <div class="step-body">
+        <h3>Community hub</h3>
+        <span class="step-path mono">/community</span>
+        <p class="desc">The landing point for the two community features, with a live preview pulled from real data.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/community</span></div><img src="screenshots/10-community-hub.png" alt="Community hub"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">15</div>
+      <div class="step-body">
+        <h3>Titles catalog</h3>
+        <span class="step-path mono">/community/titles</span>
+        <p class="desc">Films, TV series, and songs, browsable by anyone, sortable by top-rated, newest, or most-reviewed.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/community/titles</span></div><img src="screenshots/11-community-titles.png" alt="Community titles catalog"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">16</div>
+      <div class="step-body">
+        <h3>Title detail — rate &amp; critique</h3>
+        <span class="step-path mono">/community/titles/[id]</span>
+        <p class="desc">An IMDb-style score with a full star-by-star breakdown, and every critique underneath with the author's real name and role.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/community/titles/…</span></div><img src="screenshots/12-community-title-detail.png" alt="Title detail with ratings"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">17</div>
+      <div class="step-body">
+        <h3>Discussion board</h3>
+        <span class="step-path mono">/community/discussions</span>
+        <p class="desc">Threads tagged by topic (Films, TV, Music, Industry News, General), each showing its reply count at a glance.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/community/discussions</span></div><img src="screenshots/13-community-discussions.png" alt="Discussion board"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">18</div>
+      <div class="step-body">
+        <h3>Discussion thread</h3>
+        <span class="step-path mono">/community/discussions/[id]</span>
+        <p class="desc">A thread and its replies — attributed the same way as critiques, no anonymous posting.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/community/discussions/…</span></div><img src="screenshots/14-community-discussion-detail.png" alt="Discussion thread detail"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group" id="admin-side">
+    <div class="group-head">
+      <span class="eyebrow">Stop 5 of 5</span>
+      <h2>The admin console</h2>
+      <p>Its own URL, its own sidebar, no public site chrome — where the platform actually gets run day to day.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-num">19</div>
+      <div class="step-body">
+        <h3>Overview</h3>
+        <span class="step-path mono">/admin</span>
+        <p class="desc">Platform-wide counts the moment an admin logs in — users, talents, recruiters, verifications, open hunts, applications, invitations.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin</span></div><img src="screenshots/19-admin-overview.png" alt="Admin overview"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">20</div>
+      <div class="step-body">
+        <h3>Users</h3>
+        <span class="step-path mono">/admin/users</span>
+        <p class="desc">Search any account, inspect its details, suspend or reactivate it.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/users</span></div><img src="screenshots/20-admin-users.png" alt="Admin users"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">21</div>
+      <div class="step-body">
+        <h3>Verification</h3>
+        <span class="step-path mono">/admin/verification</span>
+        <p class="desc">Pending badge requests from talent and recruiters, approve or reject in one click.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/verification</span></div><img src="screenshots/21-admin-verification.png" alt="Admin verification queue"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">22</div>
+      <div class="step-body">
+        <h3>Talent hunts</h3>
+        <span class="step-path mono">/admin/casting-calls</span>
+        <p class="desc">Every posting on the platform, with the ability to close or reopen any of them.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/casting-calls</span></div><img src="screenshots/22-admin-casting-calls.png" alt="Admin casting call moderation"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">23</div>
+      <div class="step-body">
+        <h3>Community moderation</h3>
+        <span class="step-path mono">/admin/community</span>
+        <p class="desc">Every title, critique, thread, and reply — deletable directly, without needing a report filed first.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/community</span></div><img src="screenshots/23-admin-community.png" alt="Admin community moderation"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">24</div>
+      <div class="step-body">
+        <h3>Reports</h3>
+        <span class="step-path mono">/admin/reports</span>
+        <p class="desc">The one queue every user-submitted report lands in, regardless of what was reported — with a one-click "delete content" action where one applies.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/reports</span></div><img src="screenshots/24-admin-reports.png" alt="Admin reports queue"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">25</div>
+      <div class="step-body">
+        <h3>Subscriptions</h3>
+        <span class="step-path mono">/admin/subscriptions</span>
+        <p class="desc">Every subscriber, their plan and status, and a manual trigger for the payment-failure follow-up sweep.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/subscriptions</span></div><img src="screenshots/25-admin-subscriptions.png" alt="Admin subscriptions"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">26</div>
+      <div class="step-body">
+        <h3>Pricing</h3>
+        <span class="step-path mono">/admin/pricing</span>
+        <p class="desc">Set the current price for either plan, with a running history of every change and who made it — existing subscribers never get repriced.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/pricing</span></div><img src="screenshots/26-admin-pricing.png" alt="Admin pricing management"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">27</div>
+      <div class="step-body">
+        <h3>Financial overview</h3>
+        <span class="step-path mono">/admin/financial</span>
+        <p class="desc">Real revenue from paying subscribers versus a projection if every premium account (including trials) converted, plus why people are cancelling.</p>
+        <div class="frame"><div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">yougottalent.lk/admin/financial</span></div><img src="screenshots/27-admin-financial.png" alt="Admin financial overview"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>Captured from the live development environment — internal document, not for public distribution.</p>
+</footer>
+
+</body>
+</html>
