@@ -15,6 +15,7 @@ from app.models.availability_window import AvailabilityWindow
 from app.models.booking import Booking
 from app.models.follow import Follow
 from app.models.review import Review
+from app.models.report import Report
 
 __all__ = [
     "User",
@@ -34,4 +35,5 @@ __all__ = [
     "Booking",
     "Follow",
     "Review",
+    "Report",
 ]

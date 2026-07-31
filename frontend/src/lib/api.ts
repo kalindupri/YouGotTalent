@@ -337,6 +337,38 @@ export interface AdminUserDetail extends User {
   recruiter_profile: RecruiterProfile | null;
 }
 
+export type ReportCategory = "bug" | "spam" | "harassment" | "fake_profile" | "inappropriate_content" | "other";
+export type ReportTargetType = "talent_profile" | "recruiter_profile" | "casting_call" | "message";
+export type ReportStatus = "open" | "in_review" | "resolved" | "dismissed";
+
+export interface ReportCreateInput {
+  category: ReportCategory;
+  target_type?: ReportTargetType;
+  target_id?: string;
+  subject: string;
+  description: string;
+  page_url?: string;
+}
+
+export interface Report {
+  id: string;
+  reporter_user_id: string;
+  category: ReportCategory;
+  target_type: ReportTargetType | null;
+  target_id: string | null;
+  subject: string;
+  description: string;
+  page_url: string | null;
+  status: ReportStatus;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportWithReporter extends Report {
+  reporter_email: string;
+}
+
 export interface ConversationSummary {
   id: string;
   talent_id: string;
@@ -765,4 +797,16 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ status: callStatus }) },
       token
     ),
+
+  submitReport: (data: ReportCreateInput, token: string) =>
+    request<Report>("/reports", { method: "POST", body: JSON.stringify(data) }, token),
+  adminListReports: (params: { status?: ReportStatus; category?: ReportCategory } = {}, token: string) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status_filter", params.status);
+    if (params.category) qs.set("category", params.category);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<ReportWithReporter[]>(`/admin/reports${suffix}`, {}, token);
+  },
+  adminUpdateReport: (reportId: string, data: { status: ReportStatus; admin_notes?: string }, token: string) =>
+    request<ReportWithReporter>(`/admin/reports/${reportId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
 };

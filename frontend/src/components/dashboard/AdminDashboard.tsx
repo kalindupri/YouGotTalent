@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
+import Link from "next/link";
 import {
   AdminCastingCall,
   AdminStats,
@@ -9,6 +10,9 @@ import {
   CastingCallStatus,
   FinancialOverview,
   RecruiterProfile,
+  ReportCategory,
+  ReportStatus,
+  ReportWithReporter,
   TalentProfile,
   User,
   UserRole,
@@ -42,6 +46,7 @@ export default function AdminDashboard() {
     <div className="flex flex-col gap-6">
       <StatsGrid stats={stats} />
       <FinancialOverviewCard token={token} />
+      <ReportQueue token={token} />
       <VerificationQueue token={token} />
       <UserManagement token={token} />
       <CastingCallModeration token={token} />
@@ -394,6 +399,154 @@ function UserDetailPanel({ userId, token }: { userId: string; token: string }) {
       )}
       {!detail.talent_profile && !detail.recruiter_profile && <p>No linked talent or recruiter profile.</p>}
     </div>
+  );
+}
+
+const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
+  bug: "Bug",
+  spam: "Spam",
+  harassment: "Harassment",
+  fake_profile: "Fake profile",
+  inappropriate_content: "Inappropriate content",
+  other: "Other",
+};
+
+const REPORT_STATUS_TONE: Record<ReportStatus, "warning" | "info" | "success" | "neutral"> = {
+  open: "warning",
+  in_review: "info",
+  resolved: "success",
+  dismissed: "neutral",
+};
+
+function reportTargetHref(report: ReportWithReporter): string | null {
+  if (!report.target_type || !report.target_id) return null;
+  switch (report.target_type) {
+    case "talent_profile":
+      return `/talents/${report.target_id}`;
+    case "recruiter_profile":
+      return `/recruiters/${report.target_id}`;
+    case "casting_call":
+      return `/casting-calls/${report.target_id}`;
+    default:
+      return null;
+  }
+}
+
+function ReportQueue({ token }: { token: string }) {
+  const [reports, setReports] = useState<ReportWithReporter[]>([]);
+  const [statusFilter, setStatusFilter] = useState<ReportStatus | "">("open");
+  const [categoryFilter, setCategoryFilter] = useState<ReportCategory | "">("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+
+  function refresh() {
+    api
+      .adminListReports({ status: statusFilter || undefined, category: categoryFilter || undefined }, token)
+      .then(setReports)
+      .catch(() => {});
+  }
+
+  useEffect(refresh, [statusFilter, categoryFilter, token]);
+
+  async function updateStatus(report: ReportWithReporter, nextStatus: ReportStatus) {
+    setBusyId(report.id);
+    try {
+      const updated = await api.adminUpdateReport(
+        report.id,
+        { status: nextStatus, admin_notes: notesDraft[report.id] ?? report.admin_notes ?? undefined },
+        token
+      );
+      setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className={sectionClass}>
+      <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Reports</h2>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as ReportStatus | "")}
+          className={`${inputClass} w-auto`}
+        >
+          <option value="">All statuses</option>
+          <option value="open">Open</option>
+          <option value="in_review">In review</option>
+          <option value="resolved">Resolved</option>
+          <option value="dismissed">Dismissed</option>
+        </select>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value as ReportCategory | "")}
+          className={`${inputClass} w-auto`}
+        >
+          <option value="">All categories</option>
+          {Object.entries(REPORT_CATEGORY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <ul className="mt-4 flex flex-col gap-2">
+        {reports.map((r) => {
+          const targetHref = reportTargetHref(r);
+          return (
+            <li key={r.id} className="rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-zinc-900 dark:text-zinc-50">{r.subject}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className={badgeClass("neutral")}>{REPORT_CATEGORY_LABELS[r.category]}</span>
+                    <span className={badgeClass(REPORT_STATUS_TONE[r.status])}>{r.status.replace("_", " ")}</span>
+                    <span className="text-xs text-zinc-500">from {r.reporter_email}</span>
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">{r.description}</p>
+                  {targetHref && (
+                    <Link href={targetHref} target="_blank" className="mt-1 inline-block text-xs font-semibold text-rose-600 hover:underline">
+                      View reported {r.target_type?.replace("_", " ")} →
+                    </Link>
+                  )}
+                  {r.page_url && <p className="mt-1 text-xs text-zinc-500">Page: {r.page_url}</p>}
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <label className={`${labelClass} flex-1 min-w-[200px]`}>
+                  Admin notes
+                  <input
+                    value={notesDraft[r.id] ?? r.admin_notes ?? ""}
+                    onChange={(e) => setNotesDraft((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                    className={inputClass}
+                  />
+                </label>
+                <div className="flex gap-2">
+                  {r.status !== "in_review" && (
+                    <button disabled={busyId === r.id} onClick={() => updateStatus(r, "in_review")} className={btnSmall}>
+                      In review
+                    </button>
+                  )}
+                  {r.status !== "resolved" && (
+                    <button disabled={busyId === r.id} onClick={() => updateStatus(r, "resolved")} className={btnSmallPrimary}>
+                      <Check className="h-3.5 w-3.5" /> Resolve
+                    </button>
+                  )}
+                  {r.status !== "dismissed" && (
+                    <button disabled={busyId === r.id} onClick={() => updateStatus(r, "dismissed")} className={btnSmall}>
+                      <X className="h-3.5 w-3.5" /> Dismiss
+                    </button>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+        {reports.length === 0 && <p className="text-sm text-zinc-500">No reports match this filter.</p>}
+      </ul>
+    </section>
   );
 }
 

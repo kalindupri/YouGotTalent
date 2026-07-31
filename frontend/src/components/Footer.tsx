@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ReportBugLink from "@/components/ReportBugLink";
 
 export default function Footer() {
   return (
@@ -20,6 +21,7 @@ export default function Footer() {
           <Link href="/casting-calls" className="hover:text-rose-500">
             Talent hunts
           </Link>
+          <ReportBugLink />
         </div>
       </div>
     </footer>

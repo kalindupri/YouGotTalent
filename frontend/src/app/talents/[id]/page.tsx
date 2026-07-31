@@ -25,6 +25,7 @@ import InviteToRoleButton from "@/components/InviteToRoleButton";
 import BookingRequestButton from "@/components/BookingRequestButton";
 import MediaCard from "@/components/MediaCard";
 import SubmissionPreview from "@/components/SubmissionPreview";
+import ReportButton from "@/components/ReportButton";
 
 export default function TalentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -148,6 +149,7 @@ export default function TalentDetailPage() {
               <BookingRequestButton talentId={talent.id} />
             </>
           )}
+          {user && <ReportButton targetType="talent_profile" targetId={talent.id} />}
         </div>
       </div>
 

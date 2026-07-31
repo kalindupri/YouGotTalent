@@ -8,6 +8,7 @@ import { ApiError, CastingCall, CastingCallRole, RecruiterProfile, api } from "@
 import { useAuth } from "@/lib/auth-context";
 import CategoryIcon from "@/components/CategoryIcon";
 import FollowRecruiterButton from "@/components/FollowRecruiterButton";
+import ReportButton from "@/components/ReportButton";
 import {
   badgeClass,
   btnPrimary,
@@ -111,6 +112,7 @@ function CastingCallDetailContent() {
         )}
         <span className={badgeClass(statusTone(call.status))}>{call.status}</span>
         {user?.role === "talent" && <FollowRecruiterButton recruiterId={call.recruiter_id} />}
+        {user && <ReportButton targetType="casting_call" targetId={call.id} />}
       </div>
 
       <h1 className="mt-3 font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">

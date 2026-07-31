@@ -67,5 +67,9 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "no-reply@yougottalent.lk"
     FRONTEND_URL: str = "http://localhost:3001"
 
+    # Discord webhook that new reports (bug reports, profile/content reports) are posted to for
+    # triage. If unset, notifications are logged instead of sent (see app/core/discord.py).
+    DISCORD_WEBHOOK_URL: str | None = None
+
 
 settings = Settings()

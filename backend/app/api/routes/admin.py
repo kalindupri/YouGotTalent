@@ -21,9 +21,11 @@ from app.crud.admin import (
 )
 from app.crud.casting_call import get_casting_call
 from app.crud.recruiter_profile import get_recruiter_profile
+from app.crud.report import get_report, list_reports, update_report_status
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.casting_call import CastingCallStatus
+from app.models.report import ReportCategory, ReportStatus
 from app.models.user import User, UserRole
 from app.schemas.admin import (
     AdminCastingCallRead,
@@ -34,6 +36,7 @@ from app.schemas.admin import (
     UserStatusUpdate,
 )
 from app.schemas.recruiter_profile import RecruiterProfileRead
+from app.schemas.report import ReportRead, ReportStatusUpdate, ReportWithReporter
 from app.schemas.talent_profile import TalentProfileRead
 from app.schemas.user import UserRead
 
@@ -145,3 +148,31 @@ def update_casting_call_status(
 @router.get("/financial-overview", response_model=FinancialOverview)
 def read_financial_overview(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     return get_financial_overview(db)
+
+
+def _to_report_with_reporter(report) -> ReportWithReporter:
+    return ReportWithReporter(**ReportRead.model_validate(report).model_dump(), reporter_email=report.reporter.email)
+
+
+@router.get("/reports", response_model=list[ReportWithReporter])
+def read_reports(
+    status_filter: ReportStatus | None = None,
+    category: ReportCategory | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    reports = list_reports(db, status_filter, category)
+    return [_to_report_with_reporter(r) for r in reports]
+
+
+@router.patch("/reports/{report_id}", response_model=ReportWithReporter)
+def update_report(
+    report_id: uuid.UUID,
+    payload: ReportStatusUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    report = get_report(db, report_id)
+    if report is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    return _to_report_with_reporter(update_report_status(db, report, payload))
