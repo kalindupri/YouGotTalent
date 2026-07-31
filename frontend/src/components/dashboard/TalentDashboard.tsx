@@ -20,6 +20,7 @@ import {
   api,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import BillingStatusPanel from "@/components/BillingStatusPanel";
 import {
   CREDIT_PROJECT_TYPES,
   DAYS_OF_WEEK,
@@ -583,17 +584,22 @@ function MembershipCard({
         </span>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {profile.tier !== "premium" && (
-          <button onClick={handleUpgrade} disabled={upgrading} className={btnPrimary}>
-            {upgrading ? (
-              "Upgrading…"
-            ) : (
-              <>
-                <Crown className="h-4 w-4" /> Upgrade to Premium
-              </>
-            )}
-          </button>
+          <>
+            <button onClick={handleUpgrade} disabled={upgrading} className={btnPrimary}>
+              {upgrading ? (
+                "Starting…"
+              ) : (
+                <>
+                  <Crown className="h-4 w-4" /> Start free trial
+                </>
+              )}
+            </button>
+            <Link href="/pricing" className="text-xs font-semibold text-rose-600 hover:underline">
+              View pricing &amp; subscribe →
+            </Link>
+          </>
         )}
         {!profile.is_verified &&
           (profile.verification_requested_at ? (
@@ -612,10 +618,8 @@ function MembershipCard({
             </button>
           ))}
       </div>
-      <p className="mt-3 text-xs text-zinc-400">
-        Upgrading here is a placeholder — no payment is collected. Verification is reviewed
-        manually for now.
-      </p>
+      <BillingStatusPanel token={token} onCanceled={() => api.getMyTalentProfile(token).then(onUpdated)} />
+      <p className="mt-3 text-xs text-zinc-400">Verification is reviewed manually for now.</p>
     </section>
   );
 }

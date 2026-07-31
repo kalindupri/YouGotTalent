@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
+from app.crud.subscription import get_for_recruiter, get_for_talent, sync_if_expired
 from app.crud.talent_profile import get_talent_profile_by_user
 from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
@@ -50,6 +51,9 @@ def get_current_talent_profile(db: Session = Depends(get_db), user: User = Depen
     profile = get_talent_profile_by_user(db, user.id)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+    # Lazily reconciles a lapsed trial/billing period on every request that loads the profile —
+    # there's no cron/queue in this app, so this is what keeps tier from drifting from reality.
+    sync_if_expired(db, get_for_talent(db, profile.id))
     return profile
 
 
@@ -57,4 +61,5 @@ def get_current_recruiter_profile(db: Session = Depends(get_db), user: User = De
     profile = db.query(RecruiterProfile).filter(RecruiterProfile.user_id == user.id).first()
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruiter profile not found")
+    sync_if_expired(db, get_for_recruiter(db, profile.id))
     return profile

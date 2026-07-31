@@ -41,9 +41,13 @@ class FinancialOverview(BaseModel):
     premium_recruiters: int
     price_per_premium_talent: int
     price_per_premium_recruiter: int
-    # Purely a projection from current premium counts × the configured prices above — there is
-    # no payment gateway wired up yet, so no real money has actually changed hands.
+    # Purely a projection from current premium counts × the configured prices above — includes
+    # trial subscribers, who haven't paid anything yet.
     estimated_monthly_revenue: int
+    # The real numbers, from actual Subscription rows with a paying (non-trial) status.
+    trialing_subscriptions: int
+    paying_subscriptions: int
+    real_monthly_revenue_lkr: int
 
 
 class AdminUserDetail(UserRead):

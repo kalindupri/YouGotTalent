@@ -51,11 +51,36 @@ class Settings(BaseSettings):
     # Only used to build absolute URLs for the local-disk upload fallback above.
     BACKEND_PUBLIC_URL: str = "http://localhost:8000"
 
-    # Assumed monthly price per premium subscriber, used only to project estimated revenue on
-    # the admin financial overview — there is no real billing integration, so no money actually
-    # moves at these prices yet.
-    PREMIUM_TALENT_PRICE_LKR: int = 1500
-    PREMIUM_RECRUITER_PRICE_LKR: int = 5000
+    # Founding-member / year-1 monthly prices. Locked onto each Subscription as price_lkr at
+    # signup, so raising these later never changes what an existing subscriber pays.
+    PREMIUM_TALENT_PRICE_LKR: int = 490
+    PREMIUM_RECRUITER_PRICE_LKR: int = 1500
+
+    # Annual price = 10x monthly ("2 months free"), the standard SaaS annual-discount anchor.
+    ANNUAL_BILLING_MONTHS_CHARGED: int = 10
+
+    # How long a first-time upgrade stays in trial before payment is required.
+    TALENT_TRIAL_DAYS: int = 30
+    RECRUITER_TRIAL_DAYS: int = 14
+
+    # Which PaymentGateway implementation app/core/payments/factory.py hands out.
+    # "mock" activates subscriptions instantly with no external call — the default, so dev/test
+    # environments work with zero payment-provider setup. Switch to "payhere" (Sri Lanka, LKR)
+    # or "stripe" (international expansion) once real merchant credentials are configured below.
+    PAYMENT_GATEWAY: str = "mock"
+
+    PAYHERE_MERCHANT_ID: str | None = None
+    PAYHERE_MERCHANT_SECRET: str | None = None
+    PAYHERE_SANDBOX: bool = True
+
+    STRIPE_SECRET_KEY: str | None = None
+    STRIPE_PUBLISHABLE_KEY: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None
+    # Stripe doesn't settle in LKR — pricing for the Stripe path is charged in this currency
+    # instead, independent of the LKR prices above which are only for the local PayHere path.
+    STRIPE_CURRENCY: str = "usd"
+    STRIPE_TALENT_PRICE: int = 500  # cents
+    STRIPE_RECRUITER_PRICE: int = 1500  # cents
 
     # SMTP config for outgoing email. If SMTP_HOST is unset, emails are logged instead of sent
     # (safe default for local/dev environments with no mail credentials configured).

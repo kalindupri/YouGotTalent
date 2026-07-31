@@ -117,9 +117,19 @@ function FinancialOverviewCard({ token }: { token: string }) {
     <section className={sectionClass}>
       <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Financial overview</h2>
       <p className="mt-1 text-sm text-zinc-500">
-        No payment gateway is wired up yet — every figure here is a projection from current
-        subscription counts, not real collected revenue.
+        Real revenue comes from active (non-trial) subscriptions. Trialing subscribers count
+        toward premium totals below but haven&apos;t paid anything yet.
       </p>
+
+      <div className="mt-4 rounded-xl border-2 border-rose-500 bg-rose-50 p-4 dark:bg-rose-950/20">
+        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Real monthly revenue: {overview.currency} {overview.real_monthly_revenue_lkr.toLocaleString()}
+        </p>
+        <p className="mt-1 text-xs text-zinc-500">
+          {overview.paying_subscriptions} paying subscription{overview.paying_subscriptions === 1 ? "" : "s"} ·{" "}
+          {overview.trialing_subscriptions} on a free trial (not yet counted)
+        </p>
+      </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
@@ -142,7 +152,7 @@ function FinancialOverviewCard({ token }: { token: string }) {
 
       <div className="mt-5 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
         <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-          Estimated monthly revenue at current pricing: {overview.currency} {overview.estimated_monthly_revenue.toLocaleString()}
+          Projected monthly revenue if every premium account (including trials) were paying: {overview.currency} {overview.estimated_monthly_revenue.toLocaleString()}
         </p>
         <p className="mt-1 text-xs text-zinc-500">
           ({overview.currency} {overview.price_per_premium_talent.toLocaleString()} / premium talent,{" "}

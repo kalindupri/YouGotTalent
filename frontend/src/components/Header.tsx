@@ -59,6 +59,9 @@ export default function Header() {
           <Link href="/casting-calls" className="hidden text-zinc-300 hover:text-rose-500 sm:inline">
             Talent hunts
           </Link>
+          <Link href="/pricing" className="hidden text-zinc-300 hover:text-rose-500 sm:inline">
+            Pricing
+          </Link>
           {loading ? null : user ? (
             <>
               <Link href="/messages" className="relative text-zinc-300 hover:text-rose-500">

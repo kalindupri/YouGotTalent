@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, applications, auth, bookings, casting_calls, conversations, follows, invitations, recruiters, reports, talents
+from app.api.routes import admin, applications, auth, billing, bookings, casting_calls, conversations, follows, invitations, recruiters, reports, talents
 from app.core.config import settings
 from app.core.error_monitoring import setup_error_monitoring
 from app.core.storage import LOCAL_MEDIA_DIR
@@ -38,6 +38,7 @@ app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(bookings.router, prefix=settings.API_V1_PREFIX)
 app.include_router(follows.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(billing.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")

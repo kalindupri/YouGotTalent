@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_recruiter_profile, require_recruiter
+from app.crud import subscription as subscription_crud
 from app.crud.casting_call import get_recruiter_analytics
 from app.crud.recruiter_profile import (
     create_recruiter_profile,
     get_recruiter_profile,
     get_recruiter_profile_by_user,
     request_verification,
-    set_tier,
 )
 from app.crud.review import get_recruiter_review_summary, list_reviews_for_recruiter
 from app.crud.saved_search import create_saved_search, delete_saved_search, get_saved_search, list_saved_searches
@@ -86,9 +86,11 @@ def upgrade_my_tier(
     db: Session = Depends(get_db),
     recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
 ):
-    # Placeholder for real billing (e.g. Stripe) — flips the tier flag directly with no
-    # payment collected. Wire up a real checkout flow before using this in production.
-    return set_tier(db, recruiter, "premium")
+    # Starts (or reactivates) a real trial-backed subscription — see app/crud/subscription.py.
+    # For a paid, non-trial checkout use POST /billing/checkout instead.
+    subscription_crud.start_trial(db, recruiter_profile=recruiter)
+    db.refresh(recruiter)
+    return recruiter
 
 
 @router.get("/me/saved-searches", response_model=list[SavedSearchRead])

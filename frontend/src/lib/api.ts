@@ -330,6 +330,32 @@ export interface FinancialOverview {
   price_per_premium_talent: number;
   price_per_premium_recruiter: number;
   estimated_monthly_revenue: number;
+  trialing_subscriptions: number;
+  paying_subscriptions: number;
+  real_monthly_revenue_lkr: number;
+}
+
+export type SubscriptionPlanCode = "talent_premium" | "recruiter_premium";
+export type BillingCycle = "monthly" | "annual";
+export type SubscriptionStatusCode = "trialing" | "pending" | "active" | "past_due" | "canceled" | "expired";
+export type PaymentGatewayCode = "mock" | "payhere" | "stripe";
+
+export interface Subscription {
+  id: string;
+  plan: SubscriptionPlanCode;
+  billing_cycle: BillingCycle;
+  status: SubscriptionStatusCode;
+  gateway: PaymentGatewayCode;
+  price_lkr: number;
+  trial_end: string | null;
+  current_period_end: string | null;
+  canceled_at: string | null;
+}
+
+export interface CheckoutResponse {
+  redirect_url: string;
+  method: "get" | "post";
+  fields: Record<string, string>;
 }
 
 export interface AdminUserDetail extends User {
@@ -592,6 +618,11 @@ export const api = {
   requestRecruiterVerification: (token: string) =>
     request<RecruiterProfile>("/recruiters/me/request-verification", { method: "POST" }, token),
   upgradeRecruiterTier: (token: string) => request<RecruiterProfile>("/recruiters/me/upgrade", { method: "POST" }, token),
+
+  getMyBilling: (token: string) => request<Subscription | null>("/billing/me", {}, token),
+  startCheckout: (billingCycle: BillingCycle, token: string) =>
+    request<CheckoutResponse>("/billing/checkout", { method: "POST", body: JSON.stringify({ billing_cycle: billingCycle }) }, token),
+  cancelMySubscription: (token: string) => request<Subscription>("/billing/cancel", { method: "POST" }, token),
 
   listSavedSearches: (token: string) => request<SavedSearch[]>("/recruiters/me/saved-searches", {}, token),
   createSavedSearch: (

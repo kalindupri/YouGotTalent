@@ -10,6 +10,7 @@ from app.api.deps import get_current_recruiter_profile, get_current_talent_profi
 from app.core.config import settings
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video
 from app.core.storage import delete_media_file, upload_media_file
+from app.crud import subscription as subscription_crud
 from app.crud.credit import create_credit, delete_credit, get_credit
 from app.crud.review import get_talent_review_summary
 from app.crud.saved_talent import get_saved_talent, save_talent, unsave_talent
@@ -24,7 +25,6 @@ from app.crud.talent_profile import (
     get_talent_profile_by_user,
     list_talent_profiles,
     request_verification,
-    set_tier,
     update_talent_profile,
 )
 from app.db.session import get_db
@@ -291,9 +291,11 @@ def upgrade_my_tier(
     db: Session = Depends(get_db),
     profile: TalentProfile = Depends(get_current_talent_profile),
 ):
-    # Placeholder for real billing (e.g. Stripe) — flips the tier flag directly with no
-    # payment collected. Wire up a real checkout flow before using this in production.
-    return set_tier(db, profile, "premium")
+    # Starts (or reactivates) a real trial-backed subscription — see app/crud/subscription.py.
+    # For a paid, non-trial checkout use POST /billing/checkout instead.
+    subscription_crud.start_trial(db, talent_profile=profile)
+    db.refresh(profile)
+    return profile
 
 
 @router.post("/me/credits", response_model=CreditRead, status_code=status.HTTP_201_CREATED)

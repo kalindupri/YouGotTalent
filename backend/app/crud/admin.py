@@ -8,6 +8,7 @@ from app.models.application import Application
 from app.models.casting_call import CastingCall, CastingCallStatus
 from app.models.invitation import Invitation
 from app.models.recruiter_profile import RecruiterProfile
+from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.talent_profile import TalentProfile
 from app.models.user import User, UserRole
 
@@ -124,6 +125,19 @@ def get_financial_overview(db: Session) -> dict:
     free_talents = db.query(TalentProfile).filter(TalentProfile.tier == "free").count()
     premium_recruiters = db.query(RecruiterProfile).filter(RecruiterProfile.tier == "premium").count()
     free_recruiters = db.query(RecruiterProfile).filter(RecruiterProfile.tier == "free").count()
+
+    trialing_subscriptions = db.query(Subscription).filter(Subscription.status == SubscriptionStatus.TRIALING).count()
+    # ACTIVE/PAST_DUE only — trials haven't paid anything yet, so they're excluded from revenue
+    # even though they currently count toward premium_talents/premium_recruiters above.
+    paying_subscriptions = (
+        db.query(Subscription)
+        .filter(Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE]))
+        .all()
+    )
+    real_monthly_revenue_lkr = sum(
+        s.price_lkr if s.billing_cycle.value == "monthly" else round(s.price_lkr / 12) for s in paying_subscriptions
+    )
+
     return {
         "currency": "LKR",
         "free_talents": free_talents,
@@ -136,4 +150,7 @@ def get_financial_overview(db: Session) -> dict:
             premium_talents * settings.PREMIUM_TALENT_PRICE_LKR
             + premium_recruiters * settings.PREMIUM_RECRUITER_PRICE_LKR
         ),
+        "trialing_subscriptions": trialing_subscriptions,
+        "paying_subscriptions": len(paying_subscriptions),
+        "real_monthly_revenue_lkr": real_monthly_revenue_lkr,
     }
