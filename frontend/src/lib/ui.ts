@@ -394,3 +394,53 @@ export function creditProjectTypeLabel(type: string): string {
 export function creditProjectTypeIcon(type: string): LucideIcon {
   return CREDIT_PROJECT_TYPES.find((t) => t.value === type)?.icon ?? Sparkles;
 }
+
+interface DiscussionCategoryMeta {
+  label: string;
+  icon: LucideIcon;
+  solid: string;
+  soft: string;
+  border: string;
+}
+
+const DISCUSSION_CATEGORY_META: Record<string, DiscussionCategoryMeta> = {
+  films: {
+    label: "Films",
+    icon: Clapperboard,
+    solid: "bg-rose-500",
+    soft: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+    border: "border-l-rose-500",
+  },
+  tv_series: {
+    label: "TV series",
+    icon: Tv,
+    solid: "bg-blue-500",
+    soft: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    border: "border-l-blue-500",
+  },
+  music: {
+    label: "Music",
+    icon: Music,
+    solid: "bg-violet-500",
+    soft: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+    border: "border-l-violet-500",
+  },
+  industry_news: {
+    label: "Industry news",
+    icon: Megaphone,
+    solid: "bg-amber-500",
+    soft: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+    border: "border-l-amber-500",
+  },
+  general: {
+    label: "General",
+    icon: Users,
+    solid: "bg-emerald-500",
+    soft: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    border: "border-l-emerald-500",
+  },
+};
+
+export function discussionCategoryMeta(category: string): DiscussionCategoryMeta {
+  return DISCUSSION_CATEGORY_META[category] ?? DISCUSSION_CATEGORY_META.general;
+}

@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Crown, Sparkles } from "lucide-react";
-import { ApiError, BillingCycle, api } from "@/lib/api";
+import { ApiError, BillingCycle, CurrentPricing, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { redirectToCheckout } from "@/lib/billing";
 import { btnPrimary, btnSecondary, eyebrowClass } from "@/lib/ui";
-
-const TALENT_PRICE_MONTHLY = 490;
-const TALENT_PRICE_ANNUAL = 4900;
-const RECRUITER_PRICE_MONTHLY = 1500;
-const RECRUITER_PRICE_ANNUAL = 15000;
 
 const TALENT_FREE_FEATURES = ["Full public profile", "Unlimited browsing & applications", "3 portfolio items, 1 audition video", "Standard search ranking"];
 const TALENT_PREMIUM_FEATURES = ["Unlimited portfolio items", "5 audition videos", "Boosted search placement", "Verified badge queue priority"];
@@ -23,6 +18,11 @@ export default function PricingPage() {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
   const [loadingPlan, setLoadingPlan] = useState<"talent" | "recruiter" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pricing, setPricing] = useState<CurrentPricing | null>(null);
+
+  useEffect(() => {
+    api.getPricing().then(setPricing).catch(() => {});
+  }, []);
 
   async function subscribe(plan: "talent" | "recruiter") {
     if (!token) return;
@@ -75,7 +75,13 @@ export default function PricingPage() {
           title="For talent"
           roleLabel="talent"
           freePrice="LKR 0"
-          premiumPrice={cycle === "annual" ? `LKR ${TALENT_PRICE_ANNUAL.toLocaleString()}/yr` : `LKR ${TALENT_PRICE_MONTHLY.toLocaleString()}/mo`}
+          premiumPrice={
+            pricing
+              ? cycle === "annual"
+                ? `LKR ${pricing.talent_premium_annual_lkr.toLocaleString()}/yr`
+                : `LKR ${pricing.talent_premium_monthly_lkr.toLocaleString()}/mo`
+              : "…"
+          }
           freeFeatures={TALENT_FREE_FEATURES}
           premiumFeatures={TALENT_PREMIUM_FEATURES}
           canSubscribe={!user || user.role === "talent"}
@@ -87,7 +93,13 @@ export default function PricingPage() {
           title="For recruiters"
           roleLabel="recruiter"
           freePrice="LKR 0"
-          premiumPrice={cycle === "annual" ? `LKR ${RECRUITER_PRICE_ANNUAL.toLocaleString()}/yr` : `LKR ${RECRUITER_PRICE_MONTHLY.toLocaleString()}/mo`}
+          premiumPrice={
+            pricing
+              ? cycle === "annual"
+                ? `LKR ${pricing.recruiter_premium_annual_lkr.toLocaleString()}/yr`
+                : `LKR ${pricing.recruiter_premium_monthly_lkr.toLocaleString()}/mo`
+              : "…"
+          }
           freeFeatures={RECRUITER_FREE_FEATURES}
           premiumFeatures={RECRUITER_PREMIUM_FEATURES}
           canSubscribe={!user || user.role === "recruiter"}

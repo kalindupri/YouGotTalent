@@ -5,6 +5,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.payments.base import PaymentGateway
 from app.core.payments.factory import get_gateway
+from app.crud import pricing as pricing_crud
 from app.crud import subscription as subscription_crud
 from app.crud.recruiter_profile import get_recruiter_profile_by_user
 from app.crud.talent_profile import get_talent_profile_by_user
@@ -12,9 +13,15 @@ from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentProfile
 from app.models.user import User, UserRole
+from app.schemas.pricing import CurrentPricing
 from app.schemas.subscription import CancelRequest, CheckoutRequest, CheckoutResponse, PaymentRead, RetentionOfferRead, SubscriptionRead
 
 router = APIRouter(prefix="/billing", tags=["billing"])
+
+
+@router.get("/pricing", response_model=CurrentPricing)
+def read_current_pricing(db: Session = Depends(get_db)):
+    return pricing_crud.current_prices(db)
 
 
 def _current_profile(db: Session, user: User) -> TalentProfile | RecruiterProfile:

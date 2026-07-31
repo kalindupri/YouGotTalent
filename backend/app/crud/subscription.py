@@ -141,7 +141,7 @@ def start_trial(db: Session, *, talent_profile: TalentProfile | None = None, rec
         billing_cycle=BillingCycle.MONTHLY,
         status=SubscriptionStatus.TRIALING,
         gateway=PaymentGatewayName.MOCK,
-        price_lkr=price_lkr_for(plan, BillingCycle.MONTHLY),
+        price_lkr=price_lkr_for(db, plan, BillingCycle.MONTHLY),
         trial_end=trial_end,
     )
     db.add(subscription)
@@ -164,7 +164,7 @@ def start_checkout(
 
     subscription = get_for_talent(db, talent_profile.id) if talent_profile else get_for_recruiter(db, recruiter_profile.id)
     plan = SubscriptionPlan.TALENT_PREMIUM if talent_profile else SubscriptionPlan.RECRUITER_PREMIUM
-    price = price_lkr_for(plan, billing_cycle)
+    price = price_lkr_for(db, plan, billing_cycle)
 
     if subscription is None:
         subscription = Subscription(

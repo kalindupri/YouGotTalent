@@ -23,6 +23,9 @@ from app.crud.admin import (
     set_casting_call_status,
     set_user_active,
 )
+from app.crud import discussion as discussion_crud
+from app.crud import pricing as pricing_crud
+from app.crud import title as title_crud
 from app.crud.casting_call import get_casting_call
 from app.crud.recruiter_profile import get_recruiter_profile
 from app.crud.report import get_report, list_reports, update_report_status
@@ -44,6 +47,7 @@ from app.schemas.admin import (
     FinancialOverview,
     UserStatusUpdate,
 )
+from app.schemas.pricing import AdminPricingOverview, CurrentPricing, PricingUpdateRequest, PricingVersionRead
 from app.schemas.recruiter_profile import RecruiterProfileRead
 from app.schemas.report import ReportRead, ReportStatusUpdate, ReportWithReporter
 from app.schemas.subscription import PaymentRead
@@ -219,3 +223,62 @@ def trigger_dunning_sweep(db: Session = Depends(get_db), _: User = Depends(requi
     a service like cron-job.org) hitting this endpoint daily.
     """
     return run_dunning_sweep(db)
+
+
+@router.delete("/community/titles/{title_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_title(title_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    title = title_crud.get_title(db, title_id)
+    if title is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Title not found")
+    title_crud.delete_title(db, title)
+
+
+@router.delete("/community/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_title_review(review_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    review = title_crud.get_review(db, review_id)
+    if review is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+    title_crud.delete_review(db, review)
+
+
+@router.delete("/community/threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_discussion_thread(thread_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    thread = discussion_crud.get_thread(db, thread_id)
+    if thread is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Discussion not found")
+    discussion_crud.delete_thread(db, thread)
+
+
+@router.delete("/community/replies/{reply_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_discussion_reply(reply_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    reply = discussion_crud.get_reply(db, reply_id)
+    if reply is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reply not found")
+    discussion_crud.delete_reply(db, reply)
+
+
+def _to_pricing_version_read(version) -> PricingVersionRead:
+    return PricingVersionRead(
+        id=version.id,
+        plan=version.plan,
+        monthly_price_lkr=version.monthly_price_lkr,
+        created_at=version.created_at,
+        created_by_name=version.created_by.full_name if version.created_by else None,
+    )
+
+
+@router.get("/pricing", response_model=AdminPricingOverview)
+def read_pricing(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    return AdminPricingOverview(
+        current=CurrentPricing(**pricing_crud.current_prices(db)),
+        history=[_to_pricing_version_read(v) for v in pricing_crud.list_versions(db)],
+    )
+
+
+@router.post("/pricing", response_model=AdminPricingOverview, status_code=status.HTTP_201_CREATED)
+def update_pricing(payload: PricingUpdateRequest, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    pricing_crud.create_version(db, payload.plan, payload.monthly_price_lkr, admin.id)
+    return AdminPricingOverview(
+        current=CurrentPricing(**pricing_crud.current_prices(db)),
+        history=[_to_pricing_version_read(v) for v in pricing_crud.list_versions(db)],
+    )

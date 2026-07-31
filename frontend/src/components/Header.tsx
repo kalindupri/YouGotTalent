@@ -15,7 +15,7 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || user?.role === "admin") {
       setUnreadCount(0);
       return;
     }
@@ -34,7 +34,7 @@ export default function Header() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [token]);
+  }, [token, user]);
 
   function handleLogout() {
     logout();
@@ -59,22 +59,33 @@ export default function Header() {
           <Link href="/casting-calls" className="hidden text-zinc-300 hover:text-rose-500 sm:inline">
             Talent hunts
           </Link>
+          <Link href="/community" className="hidden text-zinc-300 hover:text-rose-500 sm:inline">
+            Community
+          </Link>
           <Link href="/pricing" className="hidden text-zinc-300 hover:text-rose-500 sm:inline">
             Pricing
           </Link>
           {loading ? null : user ? (
             <>
-              <Link href="/messages" className="relative text-zinc-300 hover:text-rose-500">
-                Messages
-                {unreadCount > 0 && (
-                  <span className="absolute -right-3 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Link>
-              <Link href="/dashboard" className="text-zinc-300 hover:text-rose-500">
-                Dashboard
-              </Link>
+              {user.role === "admin" ? (
+                <Link href="/admin" className="text-zinc-300 hover:text-rose-500">
+                  Admin
+                </Link>
+              ) : (
+                <>
+                  <Link href="/messages" className="relative text-zinc-300 hover:text-rose-500">
+                    Messages
+                    {unreadCount > 0 && (
+                      <span className="absolute -right-3 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                  <Link href="/dashboard" className="text-zinc-300 hover:text-rose-500">
+                    Dashboard
+                  </Link>
+                </>
+              )}
               <button onClick={handleLogout} className={`${btnSmall} !border-zinc-700 !text-zinc-300`}>
                 Log out
               </button>

@@ -23,6 +23,10 @@ class ReportTargetType(str, enum.Enum):
     RECRUITER_PROFILE = "recruiter_profile"
     CASTING_CALL = "casting_call"
     MESSAGE = "message"
+    TITLE = "title"
+    TITLE_REVIEW = "title_review"
+    DISCUSSION_THREAD = "discussion_thread"
+    DISCUSSION_REPLY = "discussion_reply"
 
 
 class ReportStatus(str, enum.Enum):

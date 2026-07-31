@@ -3,12 +3,12 @@ import uuid
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.pricing import current_monthly_price_lkr
 from app.models.application import Application
 from app.models.casting_call import CastingCall, CastingCallStatus
 from app.models.invitation import Invitation
 from app.models.recruiter_profile import RecruiterProfile
-from app.models.subscription import CancellationReason, Subscription, SubscriptionPayment, SubscriptionStatus
+from app.models.subscription import CancellationReason, Subscription, SubscriptionPayment, SubscriptionPlan, SubscriptionStatus
 from app.models.talent_profile import TalentProfile
 from app.models.user import User, UserRole
 
@@ -121,6 +121,9 @@ def set_casting_call_status(db: Session, call: CastingCall, status: CastingCallS
 
 
 def get_financial_overview(db: Session) -> dict:
+    talent_price = current_monthly_price_lkr(db, SubscriptionPlan.TALENT_PREMIUM)
+    recruiter_price = current_monthly_price_lkr(db, SubscriptionPlan.RECRUITER_PREMIUM)
+
     premium_talents = db.query(TalentProfile).filter(TalentProfile.tier == "premium").count()
     free_talents = db.query(TalentProfile).filter(TalentProfile.tier == "free").count()
     premium_recruiters = db.query(RecruiterProfile).filter(RecruiterProfile.tier == "premium").count()
@@ -144,12 +147,9 @@ def get_financial_overview(db: Session) -> dict:
         "premium_talents": premium_talents,
         "free_recruiters": free_recruiters,
         "premium_recruiters": premium_recruiters,
-        "price_per_premium_talent": settings.PREMIUM_TALENT_PRICE_LKR,
-        "price_per_premium_recruiter": settings.PREMIUM_RECRUITER_PRICE_LKR,
-        "estimated_monthly_revenue": (
-            premium_talents * settings.PREMIUM_TALENT_PRICE_LKR
-            + premium_recruiters * settings.PREMIUM_RECRUITER_PRICE_LKR
-        ),
+        "price_per_premium_talent": talent_price,
+        "price_per_premium_recruiter": recruiter_price,
+        "estimated_monthly_revenue": (premium_talents * talent_price + premium_recruiters * recruiter_price),
         "trialing_subscriptions": trialing_subscriptions,
         "paying_subscriptions": len(paying_subscriptions),
         "real_monthly_revenue_lkr": real_monthly_revenue_lkr,

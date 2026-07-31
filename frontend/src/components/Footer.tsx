@@ -21,6 +21,9 @@ export default function Footer() {
           <Link href="/casting-calls" className="hover:text-rose-500">
             Talent hunts
           </Link>
+          <Link href="/community" className="hover:text-rose-500">
+            Community
+          </Link>
           <ReportBugLink />
         </div>
       </div>

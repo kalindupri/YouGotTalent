@@ -17,6 +17,9 @@ from app.models.follow import Follow
 from app.models.review import Review
 from app.models.report import Report
 from app.models.subscription import Subscription, SubscriptionPayment
+from app.models.pricing import PricingVersion
+from app.models.title import Title, TitleReview
+from app.models.discussion import DiscussionThread, DiscussionReply
 
 __all__ = [
     "User",
@@ -39,4 +42,9 @@ __all__ = [
     "Report",
     "Subscription",
     "SubscriptionPayment",
+    "PricingVersion",
+    "Title",
+    "TitleReview",
+    "DiscussionThread",
+    "DiscussionReply",
 ]

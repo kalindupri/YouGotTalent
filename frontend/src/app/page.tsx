@@ -2,19 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CastingCall, TALENT_CATEGORIES, TalentProfile, api } from "@/lib/api";
-import { MapPin } from "lucide-react";
+import { CastingCall, TALENT_CATEGORIES, TalentProfile, Title, api } from "@/lib/api";
+import { MapPin, Star } from "lucide-react";
 import { btnPrimary, btnSecondary, categoryBadgeClass, categoryColor, coverPhotoUrl, eyebrowClass, formatCategory } from "@/lib/ui";
 import TalentAvatar from "@/components/TalentAvatar";
 import CategoryIcon from "@/components/CategoryIcon";
+import TitlePoster from "@/components/TitlePoster";
 
 export default function Home() {
   const [talents, setTalents] = useState<TalentProfile[]>([]);
   const [calls, setCalls] = useState<CastingCall[]>([]);
+  const [titles, setTitles] = useState<Title[]>([]);
 
   useEffect(() => {
     api.listTalents().then(setTalents).catch(() => {});
     api.listCastingCalls().then(setCalls).catch(() => {});
+    api.listTitles().then(setTitles).catch(() => {});
   }, []);
 
   return (
@@ -110,6 +113,44 @@ export default function Home() {
                     {t.city && <span className="text-xs text-zinc-500">{t.city}</span>}
                   </div>
                 </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {titles.length > 0 && (
+        <section className="mx-auto w-full max-w-6xl px-6 pb-20">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className={eyebrowClass}>New</span>
+              <h2 className="mt-3 font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+                Rate &amp; critique
+              </h2>
+              <p className="mt-2 text-zinc-500">Sri Lanka's films, TV series, and songs — rated by the industry.</p>
+            </div>
+            <Link href="/community/titles" className="text-sm font-bold uppercase tracking-wide text-rose-600 hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="mt-8 grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
+            {titles.slice(0, 6).map((t) => (
+              <Link key={t.id} href={`/community/titles/${t.id}`} className="group flex flex-col gap-2">
+                <div className="relative aspect-[2/3] overflow-hidden rounded-lg shadow-sm transition-all group-hover:-translate-y-1 group-hover:shadow-xl">
+                  <TitlePoster
+                    name={t.name}
+                    workType={t.work_type}
+                    posterUrl={t.poster_url}
+                    className="h-full w-full transition-transform duration-300 group-hover:scale-105"
+                  />
+                  {t.average_rating != null && (
+                    <span className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-sm bg-black/75 px-1.5 py-0.5 text-xs font-bold text-amber-400 backdrop-blur-sm">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      {t.average_rating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">{t.name}</p>
               </Link>
             ))}
           </div>

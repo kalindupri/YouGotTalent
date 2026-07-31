@@ -335,6 +335,31 @@ export interface FinancialOverview {
   real_monthly_revenue_lkr: number;
 }
 
+export interface CurrentPricing {
+  talent_premium_monthly_lkr: number;
+  talent_premium_annual_lkr: number;
+  recruiter_premium_monthly_lkr: number;
+  recruiter_premium_annual_lkr: number;
+}
+
+export interface PricingVersion {
+  id: string;
+  plan: SubscriptionPlanCode;
+  monthly_price_lkr: number;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface AdminPricingOverview {
+  current: CurrentPricing;
+  history: PricingVersion[];
+}
+
+export interface PricingUpdateInput {
+  plan: SubscriptionPlanCode;
+  monthly_price_lkr: number;
+}
+
 export type SubscriptionPlanCode = "talent_premium" | "recruiter_premium";
 export type BillingCycle = "monthly" | "annual";
 export type SubscriptionStatusCode = "trialing" | "pending" | "active" | "past_due" | "canceled" | "expired";
@@ -414,8 +439,95 @@ export interface AdminUserDetail extends User {
 }
 
 export type ReportCategory = "bug" | "spam" | "harassment" | "fake_profile" | "inappropriate_content" | "other";
-export type ReportTargetType = "talent_profile" | "recruiter_profile" | "casting_call" | "message";
+export type ReportTargetType =
+  | "talent_profile"
+  | "recruiter_profile"
+  | "casting_call"
+  | "message"
+  | "title"
+  | "title_review"
+  | "discussion_thread"
+  | "discussion_reply";
 export type ReportStatus = "open" | "in_review" | "resolved" | "dismissed";
+
+export type WorkType = "film" | "tv_series" | "song";
+
+export interface Title {
+  id: string;
+  name: string;
+  work_type: WorkType;
+  release_year: number | null;
+  genre: string | null;
+  language: string | null;
+  synopsis: string | null;
+  poster_url: string | null;
+  added_by_user_id: string;
+  created_at: string;
+  average_rating: number | null;
+  review_count: number;
+}
+
+export interface TitleCreateInput {
+  name: string;
+  work_type: WorkType;
+  release_year?: number;
+  genre?: string;
+  language?: string;
+  synopsis?: string;
+  poster_url?: string;
+}
+
+export interface TitleReviewCreateInput {
+  rating: number;
+  body?: string;
+}
+
+export interface TitleReview {
+  id: string;
+  rating: number;
+  body: string | null;
+  created_at: string;
+  updated_at: string;
+  author_name: string;
+  author_role: string;
+  author_profile_id: string | null;
+}
+
+export type DiscussionCategory = "films" | "tv_series" | "music" | "industry_news" | "general";
+
+export interface ThreadCreateInput {
+  category: DiscussionCategory;
+  subject: string;
+  body: string;
+  title_id?: string;
+}
+
+export interface DiscussionThread {
+  id: string;
+  category: DiscussionCategory;
+  subject: string;
+  body: string;
+  title_id: string | null;
+  created_at: string;
+  author_name: string;
+  author_role: string;
+  author_profile_id: string | null;
+  reply_count: number;
+}
+
+export interface ReplyCreateInput {
+  body: string;
+}
+
+export interface DiscussionReply {
+  id: string;
+  thread_id: string;
+  body: string;
+  created_at: string;
+  author_name: string;
+  author_role: string;
+  author_profile_id: string | null;
+}
 
 export interface ReportCreateInput {
   category: ReportCategory;
@@ -844,6 +956,10 @@ export const api = {
 
   adminGetStats: (token: string) => request<AdminStats>("/admin/stats", {}, token),
   adminGetFinancialOverview: (token: string) => request<FinancialOverview>("/admin/financial-overview", {}, token),
+  getPricing: () => request<CurrentPricing>("/billing/pricing"),
+  adminGetPricing: (token: string) => request<AdminPricingOverview>("/admin/pricing", {}, token),
+  adminSetPricing: (data: PricingUpdateInput, token: string) =>
+    request<AdminPricingOverview>("/admin/pricing", { method: "POST", body: JSON.stringify(data) }, token),
   adminListSubscriptions: (params: { status?: SubscriptionStatusCode } = {}, token: string) => {
     const qs = new URLSearchParams();
     if (params.status) qs.set("status_filter", params.status);
@@ -905,4 +1021,40 @@ export const api = {
   },
   adminUpdateReport: (reportId: string, data: { status: ReportStatus; admin_notes?: string }, token: string) =>
     request<ReportWithReporter>(`/admin/reports/${reportId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
+
+  listTitles: (params: { work_type?: WorkType; q?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.work_type) qs.set("work_type", params.work_type);
+    if (params.q) qs.set("q", params.q);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<Title[]>(`/titles${suffix}`);
+  },
+  createTitle: (data: TitleCreateInput, token: string) =>
+    request<Title>("/titles", { method: "POST", body: JSON.stringify(data) }, token),
+  getTitle: (id: string) => request<Title>(`/titles/${id}`),
+  listTitleReviews: (id: string) => request<TitleReview[]>(`/titles/${id}/reviews`),
+  getMyTitleReview: (id: string, token: string) => request<TitleReview | null>(`/titles/${id}/reviews/mine`, {}, token),
+  submitTitleReview: (id: string, data: TitleReviewCreateInput, token: string) =>
+    request<TitleReview>(`/titles/${id}/reviews`, { method: "POST", body: JSON.stringify(data) }, token),
+  deleteMyTitleReview: (id: string, token: string) => request<void>(`/titles/${id}/reviews/mine`, { method: "DELETE" }, token),
+
+  listDiscussions: (params: { category?: DiscussionCategory; title_id?: string; q?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.category) qs.set("category", params.category);
+    if (params.title_id) qs.set("title_id", params.title_id);
+    if (params.q) qs.set("q", params.q);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<DiscussionThread[]>(`/discussions${suffix}`);
+  },
+  createDiscussion: (data: ThreadCreateInput, token: string) =>
+    request<DiscussionThread>("/discussions", { method: "POST", body: JSON.stringify(data) }, token),
+  getDiscussion: (id: string) => request<DiscussionThread>(`/discussions/${id}`),
+  listDiscussionReplies: (id: string) => request<DiscussionReply[]>(`/discussions/${id}/replies`),
+  createDiscussionReply: (id: string, data: ReplyCreateInput, token: string) =>
+    request<DiscussionReply>(`/discussions/${id}/replies`, { method: "POST", body: JSON.stringify(data) }, token),
+
+  adminDeleteTitle: (id: string, token: string) => request<void>(`/admin/community/titles/${id}`, { method: "DELETE" }, token),
+  adminDeleteTitleReview: (id: string, token: string) => request<void>(`/admin/community/reviews/${id}`, { method: "DELETE" }, token),
+  adminDeleteThread: (id: string, token: string) => request<void>(`/admin/community/threads/${id}`, { method: "DELETE" }, token),
+  adminDeleteReply: (id: string, token: string) => request<void>(`/admin/community/replies/${id}`, { method: "DELETE" }, token),
 };
