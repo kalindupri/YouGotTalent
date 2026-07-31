@@ -6,7 +6,7 @@ import { Check, Crown, Sparkles } from "lucide-react";
 import { ApiError, BillingCycle, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { redirectToCheckout } from "@/lib/billing";
-import { btnPrimary, eyebrowClass } from "@/lib/ui";
+import { btnPrimary, btnSecondary, eyebrowClass } from "@/lib/ui";
 
 const TALENT_PRICE_MONTHLY = 490;
 const TALENT_PRICE_ANNUAL = 4900;
@@ -139,6 +139,11 @@ function PricingColumn({
             </li>
           ))}
         </ul>
+        {!loggedIn && (
+          <Link href="/register" className={`mt-5 w-full ${btnSecondary}`}>
+            Sign up free
+          </Link>
+        )}
       </div>
 
       <div className="rounded-xl border-2 border-rose-500 bg-white p-5 shadow-sm dark:bg-zinc-900">
