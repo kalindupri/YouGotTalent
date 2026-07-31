@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentProfile
 from app.models.user import User, UserRole
-from app.schemas.subscription import CheckoutRequest, CheckoutResponse, SubscriptionRead
+from app.schemas.subscription import CancelRequest, CheckoutRequest, CheckoutResponse, PaymentRead, RetentionOfferRead, SubscriptionRead
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -55,17 +55,59 @@ def start_checkout(
     return CheckoutResponse(redirect_url=checkout.redirect_url, method=checkout.method, fields=checkout.fields)
 
 
+def _current_subscription(db: Session, profile: TalentProfile | RecruiterProfile):
+    sub = (
+        subscription_crud.get_for_talent(db, profile.id)
+        if isinstance(profile, TalentProfile)
+        else subscription_crud.get_for_recruiter(db, profile.id)
+    )
+    if sub is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No subscription found")
+    return sub
+
+
 @router.post("/cancel", response_model=SubscriptionRead)
 def cancel_my_subscription(
+    payload: CancelRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     gateway: PaymentGateway = Depends(get_gateway),
 ):
     profile = _current_profile(db, user)
-    sub = subscription_crud.get_for_talent(db, profile.id) if isinstance(profile, TalentProfile) else subscription_crud.get_for_recruiter(db, profile.id)
-    if sub is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No subscription to cancel")
-    return subscription_crud.cancel(db, gateway, sub)
+    sub = _current_subscription(db, profile)
+    return subscription_crud.request_cancellation(db, gateway, sub, payload.reason_category, payload.reason_detail)
+
+
+@router.post("/reactivate", response_model=SubscriptionRead)
+def reactivate_my_subscription(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    profile = _current_profile(db, user)
+    sub = _current_subscription(db, profile)
+    if not sub.cancel_at_period_end:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This subscription isn't scheduled to cancel")
+    return subscription_crud.reactivate(db, sub)
+
+
+@router.get("/retention-offer", response_model=RetentionOfferRead)
+def read_retention_offer(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    profile = _current_profile(db, user)
+    sub = _current_subscription(db, profile)
+    return subscription_crud.retention_offer_status(sub)
+
+
+@router.post("/retention-offer/accept", response_model=SubscriptionRead)
+def accept_retention_offer(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    profile = _current_profile(db, user)
+    sub = _current_subscription(db, profile)
+    if sub.retention_offer_used:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This discount has already been used")
+    return subscription_crud.accept_retention_offer(db, sub)
+
+
+@router.get("/payments", response_model=list[PaymentRead])
+def read_my_payments(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    profile = _current_profile(db, user)
+    sub = _current_subscription(db, profile)
+    return subscription_crud.list_payments(db, sub.id)
 
 
 @router.post("/webhook/payhere", include_in_schema=False)

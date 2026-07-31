@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import BillingStatusPanel from "@/components/BillingStatusPanel";
+import PaymentHistoryList from "@/components/PaymentHistoryList";
 import {
   badgeClass,
   bookingStatusTone,
@@ -543,6 +544,7 @@ function MembershipCard({
           ))}
       </div>
       <BillingStatusPanel token={token} onCanceled={() => api.getMyRecruiterProfile(token).then(onUpdated)} />
+      <PaymentHistoryList token={token} />
       <p className="mt-3 text-xs text-zinc-400">Verification is reviewed manually for now.</p>
     </section>
   );

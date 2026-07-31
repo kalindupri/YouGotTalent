@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     TALENT_TRIAL_DAYS: int = 30
     RECRUITER_TRIAL_DAYS: int = 14
 
+    # Dunning: how long a subscriber keeps premium access after a renewal payment fails before
+    # being downgraded to free, and when mid-grace-period the reminder email goes out.
+    PAST_DUE_GRACE_DAYS: int = 7
+    PAST_DUE_REMINDER_AFTER_DAYS: int = 4
+
+    # One-time retention offer shown when a subscriber starts the cancel flow.
+    RETENTION_DISCOUNT_PERCENT: int = 10
+    RETENTION_DISCOUNT_MONTHS: int = 3
+
     # Which PaymentGateway implementation app/core/payments/factory.py hands out.
     # "mock" activates subscriptions instantly with no external call — the default, so dev/test
     # environments work with zero payment-provider setup. Switch to "payhere" (Sri Lanka, LKR)

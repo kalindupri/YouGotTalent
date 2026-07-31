@@ -339,6 +339,14 @@ export type SubscriptionPlanCode = "talent_premium" | "recruiter_premium";
 export type BillingCycle = "monthly" | "annual";
 export type SubscriptionStatusCode = "trialing" | "pending" | "active" | "past_due" | "canceled" | "expired";
 export type PaymentGatewayCode = "mock" | "payhere" | "stripe";
+export type CancellationReasonCode =
+  | "too_expensive"
+  | "not_using_enough"
+  | "missing_features"
+  | "switching_platform"
+  | "temporary_pause"
+  | "other";
+export type PaymentStatusCode = "succeeded" | "failed" | "refunded";
 
 export interface Subscription {
   id: string;
@@ -347,9 +355,51 @@ export interface Subscription {
   status: SubscriptionStatusCode;
   gateway: PaymentGatewayCode;
   price_lkr: number;
+  effective_price_lkr: number;
   trial_end: string | null;
   current_period_end: string | null;
   canceled_at: string | null;
+  cancel_at_period_end: boolean;
+  canceled_requested_at: string | null;
+  cancellation_reason_category: CancellationReasonCode | null;
+  cancellation_reason_detail: string | null;
+  retention_offer_used: boolean;
+  discount_percent: number | null;
+  discount_expires_at: string | null;
+  past_due_since: string | null;
+}
+
+export interface AdminSubscription extends Subscription {
+  subscriber_name: string;
+  subscriber_email: string;
+}
+
+export interface RetentionOffer {
+  available: boolean;
+  discount_percent: number;
+  discount_months: number;
+}
+
+export interface Payment {
+  id: string;
+  amount_lkr: number;
+  status: PaymentStatusCode;
+  gateway: PaymentGatewayCode;
+  gateway_reference: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  failure_reason: string | null;
+  created_at: string;
+}
+
+export interface ChurnReasons {
+  counts: Record<string, number>;
+  recent_details: string[];
+}
+
+export interface DunningSweepResult {
+  checked: number;
+  transitions_applied: number;
 }
 
 export interface CheckoutResponse {
@@ -622,7 +672,12 @@ export const api = {
   getMyBilling: (token: string) => request<Subscription | null>("/billing/me", {}, token),
   startCheckout: (billingCycle: BillingCycle, token: string) =>
     request<CheckoutResponse>("/billing/checkout", { method: "POST", body: JSON.stringify({ billing_cycle: billingCycle }) }, token),
-  cancelMySubscription: (token: string) => request<Subscription>("/billing/cancel", { method: "POST" }, token),
+  cancelMySubscription: (data: { reason_category: CancellationReasonCode; reason_detail?: string }, token: string) =>
+    request<Subscription>("/billing/cancel", { method: "POST", body: JSON.stringify(data) }, token),
+  reactivateMySubscription: (token: string) => request<Subscription>("/billing/reactivate", { method: "POST" }, token),
+  getRetentionOffer: (token: string) => request<RetentionOffer>("/billing/retention-offer", {}, token),
+  acceptRetentionOffer: (token: string) => request<Subscription>("/billing/retention-offer/accept", { method: "POST" }, token),
+  getMyPayments: (token: string) => request<Payment[]>("/billing/payments", {}, token),
 
   listSavedSearches: (token: string) => request<SavedSearch[]>("/recruiters/me/saved-searches", {}, token),
   createSavedSearch: (
@@ -789,6 +844,16 @@ export const api = {
 
   adminGetStats: (token: string) => request<AdminStats>("/admin/stats", {}, token),
   adminGetFinancialOverview: (token: string) => request<FinancialOverview>("/admin/financial-overview", {}, token),
+  adminListSubscriptions: (params: { status?: SubscriptionStatusCode } = {}, token: string) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status_filter", params.status);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<AdminSubscription[]>(`/admin/subscriptions${suffix}`, {}, token);
+  },
+  adminGetSubscriptionPayments: (subscriptionId: string, token: string) =>
+    request<Payment[]>(`/admin/subscriptions/${subscriptionId}/payments`, {}, token),
+  adminGetChurnReasons: (token: string) => request<ChurnReasons>("/admin/churn-reasons", {}, token),
+  adminRunDunningSweep: (token: string) => request<DunningSweepResult>("/admin/billing/run-dunning-sweep", { method: "POST" }, token),
   adminListUsers: (params: { role?: UserRole; q?: string } = {}, token: string) => {
     const qs = new URLSearchParams();
     if (params.role) qs.set("role", params.role);

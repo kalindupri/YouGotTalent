@@ -8,7 +8,7 @@ from app.models.application import Application
 from app.models.casting_call import CastingCall, CastingCallStatus
 from app.models.invitation import Invitation
 from app.models.recruiter_profile import RecruiterProfile
-from app.models.subscription import Subscription, SubscriptionStatus
+from app.models.subscription import CancellationReason, Subscription, SubscriptionPayment, SubscriptionStatus
 from app.models.talent_profile import TalentProfile
 from app.models.user import User, UserRole
 
@@ -154,3 +154,57 @@ def get_financial_overview(db: Session) -> dict:
         "paying_subscriptions": len(paying_subscriptions),
         "real_monthly_revenue_lkr": real_monthly_revenue_lkr,
     }
+
+
+def _attach_subscriber_fields(db: Session, subscription: Subscription) -> Subscription:
+    # Ad-hoc attributes (not mapped columns) — AdminSubscriptionRead's from_attributes=True
+    # picks these up the same way AdminCastingCallRead does for recruiter_company_name.
+    if subscription.talent_profile_id:
+        profile = db.query(TalentProfile).filter(TalentProfile.id == subscription.talent_profile_id).first()
+        subscription.subscriber_name = profile.display_name if profile else "Unknown"
+        user = db.query(User).filter(User.id == profile.user_id).first() if profile else None
+    else:
+        profile = db.query(RecruiterProfile).filter(RecruiterProfile.id == subscription.recruiter_profile_id).first()
+        subscription.subscriber_name = profile.company_name if profile else "Unknown"
+        user = db.query(User).filter(User.id == profile.user_id).first() if profile else None
+    subscription.subscriber_email = user.email if user else "unknown"
+    return subscription
+
+
+def list_all_subscriptions(db: Session, status_filter: SubscriptionStatus | None = None) -> list[Subscription]:
+    query = db.query(Subscription)
+    if status_filter:
+        query = query.filter(Subscription.status == status_filter)
+    subscriptions = query.order_by(Subscription.created_at.desc()).all()
+    return [_attach_subscriber_fields(db, s) for s in subscriptions]
+
+
+def get_subscription(db: Session, subscription_id: uuid.UUID) -> Subscription | None:
+    subscription = db.query(Subscription).filter(Subscription.id == subscription_id).first()
+    if subscription is None:
+        return None
+    return _attach_subscriber_fields(db, subscription)
+
+
+def list_subscription_payments(db: Session, subscription_id: uuid.UUID) -> list[SubscriptionPayment]:
+    return (
+        db.query(SubscriptionPayment)
+        .filter(SubscriptionPayment.subscription_id == subscription_id)
+        .order_by(SubscriptionPayment.created_at.desc())
+        .all()
+    )
+
+
+def get_churn_reasons(db: Session) -> dict:
+    rows = (
+        db.query(Subscription.cancellation_reason_category, Subscription.cancellation_reason_detail)
+        .filter(Subscription.status == SubscriptionStatus.CANCELED, Subscription.cancellation_reason_category.isnot(None))
+        .all()
+    )
+    counts: dict[str, int] = {reason.value: 0 for reason in CancellationReason}
+    details: list[str] = []
+    for category, detail in rows:
+        counts[category.value] = counts.get(category.value, 0) + 1
+        if detail:
+            details.append(detail)
+    return {"counts": counts, "recent_details": details[-20:]}

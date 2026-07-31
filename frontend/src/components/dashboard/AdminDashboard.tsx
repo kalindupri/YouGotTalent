@@ -6,13 +6,17 @@ import Link from "next/link";
 import {
   AdminCastingCall,
   AdminStats,
+  AdminSubscription,
   AdminUserDetail,
   CastingCallStatus,
+  ChurnReasons,
   FinancialOverview,
+  Payment,
   RecruiterProfile,
   ReportCategory,
   ReportStatus,
   ReportWithReporter,
+  SubscriptionStatusCode,
   TalentProfile,
   User,
   UserRole,
@@ -46,6 +50,8 @@ export default function AdminDashboard() {
     <div className="flex flex-col gap-6">
       <StatsGrid stats={stats} />
       <FinancialOverviewCard token={token} />
+      <SubscriptionsPanel token={token} />
+      <ChurnReasonsPanel token={token} />
       <ReportQueue token={token} />
       <VerificationQueue token={token} />
       <UserManagement token={token} />
@@ -185,6 +191,198 @@ function FinancialOverviewCard({ token }: { token: string }) {
           At these prices: <span className="font-semibold text-zinc-900 dark:text-zinc-50">{overview.currency} {whatIfRevenue.toLocaleString()}</span> / month
         </p>
       </div>
+    </section>
+  );
+}
+
+const SUBSCRIPTION_STATUS_TONE: Record<SubscriptionStatusCode, "success" | "warning" | "neutral" | "info"> = {
+  trialing: "info",
+  pending: "neutral",
+  active: "success",
+  past_due: "warning",
+  canceled: "neutral",
+  expired: "neutral",
+};
+
+function SubscriptionsPanel({ token }: { token: string }) {
+  const [subs, setSubs] = useState<AdminSubscription[]>([]);
+  const [statusFilter, setStatusFilter] = useState<SubscriptionStatusCode | "">("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [sweeping, setSweeping] = useState(false);
+  const [sweepResult, setSweepResult] = useState<string | null>(null);
+
+  function refresh() {
+    api.adminListSubscriptions({ status: statusFilter || undefined }, token).then(setSubs).catch(() => {});
+  }
+
+  useEffect(refresh, [statusFilter, token]);
+
+  async function toggleExpand(sub: AdminSubscription) {
+    if (expandedId === sub.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(sub.id);
+    setPayments(await api.adminGetSubscriptionPayments(sub.id, token));
+  }
+
+  async function handleSweep() {
+    setSweeping(true);
+    setSweepResult(null);
+    try {
+      const result = await api.adminRunDunningSweep(token);
+      setSweepResult(`Checked ${result.checked}, applied ${result.transitions_applied} transition${result.transitions_applied === 1 ? "" : "s"}.`);
+      refresh();
+    } finally {
+      setSweeping(false);
+    }
+  }
+
+  return (
+    <section className={sectionClass}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Subscriptions</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={handleSweep} disabled={sweeping} className={btnSmall}>
+            {sweeping ? "Running…" : "Run dunning sweep"}
+          </button>
+        </div>
+      </div>
+      {sweepResult && <p className="mt-2 text-xs text-zinc-500">{sweepResult}</p>}
+      <p className="mt-1 text-xs text-zinc-400">
+        There's no cron in this app yet — payment-failed reminders and downgrade notices only go
+        out when this sweep runs. Wire an external scheduler (a daily cron hitting{" "}
+        <code>/admin/billing/run-dunning-sweep</code>) to automate it, or trigger it manually here.
+      </p>
+
+      <div className="mt-4">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as SubscriptionStatusCode | "")}
+          className={`${inputClass} w-auto`}
+        >
+          <option value="">All statuses</option>
+          <option value="trialing">Trialing</option>
+          <option value="active">Active</option>
+          <option value="past_due">Past due</option>
+          <option value="canceled">Canceled</option>
+          <option value="expired">Expired</option>
+        </select>
+      </div>
+
+      <ul className="mt-4 flex flex-col gap-2">
+        {subs.map((s) => (
+          <li key={s.id} className="rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                  {s.subscriber_name} <span className="font-normal text-zinc-500">— {s.subscriber_email}</span>
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className={badgeClass("neutral")}>{s.plan === "talent_premium" ? "Talent" : "Recruiter"}</span>
+                  <span className={badgeClass(SUBSCRIPTION_STATUS_TONE[s.status])}>{s.status.replace("_", " ")}</span>
+                  <span className="text-xs text-zinc-500">
+                    LKR {s.effective_price_lkr.toLocaleString()}/{s.billing_cycle === "annual" ? "yr" : "mo"}
+                  </span>
+                  {s.cancel_at_period_end && <span className={badgeClass("warning")}>cancels at period end</span>}
+                  {s.discount_percent && <span className={badgeClass("info")}>{s.discount_percent}% off</span>}
+                </div>
+                {s.cancellation_reason_category && (
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Cancellation reason: {s.cancellation_reason_category.replace("_", " ")}
+                    {s.cancellation_reason_detail ? ` — "${s.cancellation_reason_detail}"` : ""}
+                  </p>
+                )}
+              </div>
+              <button onClick={() => toggleExpand(s)} className={btnSmall}>
+                {expandedId === s.id ? "Hide payments" : "View payments"}
+              </button>
+            </div>
+
+            {expandedId === s.id && (
+              <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                {payments.length === 0 ? (
+                  <p className="text-xs text-zinc-500">No payments recorded yet.</p>
+                ) : (
+                  <ul className="flex flex-col gap-1.5">
+                    {payments.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                        <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                        <span
+                          className={badgeClass(p.status === "succeeded" ? "success" : p.status === "failed" ? "warning" : "neutral")}
+                        >
+                          {p.status}
+                        </span>
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-50">LKR {p.amount_lkr.toLocaleString()}</span>
+                        {p.failure_reason && <span className="text-zinc-400">{p.failure_reason}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+        {subs.length === 0 && <p className="text-sm text-zinc-500">No subscriptions match this filter.</p>}
+      </ul>
+    </section>
+  );
+}
+
+const CHURN_REASON_LABELS: Record<string, string> = {
+  too_expensive: "Too expensive",
+  not_using_enough: "Not using it enough",
+  missing_features: "Missing features",
+  switching_platform: "Switching platform",
+  temporary_pause: "Temporary pause",
+  other: "Other",
+};
+
+function ChurnReasonsPanel({ token }: { token: string }) {
+  const [reasons, setReasons] = useState<ChurnReasons | null>(null);
+
+  useEffect(() => {
+    api.adminGetChurnReasons(token).then(setReasons).catch(() => {});
+  }, [token]);
+
+  const total = reasons ? Object.values(reasons.counts).reduce((sum, n) => sum + n, 0) : 0;
+
+  return (
+    <section className={sectionClass}>
+      <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Why customers leave</h2>
+      {!reasons || total === 0 ? (
+        <p className="mt-2 text-sm text-zinc-500">No cancellations recorded yet.</p>
+      ) : (
+        <>
+          <ul className="mt-4 flex flex-col gap-2">
+            {Object.entries(reasons.counts)
+              .filter(([, count]) => count > 0)
+              .sort(([, a], [, b]) => b - a)
+              .map(([reason, count]) => (
+                <li key={reason} className="flex items-center gap-3">
+                  <span className="w-40 shrink-0 text-sm text-zinc-700 dark:text-zinc-300">{CHURN_REASON_LABELS[reason] ?? reason}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <div className="h-full rounded-full bg-rose-500" style={{ width: `${(count / total) * 100}%` }} />
+                  </div>
+                  <span className="w-6 shrink-0 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-50">{count}</span>
+                </li>
+              ))}
+          </ul>
+          {reasons.recent_details.length > 0 && (
+            <div className="mt-4 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Recent comments</p>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {reasons.recent_details.map((detail, i) => (
+                  <li key={i} className="text-sm italic text-zinc-600 dark:text-zinc-400">
+                    &ldquo;{detail}&rdquo;
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
     </section>
   );
 }

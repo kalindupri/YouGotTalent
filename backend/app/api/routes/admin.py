@@ -7,12 +7,16 @@ from app.api.deps import require_admin
 from app.crud.admin import (
     approve_recruiter_verification,
     approve_talent_verification,
+    get_churn_reasons,
     get_financial_overview,
     get_stats,
+    get_subscription,
     get_user,
     list_all_casting_calls,
+    list_all_subscriptions,
     list_pending_recruiter_verifications,
     list_pending_talent_verifications,
+    list_subscription_payments,
     list_users,
     reject_recruiter_verification,
     reject_talent_verification,
@@ -22,21 +26,27 @@ from app.crud.admin import (
 from app.crud.casting_call import get_casting_call
 from app.crud.recruiter_profile import get_recruiter_profile
 from app.crud.report import get_report, list_reports, update_report_status
+from app.crud.subscription import run_dunning_sweep
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.casting_call import CastingCallStatus
 from app.models.report import ReportCategory, ReportStatus
+from app.models.subscription import SubscriptionStatus
 from app.models.user import User, UserRole
 from app.schemas.admin import (
     AdminCastingCallRead,
     AdminStats,
+    AdminSubscriptionRead,
     AdminUserDetail,
     CastingCallStatusUpdate,
+    ChurnReasons,
+    DunningSweepResult,
     FinancialOverview,
     UserStatusUpdate,
 )
 from app.schemas.recruiter_profile import RecruiterProfileRead
 from app.schemas.report import ReportRead, ReportStatusUpdate, ReportWithReporter
+from app.schemas.subscription import PaymentRead
 from app.schemas.talent_profile import TalentProfileRead
 from app.schemas.user import UserRead
 
@@ -176,3 +186,36 @@ def update_report(
     if report is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     return _to_report_with_reporter(update_report_status(db, report, payload))
+
+
+@router.get("/subscriptions", response_model=list[AdminSubscriptionRead])
+def read_subscriptions(
+    status_filter: SubscriptionStatus | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return list_all_subscriptions(db, status_filter)
+
+
+@router.get("/subscriptions/{subscription_id}/payments", response_model=list[PaymentRead])
+def read_subscription_payments(subscription_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    if get_subscription(db, subscription_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found")
+    return list_subscription_payments(db, subscription_id)
+
+
+@router.get("/churn-reasons", response_model=ChurnReasons)
+def read_churn_reasons(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    return get_churn_reasons(db)
+
+
+@router.post("/billing/run-dunning-sweep", response_model=DunningSweepResult)
+def trigger_dunning_sweep(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Processes every subscription's pending trial/period/past-due transitions in one pass.
+
+    There's no cron/queue in this app, so time-based billing emails (payment-failed reminders,
+    final downgrade notices) only go out when this runs — either an admin clicking a button, or
+    ideally an external scheduler (Azure Container Apps scheduled job, a GitHub Actions cron, or
+    a service like cron-job.org) hitting this endpoint daily.
+    """
+    return run_dunning_sweep(db)

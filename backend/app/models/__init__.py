@@ -16,7 +16,7 @@ from app.models.booking import Booking
 from app.models.follow import Follow
 from app.models.review import Review
 from app.models.report import Report
-from app.models.subscription import Subscription
+from app.models.subscription import Subscription, SubscriptionPayment
 
 __all__ = [
     "User",
@@ -38,4 +38,5 @@ __all__ = [
     "Review",
     "Report",
     "Subscription",
+    "SubscriptionPayment",
 ]

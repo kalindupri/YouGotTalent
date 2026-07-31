@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from app.models.casting_call import CastingCallStatus
 from app.schemas.casting_call import CastingCallRead
 from app.schemas.recruiter_profile import RecruiterProfileRead
+from app.schemas.subscription import SubscriptionRead
 from app.schemas.talent_profile import TalentProfileRead
 from app.schemas.user import UserRead
 
@@ -53,3 +54,18 @@ class FinancialOverview(BaseModel):
 class AdminUserDetail(UserRead):
     talent_profile: TalentProfileRead | None = None
     recruiter_profile: RecruiterProfileRead | None = None
+
+
+class AdminSubscriptionRead(SubscriptionRead):
+    subscriber_name: str
+    subscriber_email: str
+
+
+class ChurnReasons(BaseModel):
+    counts: dict[str, int]
+    recent_details: list[str]
+
+
+class DunningSweepResult(BaseModel):
+    checked: int
+    transitions_applied: int
