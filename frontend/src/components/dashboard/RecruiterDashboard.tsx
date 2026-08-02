@@ -60,6 +60,8 @@ export default function RecruiterDashboard() {
   const [analytics, setAnalytics] = useState<RecruiterAnalytics | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [callActionId, setCallActionId] = useState<string | null>(null);
+  const [callActionError, setCallActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -89,6 +91,36 @@ export default function RecruiterDashboard() {
     if (!token) return;
     await api.deleteSavedSearch(id, token);
     setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  async function handleToggleCallStatus(call: CastingCall) {
+    if (!token) return;
+    setCallActionError(null);
+    setCallActionId(call.id);
+    try {
+      const nextStatus = call.status === "open" ? "closed" : "open";
+      const updated = await api.updateCastingCall(call.id, { status: nextStatus }, token);
+      setMyCalls((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } catch {
+      setCallActionError("Could not update that talent hunt's status.");
+    } finally {
+      setCallActionId(null);
+    }
+  }
+
+  async function handleDeleteCall(callId: string) {
+    if (!token) return;
+    if (!window.confirm("Delete this talent hunt? Applications and invitations for it will be removed too.")) return;
+    setCallActionError(null);
+    setCallActionId(callId);
+    try {
+      await api.deleteCastingCall(callId, token);
+      setMyCalls((prev) => prev.filter((c) => c.id !== callId));
+    } catch {
+      setCallActionError("Could not delete that talent hunt.");
+    } finally {
+      setCallActionId(null);
+    }
   }
 
   if (loading) return <p className="text-sm text-zinc-500">Loading…</p>;
@@ -192,6 +224,7 @@ export default function RecruiterDashboard() {
 
       <section className={sectionClass}>
         <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Your talent hunts</h2>
+        {callActionError && <p className="mt-2 text-sm text-red-600">{callActionError}</p>}
         {myCalls.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-500">You haven&apos;t posted any talent hunts yet.</p>
         ) : (
@@ -199,7 +232,7 @@ export default function RecruiterDashboard() {
             {myCalls.map((c) => (
               <li
                 key={c.id}
-                className="flex items-center justify-between rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
               >
                 <div>
                   <p className="font-semibold text-zinc-900 dark:text-zinc-50">{c.title}</p>
@@ -208,9 +241,27 @@ export default function RecruiterDashboard() {
                     <span className={badgeClass(statusTone(c.status))}>{c.status}</span>
                   </div>
                 </div>
-                <Link href={`/dashboard/casting-calls/${c.id}`} className="font-semibold text-rose-600 hover:underline">
-                  View applications
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link href={`/dashboard/casting-calls/${c.id}`} className="font-semibold text-rose-600 hover:underline">
+                    Manage
+                  </Link>
+                  <button
+                    type="button"
+                    disabled={callActionId === c.id}
+                    onClick={() => handleToggleCallStatus(c)}
+                    className="font-semibold text-zinc-600 hover:underline disabled:opacity-50 dark:text-zinc-300"
+                  >
+                    {c.status === "open" ? "Close" : "Reopen"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={callActionId === c.id}
+                    onClick={() => handleDeleteCall(c.id)}
+                    className="font-semibold text-zinc-500 hover:text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

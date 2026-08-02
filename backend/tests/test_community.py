@@ -1,3 +1,6 @@
+from tests.conftest import auth_headers, register_and_verify
+
+
 def create_title(client, headers, *, name="Superhitha", work_type="film", **extra):
     return client.post(
         "/api/v1/titles",
@@ -219,3 +222,99 @@ def test_report_accepts_new_community_target_types(client, talent_headers, talen
     )
     assert resp.status_code == 201, resp.text
     assert resp.json()["target_type"] == "title"
+
+
+def test_creator_can_update_own_title(client, talent_headers, talent_profile):
+    title = create_title(client, talent_headers, name="Original Name").json()
+    resp = client.patch(
+        f"/api/v1/titles/{title['id']}",
+        json={"name": "Corrected Name", "genre": "Drama"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["name"] == "Corrected Name"
+    assert resp.json()["genre"] == "Drama"
+
+
+def test_creator_can_delete_own_title(client, talent_headers, talent_profile):
+    title = create_title(client, talent_headers).json()
+    resp = client.delete(f"/api/v1/titles/{title['id']}", headers=talent_headers)
+    assert resp.status_code == 204
+    assert client.get(f"/api/v1/titles/{title['id']}").status_code == 404
+
+
+def test_non_creator_cannot_update_or_delete_title(client, talent_headers, talent_profile, db_session):
+    title = create_title(client, talent_headers).json()
+    other_token = register_and_verify(client, db_session, "other-talent@example.com", role="talent")
+    other_headers = auth_headers(other_token)
+
+    assert client.patch(f"/api/v1/titles/{title['id']}", json={"name": "Hijacked"}, headers=other_headers).status_code == 403
+    assert client.delete(f"/api/v1/titles/{title['id']}", headers=other_headers).status_code == 403
+    assert client.get(f"/api/v1/titles/{title['id']}").json()["name"] == title["name"]
+
+
+def test_author_can_update_own_thread(client, talent_headers, talent_profile):
+    thread = create_thread(client, talent_headers, subject="Original subject").json()
+    resp = client.patch(
+        f"/api/v1/discussions/{thread['id']}",
+        json={"subject": "Updated subject", "body": "Updated body"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["subject"] == "Updated subject"
+    assert resp.json()["body"] == "Updated body"
+
+
+def test_author_can_delete_own_thread(client, talent_headers, talent_profile):
+    thread = create_thread(client, talent_headers).json()
+    resp = client.delete(f"/api/v1/discussions/{thread['id']}", headers=talent_headers)
+    assert resp.status_code == 204
+    assert client.get(f"/api/v1/discussions/{thread['id']}").status_code == 404
+
+
+def test_non_author_cannot_update_or_delete_thread(client, talent_headers, talent_profile, db_session):
+    thread = create_thread(client, talent_headers).json()
+    other_token = register_and_verify(client, db_session, "other-thread-talent@example.com", role="talent")
+    other_headers = auth_headers(other_token)
+
+    assert client.patch(f"/api/v1/discussions/{thread['id']}", json={"subject": "Hijacked"}, headers=other_headers).status_code == 403
+    assert client.delete(f"/api/v1/discussions/{thread['id']}", headers=other_headers).status_code == 403
+
+
+def test_author_can_update_own_reply(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+    thread = create_thread(client, talent_headers).json()
+    reply = client.post(
+        f"/api/v1/discussions/{thread['id']}/replies", json={"body": "Original reply"}, headers=recruiter_headers
+    ).json()
+
+    resp = client.patch(
+        f"/api/v1/discussions/{thread['id']}/replies/{reply['id']}",
+        json={"body": "Edited reply"},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["body"] == "Edited reply"
+
+
+def test_author_can_delete_own_reply(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+    thread = create_thread(client, talent_headers).json()
+    reply = client.post(
+        f"/api/v1/discussions/{thread['id']}/replies", json={"body": "Reply to delete"}, headers=recruiter_headers
+    ).json()
+
+    resp = client.delete(f"/api/v1/discussions/{thread['id']}/replies/{reply['id']}", headers=recruiter_headers)
+    assert resp.status_code == 204
+    assert client.get(f"/api/v1/discussions/{thread['id']}/replies").json() == []
+
+
+def test_non_author_cannot_update_or_delete_reply(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+    thread = create_thread(client, talent_headers).json()
+    reply = client.post(
+        f"/api/v1/discussions/{thread['id']}/replies", json={"body": "Not yours"}, headers=recruiter_headers
+    ).json()
+
+    # talent_headers is the thread author, not the reply author (recruiter posted the reply).
+    assert client.patch(
+        f"/api/v1/discussions/{thread['id']}/replies/{reply['id']}", json={"body": "Hijacked"}, headers=talent_headers
+    ).status_code == 403
+    assert client.delete(f"/api/v1/discussions/{thread['id']}/replies/{reply['id']}", headers=talent_headers).status_code == 403

@@ -16,6 +16,16 @@ class TitleCreate(BaseModel):
     poster_url: str | None = None
 
 
+class TitleUpdate(BaseModel):
+    name: str | None = None
+    work_type: WorkType | None = None
+    release_year: int | None = None
+    genre: str | None = None
+    language: str | None = None
+    synopsis: str | None = None
+    poster_url: str | None = None
+
+
 class TitleRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

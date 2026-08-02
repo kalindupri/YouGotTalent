@@ -178,6 +178,87 @@ def test_cannot_delete_another_talents_credit(client, db_session):
     assert resp.status_code == 404
 
 
+def test_update_own_credit(client, talent_headers):
+    create_profile(client, talent_headers)
+    resp = client.post(
+        "/api/v1/talents/me/credits",
+        json={"project_type": "film", "title": "Short film lead", "role": "Lead actor"},
+        headers=talent_headers,
+    )
+    credit_id = resp.json()["id"]
+
+    resp = client.patch(
+        f"/api/v1/talents/me/credits/{credit_id}",
+        json={"title": "Feature film lead", "role": "Supporting actor"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["title"] == "Feature film lead"
+    assert resp.json()["role"] == "Supporting actor"
+    assert resp.json()["project_type"] == "film"
+
+
+def test_cannot_update_another_talents_credit(client, db_session):
+    token_a = register_and_verify(client, db_session, "credit-a@example.com", role="talent")
+    token_b = register_and_verify(client, db_session, "credit-b@example.com", role="talent")
+    headers_a = auth_headers(token_a)
+    headers_b = auth_headers(token_b)
+
+    create_profile(client, headers_a, display_name="Credit A")
+    create_profile(client, headers_b, display_name="Credit B")
+
+    credit_id = client.post(
+        "/api/v1/talents/me/credits",
+        json={"project_type": "film", "title": "A's credit"},
+        headers=headers_a,
+    ).json()["id"]
+
+    resp = client.patch(f"/api/v1/talents/me/credits/{credit_id}", json={"title": "Hijacked"}, headers=headers_b)
+    assert resp.status_code == 404
+
+
+def test_update_and_delete_own_media(client, talent_headers):
+    create_profile(client, talent_headers)
+    resp = client.post(
+        "/api/v1/talents/me/media",
+        json={"url": "https://example.com/photo.jpg", "media_type": "photo", "title": "Headshot"},
+        headers=talent_headers,
+    )
+    media_id = resp.json()["id"]
+
+    resp = client.patch(f"/api/v1/talents/me/media/{media_id}", json={"title": "Updated headshot"}, headers=talent_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["title"] == "Updated headshot"
+
+    resp = client.delete(f"/api/v1/talents/me/media/{media_id}", headers=talent_headers)
+    assert resp.status_code == 204
+
+    resp = client.delete(f"/api/v1/talents/me/media/{media_id}", headers=talent_headers)
+    assert resp.status_code == 404
+
+
+def test_cannot_edit_or_delete_another_talents_media(client, db_session):
+    token_a = register_and_verify(client, db_session, "media-a@example.com", role="talent")
+    token_b = register_and_verify(client, db_session, "media-b@example.com", role="talent")
+    headers_a = auth_headers(token_a)
+    headers_b = auth_headers(token_b)
+
+    create_profile(client, headers_a, display_name="Media A")
+    create_profile(client, headers_b, display_name="Media B")
+
+    media_id = client.post(
+        "/api/v1/talents/me/media",
+        json={"url": "https://example.com/photo.jpg", "media_type": "photo"},
+        headers=headers_a,
+    ).json()["id"]
+
+    assert client.patch(f"/api/v1/talents/me/media/{media_id}", json={"title": "Hijacked"}, headers=headers_b).status_code == 404
+    assert client.delete(f"/api/v1/talents/me/media/{media_id}", headers=headers_b).status_code == 404
+
+    # Confirm B's failed attempts didn't touch A's copy — still deletable by the real owner.
+    assert client.delete(f"/api/v1/talents/me/media/{media_id}", headers=headers_a).status_code == 204
+
+
 def test_browse_filters_by_category(client, talent_headers, db_session):
     create_profile(client, talent_headers, category="singing")
     token_b = register_and_verify(client, db_session, "actor@example.com", role="talent")

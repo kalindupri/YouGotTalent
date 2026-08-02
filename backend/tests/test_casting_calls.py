@@ -1,3 +1,6 @@
+from tests.conftest import auth_headers, register_and_verify
+
+
 def test_create_single_role_casting_call(client, recruiter_headers, recruiter_profile):
     resp = client.post(
         "/api/v1/casting-calls",
@@ -130,4 +133,57 @@ def test_get_casting_call_by_id(client, casting_call):
 
 def test_get_casting_call_unknown_id_404(client):
     resp = client.get("/api/v1/casting-calls/00000000-0000-0000-0000-000000000000")
+    assert resp.status_code == 404
+
+
+def test_owner_can_update_own_casting_call(client, casting_call, recruiter_headers):
+    resp = client.patch(
+        f"/api/v1/casting-calls/{casting_call['id']}",
+        json={"title": "Updated title", "compensation": "LKR 50,000", "status": "closed"},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["title"] == "Updated title"
+    assert body["compensation"] == "LKR 50,000"
+    assert body["status"] == "closed"
+    # Untouched fields survive a partial update.
+    assert body["description"] == casting_call["description"]
+
+
+def test_owner_can_delete_own_casting_call(client, casting_call, recruiter_headers):
+    resp = client.delete(f"/api/v1/casting-calls/{casting_call['id']}", headers=recruiter_headers)
+    assert resp.status_code == 204
+
+    resp = client.get(f"/api/v1/casting-calls/{casting_call['id']}")
+    assert resp.status_code == 404
+
+
+def test_non_owner_cannot_update_or_delete_casting_call(client, casting_call, db_session):
+    other_token = register_and_verify(client, db_session, "other-recruiter@example.com", role="recruiter")
+    other_headers = auth_headers(other_token)
+    client.post(
+        "/api/v1/recruiters/me",
+        json={"company_name": "Other Agency", "industry": "Film"},
+        headers=other_headers,
+    )
+
+    resp = client.patch(f"/api/v1/casting-calls/{casting_call['id']}", json={"title": "Hijacked"}, headers=other_headers)
+    assert resp.status_code == 403
+
+    resp = client.delete(f"/api/v1/casting-calls/{casting_call['id']}", headers=other_headers)
+    assert resp.status_code == 403
+
+    # Still there, untouched.
+    resp = client.get(f"/api/v1/casting-calls/{casting_call['id']}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == casting_call["title"]
+
+
+def test_update_unknown_casting_call_404(client, recruiter_headers):
+    resp = client.patch(
+        "/api/v1/casting-calls/00000000-0000-0000-0000-000000000000",
+        json={"title": "x"},
+        headers=recruiter_headers,
+    )
     assert resp.status_code == 404

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.author import get_author_info
 from app.models.discussion import DiscussionCategory, DiscussionReply, DiscussionThread
-from app.schemas.discussion import ThreadCreate, ReplyCreate
+from app.schemas.discussion import ReplyCreate, ReplyUpdate, ThreadCreate, ThreadUpdate
 
 
 def _to_thread_dict(db: Session, thread: DiscussionThread, reply_count: int | None = None) -> dict:
@@ -19,10 +19,25 @@ def _to_thread_dict(db: Session, thread: DiscussionThread, reply_count: int | No
         "body": thread.body,
         "title_id": thread.title_id,
         "created_at": thread.created_at,
+        "author_user_id": thread.author_user_id,
         "author_name": author["name"],
         "author_role": author["role"],
         "author_profile_id": author["profile_id"],
         "reply_count": reply_count,
+    }
+
+
+def _to_reply_dict(db: Session, reply: DiscussionReply) -> dict:
+    author = get_author_info(db, reply.author_user_id)
+    return {
+        "id": reply.id,
+        "thread_id": reply.thread_id,
+        "body": reply.body,
+        "created_at": reply.created_at,
+        "author_user_id": reply.author_user_id,
+        "author_name": author["name"],
+        "author_role": author["role"],
+        "author_profile_id": author["profile_id"],
     }
 
 
@@ -56,6 +71,14 @@ def list_threads(db: Session, category: DiscussionCategory | None = None, title_
     return [_to_thread_dict(db, t) for t in threads]
 
 
+def update_thread(db: Session, thread: DiscussionThread, thread_in: ThreadUpdate) -> dict:
+    for field, value in thread_in.model_dump(exclude_unset=True).items():
+        setattr(thread, field, value)
+    db.commit()
+    db.refresh(thread)
+    return _to_thread_dict(db, thread)
+
+
 def delete_thread(db: Session, thread: DiscussionThread) -> None:
     db.delete(thread)
     db.commit()
@@ -66,39 +89,23 @@ def create_reply(db: Session, thread_id: uuid.UUID, user_id: uuid.UUID, reply_in
     db.add(reply)
     db.commit()
     db.refresh(reply)
-    author = get_author_info(db, user_id)
-    return {
-        "id": reply.id,
-        "thread_id": reply.thread_id,
-        "body": reply.body,
-        "created_at": reply.created_at,
-        "author_name": author["name"],
-        "author_role": author["role"],
-        "author_profile_id": author["profile_id"],
-    }
+    return _to_reply_dict(db, reply)
 
 
 def list_replies(db: Session, thread_id: uuid.UUID) -> list[dict]:
     replies = db.query(DiscussionReply).filter(DiscussionReply.thread_id == thread_id).order_by(DiscussionReply.created_at.asc()).all()
-    out = []
-    for r in replies:
-        author = get_author_info(db, r.author_user_id)
-        out.append(
-            {
-                "id": r.id,
-                "thread_id": r.thread_id,
-                "body": r.body,
-                "created_at": r.created_at,
-                "author_name": author["name"],
-                "author_role": author["role"],
-                "author_profile_id": author["profile_id"],
-            }
-        )
-    return out
+    return [_to_reply_dict(db, r) for r in replies]
 
 
 def get_reply(db: Session, reply_id: uuid.UUID) -> DiscussionReply | None:
     return db.query(DiscussionReply).filter(DiscussionReply.id == reply_id).first()
+
+
+def update_reply(db: Session, reply: DiscussionReply, reply_in: ReplyUpdate) -> dict:
+    reply.body = reply_in.body
+    db.commit()
+    db.refresh(reply)
+    return _to_reply_dict(db, reply)
 
 
 def delete_reply(db: Session, reply: DiscussionReply) -> None:

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.author import get_author_info
 from app.models.title import Title, TitleReview, WorkType
-from app.schemas.title import TitleCreate, TitleReviewCreate
+from app.schemas.title import TitleCreate, TitleReviewCreate, TitleUpdate
 
 
 def _attach_rating_summary(db: Session, title: Title) -> Title:
@@ -39,6 +39,14 @@ def list_titles(db: Session, work_type: WorkType | None = None, q: str | None = 
         query = query.filter(or_(Title.name.ilike(pattern), Title.genre.ilike(pattern)))
     titles = query.order_by(Title.created_at.desc()).all()
     return [_attach_rating_summary(db, t) for t in titles]
+
+
+def update_title(db: Session, title: Title, title_in: TitleUpdate) -> Title:
+    for field, value in title_in.model_dump(exclude_unset=True).items():
+        setattr(title, field, value)
+    db.commit()
+    db.refresh(title)
+    return _attach_rating_summary(db, title)
 
 
 def delete_title(db: Session, title: Title) -> None:

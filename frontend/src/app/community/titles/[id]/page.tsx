@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Star } from "lucide-react";
-import { ApiError, Title, TitleReview, api } from "@/lib/api";
+import { ApiError, Title, TitleReview, WorkType, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { btnPrimary, btnSmall, inputClass, sectionClass } from "@/lib/ui";
+import { btnPrimary, btnSmall, inputClass, labelClass, sectionClass } from "@/lib/ui";
 import ReportButton from "@/components/ReportButton";
 import TitlePoster from "@/components/TitlePoster";
 import AuthorAvatar from "@/components/AuthorAvatar";
@@ -65,6 +65,7 @@ function RatingDistribution({ reviews }: { reviews: TitleReview[] }) {
 export default function TitleDetailPage() {
   const params = useParams();
   const titleId = params.id as string;
+  const router = useRouter();
   const { user, token } = useAuth();
 
   const [title, setTitle] = useState<Title | null>(null);
@@ -72,6 +73,8 @@ export default function TitleDetailPage() {
   const [myReview, setMyReview] = useState<TitleReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [deletingTitle, setDeletingTitle] = useState(false);
 
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState("");
@@ -134,6 +137,18 @@ export default function TitleDetailPage() {
     }
   }
 
+  async function handleDeleteTitle() {
+    if (!token) return;
+    if (!window.confirm("Delete this title? Its ratings and critiques will be removed too. Linked discussions will stay but lose the link.")) return;
+    setDeletingTitle(true);
+    try {
+      await api.deleteTitle(titleId, token);
+      router.push("/community/titles");
+    } catch {
+      setDeletingTitle(false);
+    }
+  }
+
   if (notFound) {
     return (
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-14">
@@ -158,13 +173,45 @@ export default function TitleDetailPage() {
             <span className="text-xs font-bold uppercase tracking-widest text-rose-400">{WORK_TYPE_LABELS[title.work_type]}</span>
             <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
               <h1 className="font-heading text-3xl font-black text-white sm:text-4xl">{title.name}</h1>
-              <ReportButton targetType="title" targetId={title.id} />
+              <div className="flex items-center gap-3">
+                {user && user.id === title.added_by_user_id && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTitle((v) => !v)}
+                      className="text-sm font-semibold text-zinc-300 hover:text-white hover:underline"
+                    >
+                      {editingTitle ? "Cancel" : "Edit"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingTitle}
+                      onClick={handleDeleteTitle}
+                      className="text-sm font-semibold text-red-400 hover:text-red-300 hover:underline disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+                <ReportButton targetType="title" targetId={title.id} />
+              </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2 text-sm text-zinc-400">
               {title.release_year && <span>{title.release_year}</span>}
               {title.genre && <span>· {title.genre}</span>}
               {title.language && <span>· {title.language}</span>}
             </div>
+
+            {editingTitle && (
+              <EditTitleForm
+                title={title}
+                token={token!}
+                onSaved={(updated) => {
+                  setTitle(updated);
+                  setEditingTitle(false);
+                }}
+              />
+            )}
 
             <div className="mt-6 flex flex-wrap items-center gap-8">
               <div className="flex items-center gap-3">
@@ -250,6 +297,95 @@ export default function TitleDetailPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function EditTitleForm({ title, token, onSaved }: { title: Title; token: string; onSaved: (t: Title) => void }) {
+  const [name, setName] = useState(title.name);
+  const [workType, setWorkType] = useState<WorkType>(title.work_type);
+  const [releaseYear, setReleaseYear] = useState(title.release_year?.toString() ?? "");
+  const [genre, setGenre] = useState(title.genre ?? "");
+  const [language, setLanguage] = useState(title.language ?? "");
+  const [synopsis, setSynopsis] = useState(title.synopsis ?? "");
+  const [posterUrl, setPosterUrl] = useState(title.poster_url ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const updated = await api.updateTitle(
+        title.id,
+        {
+          name,
+          work_type: workType,
+          release_year: releaseYear ? Number(releaseYear) : undefined,
+          genre: genre || undefined,
+          language: language || undefined,
+          synopsis: synopsis || undefined,
+          poster_url: posterUrl || undefined,
+        },
+        token
+      );
+      onSaved(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save these changes.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="mt-6 flex max-w-md flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4"
+    >
+      <label className={`${labelClass} text-zinc-300`}>
+        Name
+        <input required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+      </label>
+      <label className={`${labelClass} text-zinc-300`}>
+        Type
+        <select value={workType} onChange={(e) => setWorkType(e.target.value as WorkType)} className={inputClass}>
+          <option value="film">Film</option>
+          <option value="tv_series">TV series</option>
+          <option value="song">Song</option>
+        </select>
+      </label>
+      <label className={`${labelClass} text-zinc-300`}>
+        Release year
+        <input
+          type="number"
+          value={releaseYear}
+          onChange={(e) => setReleaseYear(e.target.value)}
+          className={inputClass}
+        />
+      </label>
+      <label className={`${labelClass} text-zinc-300`}>
+        Genre
+        <input value={genre} onChange={(e) => setGenre(e.target.value)} className={inputClass} />
+      </label>
+      <label className={`${labelClass} text-zinc-300`}>
+        Language
+        <input value={language} onChange={(e) => setLanguage(e.target.value)} className={inputClass} />
+      </label>
+      <label className={`${labelClass} text-zinc-300`}>
+        Synopsis
+        <textarea rows={3} value={synopsis} onChange={(e) => setSynopsis(e.target.value)} className={inputClass} />
+      </label>
+      <label className={`${labelClass} text-zinc-300`}>
+        Poster URL
+        <input value={posterUrl} onChange={(e) => setPosterUrl(e.target.value)} className={inputClass} />
+      </label>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={submitting} className={btnPrimary}>
+          {submitting ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+    </form>
   );
 }
 

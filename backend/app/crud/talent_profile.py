@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.media import Media, MediaType
 from app.models.talent_profile import TalentCategory, TalentProfile
-from app.schemas.talent_profile import MediaCreate, TalentProfileCreate, TalentProfileUpdate
+from app.schemas.talent_profile import MediaCreate, MediaUpdate, TalentProfileCreate, TalentProfileUpdate
 
 
 def get_talent_profile(db: Session, talent_id: uuid.UUID) -> TalentProfile | None:
@@ -117,6 +117,18 @@ def count_media_by_type(db: Session, talent_profile_id: uuid.UUID, media_type: M
 
 def get_cover_media(db: Session, talent_profile_id: uuid.UUID) -> Media | None:
     return db.query(Media).filter(Media.talent_profile_id == talent_profile_id, Media.is_cover.is_(True)).first()
+
+
+def update_media(db: Session, media: Media, media_in: MediaUpdate) -> Media:
+    for field, value in media_in.model_dump(exclude_unset=True).items():
+        setattr(media, field, value)
+    db.commit()
+    db.refresh(media)
+    return media
+
+
+def get_media(db: Session, media_id: uuid.UUID) -> Media | None:
+    return db.query(Media).filter(Media.id == media_id).first()
 
 
 def delete_media(db: Session, media: Media) -> None:

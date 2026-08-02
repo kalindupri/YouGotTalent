@@ -6,7 +6,7 @@ from app.models.application import Application, ApplicationStatus
 from app.models.casting_call import CastingCall
 from app.models.casting_call_role import CastingCallRole
 from app.models.talent_profile import TalentCategory
-from app.schemas.casting_call import CastingCallCreate
+from app.schemas.casting_call import CastingCallCreate, CastingCallUpdate
 
 
 def get_casting_call(db: Session, casting_call_id: uuid.UUID) -> CastingCall | None:
@@ -36,6 +36,19 @@ def create_casting_call(db: Session, recruiter_id: uuid.UUID, call_in: CastingCa
     db.commit()
     db.refresh(call)
     return call
+
+
+def update_casting_call(db: Session, call: CastingCall, call_in: CastingCallUpdate) -> CastingCall:
+    for field, value in call_in.model_dump(exclude_unset=True).items():
+        setattr(call, field, value)
+    db.commit()
+    db.refresh(call)
+    return call
+
+
+def delete_casting_call(db: Session, call: CastingCall) -> None:
+    db.delete(call)
+    db.commit()
 
 
 def get_recruiter_analytics(db: Session, recruiter_id: uuid.UUID) -> dict:

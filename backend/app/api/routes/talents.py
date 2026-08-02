@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud import subscription as subscription_crud
-from app.crud.credit import create_credit, delete_credit, get_credit
+from app.crud.credit import create_credit, delete_credit, get_credit, update_credit
 from app.crud.review import get_talent_review_summary
 from app.crud.saved_talent import get_saved_talent, save_talent, unsave_talent
 from app.crud.talent_profile import (
@@ -21,10 +21,12 @@ from app.crud.talent_profile import (
     create_talent_profile,
     delete_media,
     get_cover_media,
+    get_media,
     get_talent_profile,
     get_talent_profile_by_user,
     list_talent_profiles,
     request_verification,
+    update_media,
     update_talent_profile,
 )
 from app.db.session import get_db
@@ -32,11 +34,12 @@ from app.models.media import MediaType
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentCategory, TalentProfile
 from app.models.user import User
-from app.schemas.credit import CreditCreate, CreditRead
+from app.schemas.credit import CreditCreate, CreditRead, CreditUpdate
 from app.schemas.review import TalentReviewSummary
 from app.schemas.talent_profile import (
     MediaCreate,
     MediaRead,
+    MediaUpdate,
     TalentProfileCreate,
     TalentProfileRead,
     TalentProfileUpdate,
@@ -234,6 +237,32 @@ def upload_my_cover_photo(
     return add_media(db, profile.id, media_in)
 
 
+@router.patch("/me/media/{media_id}", response_model=MediaRead)
+def update_my_media(
+    media_id: uuid.UUID,
+    media_in: MediaUpdate,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    media = get_media(db, media_id)
+    if media is None or media.talent_profile_id != profile.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media item not found")
+    return update_media(db, media, media_in)
+
+
+@router.delete("/me/media/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_media(
+    media_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    media = get_media(db, media_id)
+    if media is None or media.talent_profile_id != profile.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media item not found")
+    delete_media_file(media.url)
+    delete_media(db, media)
+
+
 @router.post("/me/intro-video", response_model=TalentProfileRead, status_code=status.HTTP_201_CREATED)
 def upload_my_intro_video(
     file: UploadFile = File(...),
@@ -305,6 +334,19 @@ def add_my_credit(
     profile: TalentProfile = Depends(get_current_talent_profile),
 ):
     return create_credit(db, profile.id, credit_in)
+
+
+@router.patch("/me/credits/{credit_id}", response_model=CreditRead)
+def update_my_credit(
+    credit_id: uuid.UUID,
+    credit_in: CreditUpdate,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    credit = get_credit(db, credit_id)
+    if credit is None or credit.talent_profile_id != profile.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credit not found")
+    return update_credit(db, credit, credit_in)
 
 
 @router.delete("/me/credits/{credit_id}", status_code=status.HTTP_204_NO_CONTENT)

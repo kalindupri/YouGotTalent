@@ -8,7 +8,7 @@ from app.crud import title as title_crud
 from app.db.session import get_db
 from app.models.title import WorkType
 from app.models.user import User
-from app.schemas.title import TitleCreate, TitleRead, TitleReviewCreate, TitleReviewRead
+from app.schemas.title import TitleCreate, TitleRead, TitleReviewCreate, TitleReviewRead, TitleUpdate
 
 router = APIRouter(prefix="/titles", tags=["titles"])
 
@@ -29,6 +29,31 @@ def read_title(title_id: uuid.UUID, db: Session = Depends(get_db)):
     if title is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Title not found")
     return title
+
+
+@router.patch("/{title_id}", response_model=TitleRead)
+def update_title(
+    title_id: uuid.UUID,
+    payload: TitleUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    title = title_crud.get_title(db, title_id)
+    if title is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Title not found")
+    if title.added_by_user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You didn't add this title")
+    return title_crud.update_title(db, title, payload)
+
+
+@router.delete("/{title_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_title(title_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    title = title_crud.get_title(db, title_id)
+    if title is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Title not found")
+    if title.added_by_user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You didn't add this title")
+    title_crud.delete_title(db, title)
 
 
 @router.get("/{title_id}/reviews", response_model=list[TitleReviewRead])

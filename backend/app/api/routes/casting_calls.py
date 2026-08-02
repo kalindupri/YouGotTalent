@@ -6,14 +6,21 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_recruiter_profile
 from app.core.config import settings
 from app.core.email import send_email
-from app.crud.casting_call import create_casting_call, get_casting_call, increment_view_count, list_casting_calls
+from app.crud.casting_call import (
+    create_casting_call,
+    delete_casting_call,
+    get_casting_call,
+    increment_view_count,
+    list_casting_calls,
+    update_casting_call,
+)
 from app.crud.follow import list_follower_talents
 from app.crud.recruiter_profile import count_open_casting_calls
 from app.crud.talent_profile import list_talent_profiles_for_job_alert
 from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentCategory
-from app.schemas.casting_call import CastingCallCreate, CastingCallRead
+from app.schemas.casting_call import CastingCallCreate, CastingCallRead, CastingCallUpdate
 
 router = APIRouter(prefix="/casting-calls", tags=["casting-calls"])
 
@@ -84,3 +91,33 @@ def create_new_casting_call(
         )
 
     return call
+
+
+def _get_own_casting_call(db: Session, casting_call_id: uuid.UUID, recruiter: RecruiterProfile):
+    call = get_casting_call(db, casting_call_id)
+    if call is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Casting call not found")
+    if call.recruiter_id != recruiter.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't own this talent hunt")
+    return call
+
+
+@router.patch("/{casting_call_id}", response_model=CastingCallRead)
+def update_my_casting_call(
+    casting_call_id: uuid.UUID,
+    call_in: CastingCallUpdate,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    call = _get_own_casting_call(db, casting_call_id, recruiter)
+    return update_casting_call(db, call, call_in)
+
+
+@router.delete("/{casting_call_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_casting_call(
+    casting_call_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    call = _get_own_casting_call(db, casting_call_id, recruiter)
+    delete_casting_call(db, call)

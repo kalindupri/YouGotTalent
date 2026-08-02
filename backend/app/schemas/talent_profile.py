@@ -63,6 +63,10 @@ class MediaCreate(BaseModel):
     is_cover: bool = False
 
 
+class MediaUpdate(BaseModel):
+    title: str | None = None
+
+
 class TalentProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

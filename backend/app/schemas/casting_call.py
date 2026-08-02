@@ -24,6 +24,20 @@ class CastingCallCreate(BaseModel):
     roles: list[CastingCallRoleCreate] = Field(min_length=1)
 
 
+class CastingCallUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    category: TalentCategory | None = None
+    location: str | None = None
+    compensation: str | None = None
+    application_deadline: date | None = None
+    status: CastingCallStatus | None = None
+    audition_brief: str | None = None
+    audition_reference_url: str | None = None
+    tags: list[str] | None = None
+    shoot_details: str | None = None
+
+
 class CastingCallRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

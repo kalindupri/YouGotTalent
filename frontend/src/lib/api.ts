@@ -90,6 +90,20 @@ export interface CreditInput {
   reference_url?: string;
 }
 
+export interface CreditUpdateInput {
+  project_type?: CreditProjectType;
+  title?: string;
+  role?: string;
+  company_or_director?: string;
+  location?: string;
+  date_label?: string;
+  reference_url?: string;
+}
+
+export interface MediaUpdateInput {
+  title?: string;
+}
+
 export interface TalentProfile {
   id: string;
   user_id: string;
@@ -477,6 +491,16 @@ export interface TitleCreateInput {
   poster_url?: string;
 }
 
+export interface TitleUpdateInput {
+  name?: string;
+  work_type?: WorkType;
+  release_year?: number;
+  genre?: string;
+  language?: string;
+  synopsis?: string;
+  poster_url?: string;
+}
+
 export interface TitleReviewCreateInput {
   rating: number;
   body?: string;
@@ -509,13 +533,25 @@ export interface DiscussionThread {
   body: string;
   title_id: string | null;
   created_at: string;
+  author_user_id: string;
   author_name: string;
   author_role: string;
   author_profile_id: string | null;
   reply_count: number;
 }
 
+export interface ThreadUpdateInput {
+  category?: DiscussionCategory;
+  subject?: string;
+  body?: string;
+  title_id?: string;
+}
+
 export interface ReplyCreateInput {
+  body: string;
+}
+
+export interface ReplyUpdateInput {
   body: string;
 }
 
@@ -524,6 +560,7 @@ export interface DiscussionReply {
   thread_id: string;
   body: string;
   created_at: string;
+  author_user_id: string;
   author_name: string;
   author_role: string;
   author_profile_id: string | null;
@@ -759,6 +796,10 @@ export const api = {
     }
     return res.json();
   },
+  updateMyMedia: (mediaId: string, data: MediaUpdateInput, token: string) =>
+    request<Media>(`/talents/me/media/${mediaId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
+  deleteMyMedia: (mediaId: string, token: string) =>
+    request<void>(`/talents/me/media/${mediaId}`, { method: "DELETE" }, token),
   saveTalent: (talentId: string, token: string) =>
     request<void>(`/talents/${talentId}/save`, { method: "POST" }, token),
   unsaveTalent: (talentId: string, token: string) =>
@@ -769,6 +810,8 @@ export const api = {
   upgradeTalentTier: (token: string) => request<TalentProfile>("/talents/me/upgrade", { method: "POST" }, token),
   addMyCredit: (data: CreditInput, token: string) =>
     request<Credit>("/talents/me/credits", { method: "POST", body: JSON.stringify(data) }, token),
+  updateMyCredit: (creditId: string, data: CreditUpdateInput, token: string) =>
+    request<Credit>(`/talents/me/credits/${creditId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
   deleteMyCredit: (creditId: string, token: string) =>
     request<void>(`/talents/me/credits/${creditId}`, { method: "DELETE" }, token),
 
@@ -830,6 +873,25 @@ export const api = {
     },
     token: string
   ) => request<CastingCall>("/casting-calls", { method: "POST", body: JSON.stringify(data) }, token),
+  updateCastingCall: (
+    castingCallId: string,
+    data: {
+      title?: string;
+      description?: string;
+      category?: TalentCategory;
+      location?: string;
+      compensation?: string;
+      application_deadline?: string;
+      status?: CastingCallStatus;
+      audition_brief?: string;
+      audition_reference_url?: string;
+      tags?: string[];
+      shoot_details?: string;
+    },
+    token: string
+  ) => request<CastingCall>(`/casting-calls/${castingCallId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
+  deleteCastingCall: (castingCallId: string, token: string) =>
+    request<void>(`/casting-calls/${castingCallId}`, { method: "DELETE" }, token),
 
   applyToCastingCall: (
     castingCallId: string,
@@ -1037,6 +1099,9 @@ export const api = {
   submitTitleReview: (id: string, data: TitleReviewCreateInput, token: string) =>
     request<TitleReview>(`/titles/${id}/reviews`, { method: "POST", body: JSON.stringify(data) }, token),
   deleteMyTitleReview: (id: string, token: string) => request<void>(`/titles/${id}/reviews/mine`, { method: "DELETE" }, token),
+  updateTitle: (id: string, data: TitleUpdateInput, token: string) =>
+    request<Title>(`/titles/${id}`, { method: "PATCH", body: JSON.stringify(data) }, token),
+  deleteTitle: (id: string, token: string) => request<void>(`/titles/${id}`, { method: "DELETE" }, token),
 
   listDiscussions: (params: { category?: DiscussionCategory; title_id?: string; q?: string } = {}) => {
     const qs = new URLSearchParams();
@@ -1052,6 +1117,13 @@ export const api = {
   listDiscussionReplies: (id: string) => request<DiscussionReply[]>(`/discussions/${id}/replies`),
   createDiscussionReply: (id: string, data: ReplyCreateInput, token: string) =>
     request<DiscussionReply>(`/discussions/${id}/replies`, { method: "POST", body: JSON.stringify(data) }, token),
+  updateDiscussion: (id: string, data: ThreadUpdateInput, token: string) =>
+    request<DiscussionThread>(`/discussions/${id}`, { method: "PATCH", body: JSON.stringify(data) }, token),
+  deleteDiscussion: (id: string, token: string) => request<void>(`/discussions/${id}`, { method: "DELETE" }, token),
+  updateDiscussionReply: (threadId: string, replyId: string, data: ReplyUpdateInput, token: string) =>
+    request<DiscussionReply>(`/discussions/${threadId}/replies/${replyId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
+  deleteDiscussionReply: (threadId: string, replyId: string, token: string) =>
+    request<void>(`/discussions/${threadId}/replies/${replyId}`, { method: "DELETE" }, token),
 
   adminDeleteTitle: (id: string, token: string) => request<void>(`/admin/community/titles/${id}`, { method: "DELETE" }, token),
   adminDeleteTitleReview: (id: string, token: string) => request<void>(`/admin/community/reviews/${id}`, { method: "DELETE" }, token),

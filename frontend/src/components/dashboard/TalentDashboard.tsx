@@ -123,7 +123,7 @@ export default function TalentDashboard() {
       <SocialLinksCard profile={profile} onUpdated={setProfile} token={token!} />
       <AttributesCard profile={profile} onUpdated={setProfile} token={token!} />
       <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
-      <MediaGalleryCard profile={profile} />
+      <MediaGalleryCard profile={profile} onUpdated={setProfile} token={token!} />
       <AddMediaForm
         token={token!}
         profile={profile}
@@ -1197,6 +1197,53 @@ function CreditsCard({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editRole, setEditRole] = useState("");
+  const [editCompanyOrDirector, setEditCompanyOrDirector] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editDateLabel, setEditDateLabel] = useState("");
+  const [editReferenceUrl, setEditReferenceUrl] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  function startEditing(credit: Credit) {
+    setEditingId(credit.id);
+    setEditTitle(credit.title);
+    setEditRole(credit.role ?? "");
+    setEditCompanyOrDirector(credit.company_or_director ?? "");
+    setEditLocation(credit.location ?? "");
+    setEditDateLabel(credit.date_label ?? "");
+    setEditReferenceUrl(credit.reference_url ?? "");
+    setEditError(null);
+  }
+
+  async function handleEditSave(e: FormEvent) {
+    e.preventDefault();
+    if (!editingId) return;
+    setEditError(null);
+    setEditSubmitting(true);
+    try {
+      const updated = await api.updateMyCredit(
+        editingId,
+        {
+          title: editTitle,
+          role: editRole || undefined,
+          company_or_director: editCompanyOrDirector || undefined,
+          location: editLocation || undefined,
+          date_label: editDateLabel || undefined,
+          reference_url: editReferenceUrl || undefined,
+        },
+        token
+      );
+      onUpdated({ ...profile, credits: profile.credits.map((c) => (c.id === updated.id ? updated : c)) });
+      setEditingId(null);
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : "Could not save these changes.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
@@ -1309,44 +1356,175 @@ function CreditsCard({
         <p className="mt-4 text-sm text-zinc-500">No credits added yet.</p>
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
-          {profile.credits.map((c) => (
-            <li
-              key={c.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
-            >
-              <div>
-                <p className="flex items-center gap-1.5 font-semibold text-zinc-900 dark:text-zinc-50">
-                  {createElement(creditProjectTypeIcon(c.project_type), { className: "h-4 w-4 text-zinc-500" })}
-                  {c.title}
-                  {c.role && <span className="font-normal text-zinc-500"> — {c.role}</span>}
-                </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {creditProjectTypeLabel(c.project_type)}
-                  {c.date_label ? ` · ${c.date_label}` : ""}
-                  {c.company_or_director ? ` · ${c.company_or_director}` : ""}
-                </p>
-              </div>
-              <button onClick={() => handleDelete(c)} disabled={deletingId === c.id} className={btnSmall}>
-                Delete
-              </button>
-            </li>
-          ))}
+          {profile.credits.map((c) =>
+            editingId === c.id ? (
+              <li key={c.id} className="rounded-2xl border-2 border-zinc-100 p-4 dark:border-zinc-800">
+                <form onSubmit={handleEditSave} className="flex flex-col gap-3">
+                  <label className={labelClass}>
+                    Project title
+                    <input required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className={inputClass} />
+                  </label>
+                  <label className={labelClass}>
+                    Your role
+                    <input value={editRole} onChange={(e) => setEditRole(e.target.value)} className={inputClass} />
+                  </label>
+                  <label className={labelClass}>
+                    Company / director
+                    <input
+                      value={editCompanyOrDirector}
+                      onChange={(e) => setEditCompanyOrDirector(e.target.value)}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className={labelClass}>
+                    Location
+                    <input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className={inputClass} />
+                  </label>
+                  <label className={labelClass}>
+                    Date
+                    <input value={editDateLabel} onChange={(e) => setEditDateLabel(e.target.value)} className={inputClass} />
+                  </label>
+                  <label className={labelClass}>
+                    Reference link
+                    <input
+                      type="url"
+                      value={editReferenceUrl}
+                      onChange={(e) => setEditReferenceUrl(e.target.value)}
+                      className={inputClass}
+                    />
+                  </label>
+                  {editError && <p className="text-sm text-red-600">{editError}</p>}
+                  <div className="flex items-center gap-3">
+                    <button type="submit" disabled={editSubmitting} className={`w-fit ${btnPrimary}`}>
+                      {editSubmitting ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" onClick={() => setEditingId(null)} className={`w-fit ${btnSmall}`}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </li>
+            ) : (
+              <li
+                key={c.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
+              >
+                <div>
+                  <p className="flex items-center gap-1.5 font-semibold text-zinc-900 dark:text-zinc-50">
+                    {createElement(creditProjectTypeIcon(c.project_type), { className: "h-4 w-4 text-zinc-500" })}
+                    {c.title}
+                    {c.role && <span className="font-normal text-zinc-500"> — {c.role}</span>}
+                  </p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {creditProjectTypeLabel(c.project_type)}
+                    {c.date_label ? ` · ${c.date_label}` : ""}
+                    {c.company_or_director ? ` · ${c.company_or_director}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button onClick={() => startEditing(c)} className={btnSmall}>
+                    Edit
+                  </button>
+                  <button onClick={() => handleDelete(c)} disabled={deletingId === c.id} className={btnSmall}>
+                    Delete
+                  </button>
+                </div>
+              </li>
+            )
+          )}
         </ul>
       )}
     </section>
   );
 }
 
-function MediaGalleryCard({ profile }: { profile: TalentProfile }) {
+function MediaGalleryCard({
+  profile,
+  onUpdated,
+  token,
+}: {
+  profile: TalentProfile;
+  onUpdated: (p: TalentProfile) => void;
+  token: string;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
   if (profile.media.length === 0) return null;
+
+  function startEditing(media: Media) {
+    setEditingId(media.id);
+    setEditTitle(media.title ?? "");
+    setError(null);
+  }
+
+  async function handleEditSave(e: FormEvent) {
+    e.preventDefault();
+    if (!editingId) return;
+    setBusyId(editingId);
+    setError(null);
+    try {
+      const updated = await api.updateMyMedia(editingId, { title: editTitle || undefined }, token);
+      onUpdated({ ...profile, media: profile.media.map((m) => (m.id === updated.id ? updated : m)) });
+      setEditingId(null);
+    } catch {
+      setError("Could not save this title.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(media: Media) {
+    if (!window.confirm("Delete this media item?")) return;
+    setBusyId(media.id);
+    setError(null);
+    try {
+      await api.deleteMyMedia(media.id, token);
+      onUpdated({ ...profile, media: profile.media.filter((m) => m.id !== media.id) });
+    } catch {
+      setError("Could not delete this media item.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <section className={sectionClass}>
       <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Your auditions</h2>
       <p className="mt-1 text-sm text-zinc-500">Preview and play back what you&apos;ve added so far.</p>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {profile.media.map((m) => (
-          <MediaCard key={m.id} media={m} />
+          <div key={m.id} className="flex flex-col gap-2">
+            <MediaCard media={m} />
+            {editingId === m.id ? (
+              <form onSubmit={handleEditSave} className="flex items-center gap-2">
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Title"
+                  className={`${inputClass} flex-1`}
+                />
+                <button type="submit" disabled={busyId === m.id} className={btnSmall}>
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingId(null)} className={btnSmall}>
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button onClick={() => startEditing(m)} className={btnSmall}>
+                  Edit title
+                </button>
+                <button onClick={() => handleDelete(m)} disabled={busyId === m.id} className={btnSmall}>
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </section>
