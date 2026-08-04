@@ -33,6 +33,9 @@ class Application(Base):
     status: Mapped[ApplicationStatus] = mapped_column(Enum(ApplicationStatus, name="application_status"), default=ApplicationStatus.PENDING, nullable=False)
 
     applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Stamped when the owning recruiter lists applications for this casting call — powers a
+    # simple read-receipt for the talent ("Seen" / "Not yet seen").
+    viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     casting_call: Mapped["CastingCall"] = relationship("CastingCall", back_populates="applications")
     role: Mapped["CastingCallRole"] = relationship("CastingCallRole", back_populates="applications")

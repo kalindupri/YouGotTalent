@@ -4,7 +4,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Save, ShieldCheck } from "lucide-react";
-import { ApiError, api, TALENT_CATEGORIES, TalentCategory, TalentProfile } from "@/lib/api";
+import { ApiError, api, CastingCall, TALENT_CATEGORIES, TalentCategory, TalentProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
   btnSecondary,
@@ -13,6 +13,8 @@ import {
   categoryBadgeClass,
   coverPhotoUrl,
   formatCategory,
+  formatInstrument,
+  INSTRUMENT_GROUPS,
   inputClass,
   labelClass,
   verifiedBadgeClass,
@@ -44,11 +46,58 @@ function TalentsPageContent() {
   const [experienceMin, setExperienceMin] = useState(searchParams.get("experience_min") ?? "");
   const [experienceMax, setExperienceMax] = useState(searchParams.get("experience_max") ?? "");
   const [verifiedOnly, setVerifiedOnly] = useState(searchParams.get("verified_only") === "true");
+  const [instruments, setInstruments] = useState<string[]>(searchParams.getAll("instruments"));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [savingSearch, setSavingSearch] = useState(false);
   const [saveSearchMessage, setSaveSearchMessage] = useState<string | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [myOpenCalls, setMyOpenCalls] = useState<CastingCall[]>([]);
+  const [inviteCallId, setInviteCallId] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token || user?.role !== "recruiter") return;
+    api
+      .getMyRecruiterProfile(token)
+      .then((recruiter) => api.listCastingCalls().then((all) => all.filter((c) => c.recruiter_id === recruiter.id && c.status === "open")))
+      .then(setMyOpenCalls)
+      .catch(() => {});
+  }, [token, user]);
+
+  function toggleInstrument(instrument: string) {
+    setInstruments((prev) => (prev.includes(instrument) ? prev.filter((i) => i !== instrument) : [...prev, instrument]));
+  }
+
+  function toggleSelected(talentId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(talentId)) next.delete(talentId);
+      else next.add(talentId);
+      return next;
+    });
+  }
+
+  async function handleBulkInvite() {
+    if (!token || !inviteCallId || selectedIds.size === 0) return;
+    setInviting(true);
+    setInviteMessage(null);
+    try {
+      const result = await api.bulkInviteTalent(inviteCallId, { talent_ids: Array.from(selectedIds) }, token);
+      setInviteMessage(
+        `Invited ${result.invited.length} talent${result.invited.length === 1 ? "" : "s"}.` +
+          (result.skipped.length > 0 ? ` ${result.skipped.length} already invited or unavailable.` : "")
+      );
+      setSelectedIds(new Set());
+    } catch (err) {
+      setInviteMessage(err instanceof ApiError ? err.message : "Could not send these invitations.");
+    } finally {
+      setInviting(false);
+    }
+  }
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -64,6 +113,7 @@ function TalentsPageContent() {
               experience_min: experienceMin ? Number(experienceMin) : undefined,
               experience_max: experienceMax ? Number(experienceMax) : undefined,
               verified_only: verifiedOnly || undefined,
+              instruments: instruments.length > 0 ? instruments : undefined,
             })
           );
         } catch {
@@ -75,7 +125,7 @@ function TalentsPageContent() {
       load();
     }, 250);
     return () => clearTimeout(handle);
-  }, [category, city, q, experienceMin, experienceMax, verifiedOnly]);
+  }, [category, city, q, experienceMin, experienceMax, verifiedOnly, instruments]);
 
   async function handleSaveSearch(e: FormEvent) {
     e.preventDefault();
@@ -176,6 +226,35 @@ function TalentsPageContent() {
             />
             Verified talent only
           </label>
+          <div className="flex w-full flex-col gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+              Instruments (music category)
+            </span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {INSTRUMENT_GROUPS.map((group) => (
+                <div key={group.label} className="flex flex-wrap items-center gap-1.5">
+                  {group.instruments.map((i) => (
+                    <label
+                      key={i}
+                      className={`cursor-pointer rounded-full border-2 px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        instruments.includes(i)
+                          ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                          : "border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={instruments.includes(i)}
+                        onChange={() => toggleInstrument(i)}
+                        className="hidden"
+                      />
+                      {formatInstrument(i)}
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
           {user?.role === "recruiter" && (
             <button type="submit" disabled={savingSearch} className={btnSecondary}>
               {savingSearch ? (
@@ -198,36 +277,50 @@ function TalentsPageContent() {
 
       <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
         {talents.map((t) => (
-          <Link
-            key={t.id}
-            href={`/talents/${t.id}`}
-            className="group overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
-          >
-            <div className="aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-              <TalentAvatar
-                name={t.display_name}
-                coverUrl={coverPhotoUrl(t.media)}
-                className="h-full w-full text-4xl transition-transform duration-300 group-hover:scale-105"
-              />
-            </div>
-            <div className="p-4">
-              <div className="flex items-center gap-1.5">
-                <p className="font-heading text-lg font-bold text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
-                {t.is_verified && (
-                  <span className={verifiedBadgeClass}>
-                    <ShieldCheck className="h-3 w-3" />
-                  </span>
+          <div key={t.id} className="relative">
+            {user?.role === "recruiter" && myOpenCalls.length > 0 && (
+              <label
+                className="absolute left-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-white/90 shadow"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(t.id)}
+                  onChange={() => toggleSelected(t.id)}
+                  className="h-4 w-4 accent-rose-600"
+                />
+              </label>
+            )}
+            <Link
+              href={`/talents/${t.id}`}
+              className="group block overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <div className="aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                <TalentAvatar
+                  name={t.display_name}
+                  coverUrl={coverPhotoUrl(t.media)}
+                  className="h-full w-full text-4xl transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              <div className="p-4">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-heading text-lg font-bold text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
+                  {t.is_verified && (
+                    <span className={verifiedBadgeClass}>
+                      <ShieldCheck className="h-3 w-3" />
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className={categoryBadgeClass(t.category)}>{formatCategory(t.category)}</span>
+                  {t.city && <span className="text-xs text-zinc-500">{t.city}</span>}
+                </div>
+                {t.skills && t.skills.length > 0 && (
+                  <p className="mt-2 truncate text-xs text-zinc-500">{t.skills.slice(0, 3).join(" · ")}</p>
                 )}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className={categoryBadgeClass(t.category)}>{formatCategory(t.category)}</span>
-                {t.city && <span className="text-xs text-zinc-500">{t.city}</span>}
-              </div>
-              {t.skills && t.skills.length > 0 && (
-                <p className="mt-2 truncate text-xs text-zinc-500">{t.skills.slice(0, 3).join(" · ")}</p>
-              )}
-            </div>
-          </Link>
+            </Link>
+          </div>
         ))}
         {loading &&
           Array.from({ length: 6 }).map((_, i) => (
@@ -236,6 +329,45 @@ function TalentsPageContent() {
             </div>
           ))}
       </div>
+
+      {(selectedIds.size > 0 || inviteMessage) && (
+        <div className="sticky bottom-4 mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+          {selectedIds.size > 0 && (
+            <>
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                {selectedIds.size} talent selected
+              </span>
+              <select value={inviteCallId} onChange={(e) => setInviteCallId(e.target.value)} className={`${inputClass} w-auto`}>
+                <option value="">Invite to…</option>
+                {myOpenCalls.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!inviteCallId || inviting}
+                onClick={handleBulkInvite}
+                className={btnSecondary}
+              >
+                {inviting ? "Inviting…" : "Send invitations"}
+              </button>
+              <button type="button" onClick={() => setSelectedIds(new Set())} className={btnSmall}>
+                Clear
+              </button>
+            </>
+          )}
+          {inviteMessage && (
+            <p className="w-full text-sm text-zinc-500">
+              {inviteMessage}{" "}
+              <button type="button" onClick={() => setInviteMessage(null)} className="font-semibold text-rose-600 hover:underline">
+                Dismiss
+              </button>
+            </p>
+          )}
+        </div>
+      )}
     </main>
   );
 }

@@ -10,6 +10,7 @@ from app.api.routes import (
     auth,
     billing,
     bookings,
+    calendar,
     casting_calls,
     conversations,
     discussions,
@@ -51,6 +52,7 @@ app.include_router(conversations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(invitations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(bookings.router, prefix=settings.API_V1_PREFIX)
+app.include_router(calendar.router, prefix=settings.API_V1_PREFIX)
 app.include_router(follows.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(billing.router, prefix=settings.API_V1_PREFIX)

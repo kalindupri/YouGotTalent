@@ -114,6 +114,7 @@ export interface TalentProfile {
   date_of_birth: string | null;
   experience_years: number | null;
   skills: string[] | null;
+  instruments: string[] | null;
   tier: "free" | "premium";
   is_verified: boolean;
   verification_requested_at: string | null;
@@ -139,6 +140,7 @@ export interface TalentProfileInput {
   date_of_birth?: string | null;
   experience_years?: number | null;
   skills?: string[] | null;
+  instruments?: string[] | null;
   instagram_url?: string | null;
   facebook_url?: string | null;
   tiktok_url?: string | null;
@@ -207,6 +209,7 @@ export interface CastingCall {
   audition_reference_url: string | null;
   tags: string[] | null;
   shoot_details: string | null;
+  premium_talent_only: boolean;
   is_featured: boolean;
   view_count: number;
   created_at: string;
@@ -222,6 +225,19 @@ export interface Application {
   submission_url: string | null;
   status: ApplicationStatus;
   applied_at: string;
+  viewed_at: string | null;
+  match_score: number | null;
+}
+
+export interface ProfileViewer {
+  recruiter_id: string;
+  company_name: string;
+  viewed_at: string;
+}
+
+export interface ProfileViewSummary {
+  count: number;
+  viewers: ProfileViewer[];
 }
 
 export type InvitationStatus = "pending" | "accepted" | "declined";
@@ -235,6 +251,27 @@ export interface Invitation {
   status: InvitationStatus;
   created_at: string;
   casting_call: CastingCall;
+}
+
+export interface BulkInvitationResult {
+  invited: Invitation[];
+  skipped: string[];
+}
+
+export interface TalentListMember {
+  id: string;
+  talent_id: string;
+  notes: string | null;
+  created_at: string;
+  talent_display_name: string;
+}
+
+export interface TalentList {
+  id: string;
+  recruiter_id: string;
+  name: string;
+  created_at: string;
+  members: TalentListMember[];
 }
 
 export interface AvailabilityWindow {
@@ -259,11 +296,48 @@ export interface Booking {
   message: string | null;
   status: BookingStatus;
   agreement_status: AgreementStatus;
-  agreement_document_url: string | null;
+  talent_signature_name: string | null;
+  talent_signed_at: string | null;
+  recruiter_signature_name: string | null;
+  recruiter_signed_at: string | null;
   created_at: string;
   talent_display_name: string;
   recruiter_company_name: string;
   casting_call_title: string | null;
+}
+
+export interface CalendarEntry {
+  id: string;
+  talent_id: string;
+  title: string;
+  start_date: string; // "YYYY-MM-DD"
+  end_date: string;
+  notes: string | null;
+  is_public: boolean;
+  created_at: string;
+}
+
+export interface CalendarEntryInput {
+  title: string;
+  start_date: string;
+  end_date: string;
+  notes?: string | null;
+  is_public?: boolean;
+}
+
+export interface CalendarEvent {
+  id: string;
+  kind: "booking" | "entry";
+  title: string;
+  start_at: string;
+  end_at: string;
+  status: string;
+}
+
+export interface BusyRange {
+  start_date: string;
+  end_date: string;
+  title: string | null;
 }
 
 export interface Follow {
@@ -708,6 +782,7 @@ export const api = {
       experience_min?: number;
       experience_max?: number;
       verified_only?: boolean;
+      instruments?: string[];
     } = {}
   ) => {
     const qs = new URLSearchParams();
@@ -717,9 +792,11 @@ export const api = {
     if (params.experience_min !== undefined) qs.set("experience_min", String(params.experience_min));
     if (params.experience_max !== undefined) qs.set("experience_max", String(params.experience_max));
     if (params.verified_only) qs.set("verified_only", "true");
+    (params.instruments ?? []).forEach((i) => qs.append("instruments", i));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<TalentProfile[]>(`/talents${suffix}`);
   },
+  listFeaturedTalent: () => request<TalentProfile[]>("/talents/featured"),
   getTalent: (id: string) => request<TalentProfile>(`/talents/${id}`),
   getMyTalentProfile: (token: string) => request<TalentProfile>("/talents/me", {}, token),
   createMyTalentProfile: (data: TalentProfileInput, token: string) =>
@@ -850,6 +927,35 @@ export const api = {
   deleteSavedSearch: (savedSearchId: string, token: string) =>
     request<void>(`/recruiters/me/saved-searches/${savedSearchId}`, { method: "DELETE" }, token),
 
+  listMyTalentLists: (token: string) => request<TalentList[]>("/recruiters/me/talent-lists", {}, token),
+  createTalentList: (name: string, token: string) =>
+    request<TalentList>("/recruiters/me/talent-lists", { method: "POST", body: JSON.stringify({ name }) }, token),
+  deleteTalentList: (listId: string, token: string) =>
+    request<void>(`/recruiters/me/talent-lists/${listId}`, { method: "DELETE" }, token),
+  addTalentToList: (listId: string, data: { talent_id: string; notes?: string }, token: string) =>
+    request<TalentListMember>(
+      `/recruiters/me/talent-lists/${listId}/members`,
+      { method: "POST", body: JSON.stringify(data) },
+      token
+    ),
+  updateTalentListMemberNotes: (listId: string, memberId: string, notes: string | null, token: string) =>
+    request<TalentListMember>(
+      `/recruiters/me/talent-lists/${listId}/members/${memberId}`,
+      { method: "PATCH", body: JSON.stringify({ notes }) },
+      token
+    ),
+  removeTalentFromList: (listId: string, memberId: string, token: string) =>
+    request<void>(`/recruiters/me/talent-lists/${listId}/members/${memberId}`, { method: "DELETE" }, token),
+
+  listNewArrivals: (token: string) => request<TalentProfile[]>("/recruiters/me/new-arrivals", {}, token),
+
+  bulkInviteTalent: (castingCallId: string, data: { talent_ids: string[]; message?: string }, token: string) =>
+    request<BulkInvitationResult>(
+      `/casting-calls/${castingCallId}/invitations/bulk`,
+      { method: "POST", body: JSON.stringify(data) },
+      token
+    ),
+
   listCastingCalls: (params: { category?: TalentCategory } = {}) => {
     const qs = new URLSearchParams();
     if (params.category) qs.set("category", params.category);
@@ -869,6 +975,7 @@ export const api = {
       audition_reference_url?: string;
       tags?: string[];
       shoot_details?: string;
+      premium_talent_only?: boolean;
       roles: CastingCallRoleInput[];
     },
     token: string
@@ -887,6 +994,7 @@ export const api = {
       audition_reference_url?: string;
       tags?: string[];
       shoot_details?: string;
+      premium_talent_only?: boolean;
     },
     token: string
   ) => request<CastingCall>(`/casting-calls/${castingCallId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
@@ -934,6 +1042,7 @@ export const api = {
   listApplicationsForCastingCall: (castingCallId: string, token: string) =>
     request<Application[]>(`/casting-calls/${castingCallId}/applications`, {}, token),
   listMyApplications: (token: string) => request<Application[]>("/talents/me/applications", {}, token),
+  getMyProfileViews: (token: string) => request<ProfileViewSummary>("/talents/me/profile-views", {}, token),
   updateApplicationStatus: (applicationId: string, status: ApplicationStatus, token: string) =>
     request<Application>(
       `/applications/${applicationId}`,
@@ -963,6 +1072,14 @@ export const api = {
     request<void>(`/talents/me/availability/${windowId}`, { method: "DELETE" }, token),
   listTalentAvailability: (talentId: string) => request<AvailabilityWindow[]>(`/talents/${talentId}/availability`),
 
+  getMyCalendar: (month: string, token: string) => request<CalendarEvent[]>(`/talents/me/calendar?month=${month}`, {}, token),
+  getTalentBusyDates: (talentId: string) => request<BusyRange[]>(`/talents/${talentId}/calendar/busy-dates`),
+  listMyCalendarEntries: (token: string) => request<CalendarEntry[]>("/talents/me/calendar-entries", {}, token),
+  addMyCalendarEntry: (data: CalendarEntryInput, token: string) =>
+    request<CalendarEntry>("/talents/me/calendar-entries", { method: "POST", body: JSON.stringify(data) }, token),
+  deleteMyCalendarEntry: (entryId: string, token: string) =>
+    request<void>(`/talents/me/calendar-entries/${entryId}`, { method: "DELETE" }, token),
+
   requestBooking: (
     talentId: string,
     data: { start_at: string; end_at: string; message?: string; casting_call_id?: string },
@@ -978,10 +1095,10 @@ export const api = {
     ),
   cancelBooking: (bookingId: string, token: string) =>
     request<Booking>(`/bookings/${bookingId}/cancel`, { method: "PATCH" }, token),
-  signBookingAgreement: (bookingId: string, documentUrl: string | undefined, token: string) =>
+  signBookingAgreement: (bookingId: string, signatureName: string, token: string) =>
     request<Booking>(
-      `/bookings/${bookingId}/agreement`,
-      { method: "PATCH", body: JSON.stringify({ agreement_document_url: documentUrl || null }) },
+      `/bookings/${bookingId}/agreement/sign`,
+      { method: "PATCH", body: JSON.stringify({ signature_name: signatureName }) },
       token
     ),
 

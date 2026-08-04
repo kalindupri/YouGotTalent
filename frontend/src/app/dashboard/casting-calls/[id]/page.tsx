@@ -42,6 +42,7 @@ export default function ManageCastingCallPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -51,6 +52,7 @@ export default function ManageCastingCallPage() {
       .then(setApplications)
       .catch(() => setError("Could not load applications for this casting call."));
     api.listInvitationsForCastingCall(params.id, token).then(setInvitations).catch(() => {});
+    api.getMyRecruiterProfile(token).then((p) => setIsPremium(p.tier === "premium")).catch(() => {});
   }, [params.id, token]);
 
   async function handleStatusChange(applicationId: string, status: ApplicationStatus) {
@@ -89,9 +91,16 @@ export default function ManageCastingCallPage() {
           <h1 className="font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
             {call?.title ?? "Casting call"}
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            {applications.length} application{applications.length === 1 ? "" : "s"}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-zinc-500">
+              {applications.length} application{applications.length === 1 ? "" : "s"}
+            </p>
+            {call?.premium_talent_only && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                Premium talent only
+              </span>
+            )}
+          </div>
         </div>
         {call && (
           <div className="flex items-center gap-3">
@@ -116,6 +125,7 @@ export default function ManageCastingCallPage() {
         <EditCastingCallForm
           call={call}
           token={token!}
+          isPremium={isPremium}
           onSaved={(updated) => {
             setCall(updated);
             setEditing(false);
@@ -198,9 +208,16 @@ function ApplicationCard({
 
   return (
     <div className="rounded-2xl border-2 border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      {roleTitle && (
-        <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-zinc-400">Applied for: {roleTitle}</p>
-      )}
+      <div className="mb-1 flex items-start justify-between gap-2">
+        {roleTitle && (
+          <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-400">Applied for: {roleTitle}</p>
+        )}
+        {application.match_score !== null && (
+          <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+            {application.match_score}% match
+          </span>
+        )}
+      </div>
       <Link href={`/talents/${application.talent_id}`} className="text-sm font-semibold text-rose-600 hover:underline">
         View talent profile
       </Link>
@@ -227,10 +244,12 @@ function ApplicationCard({
 function EditCastingCallForm({
   call,
   token,
+  isPremium,
   onSaved,
 }: {
   call: CastingCall;
   token: string;
+  isPremium: boolean;
   onSaved: (call: CastingCall) => void;
 }) {
   const [title, setTitle] = useState(call.title);
@@ -243,6 +262,7 @@ function EditCastingCallForm({
   const [auditionReferenceUrl, setAuditionReferenceUrl] = useState(call.audition_reference_url ?? "");
   const [tagsInput, setTagsInput] = useState((call.tags ?? []).join(", "));
   const [shootDetails, setShootDetails] = useState(call.shoot_details ?? "");
+  const [premiumTalentOnly, setPremiumTalentOnly] = useState(call.premium_talent_only);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -264,6 +284,7 @@ function EditCastingCallForm({
           audition_reference_url: auditionReferenceUrl || undefined,
           tags: parseTags(tagsInput),
           shoot_details: shootDetails || undefined,
+          premium_talent_only: premiumTalentOnly,
         },
         token
       );
@@ -351,6 +372,19 @@ function EditCastingCallForm({
           className={inputClass}
         />
       </label>
+      {isPremium ? (
+        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <input
+            type="checkbox"
+            checked={premiumTalentOnly}
+            onChange={(e) => setPremiumTalentOnly(e.target.checked)}
+            className="accent-rose-600"
+          />
+          Premium talent only
+        </label>
+      ) : (
+        <p className="text-xs text-zinc-400">Upgrade to Premium to restrict this posting to Premium talent only.</p>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={submitting} className={btnPrimary}>
         {submitting ? "Saving…" : "Save changes"}

@@ -12,6 +12,9 @@ from app.models.recruiter_profile import RecruiterProfile
 from app.models.user import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# auto_error=False so public endpoints can optionally recognize a logged-in recruiter
+# (e.g. to log a profile view) without requiring auth for anonymous visitors.
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
@@ -63,3 +66,17 @@ def get_current_recruiter_profile(db: Session = Depends(get_db), user: User = De
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruiter profile not found")
     sync_if_expired(db, get_for_recruiter(db, profile.id))
     return profile
+
+
+def get_optional_recruiter_profile(
+    db: Session = Depends(get_db), token: str | None = Depends(optional_oauth2_scheme)
+) -> RecruiterProfile | None:
+    if not token:
+        return None
+    subject = decode_access_token(token)
+    if subject is None:
+        return None
+    user = db.query(User).filter(User.id == uuid.UUID(subject)).first()
+    if user is None or not user.is_active or user.role != UserRole.RECRUITER:
+        return None
+    return db.query(RecruiterProfile).filter(RecruiterProfile.user_id == user.id).first()

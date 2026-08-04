@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CalendarClock, Check } from "lucide-react";
-import { ApiError, AvailabilityWindow, api } from "@/lib/api";
+import { ApiError, AvailabilityWindow, BusyRange, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { DAYS_OF_WEEK, btnSmall, btnSmallPrimary, formatTimeOfDay, inputClass, labelClass } from "@/lib/ui";
 
@@ -11,6 +11,7 @@ export default function BookingRequestButton({ talentId }: { talentId: string })
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
+  const [busyDates, setBusyDates] = useState<BusyRange[]>([]);
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -24,7 +25,12 @@ export default function BookingRequestButton({ talentId }: { talentId: string })
     if (windows.length > 0) return;
     setLoading(true);
     try {
-      setWindows(await api.listTalentAvailability(talentId));
+      const [availabilityWindows, busy] = await Promise.all([
+        api.listTalentAvailability(talentId),
+        api.getTalentBusyDates(talentId).catch(() => []),
+      ]);
+      setWindows(availabilityWindows);
+      setBusyDates(busy);
     } finally {
       setLoading(false);
     }
@@ -82,6 +88,20 @@ export default function BookingRequestButton({ talentId }: { talentId: string })
                   ))}
                 </ul>
               </div>
+              {busyDates.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Already busy</p>
+                  <ul className="mt-1 flex flex-col gap-0.5 text-sm text-zinc-700 dark:text-zinc-300">
+                    {busyDates.map((r, i) => (
+                      <li key={i}>
+                        {r.start_date}
+                        {r.end_date !== r.start_date ? ` – ${r.end_date}` : ""}
+                        {r.title ? ` (${r.title})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <label className={labelClass}>
                 Date
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />

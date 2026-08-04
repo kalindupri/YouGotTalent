@@ -45,6 +45,7 @@ function CastingCallDetailContent() {
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [talentTier, setTalentTier] = useState<"free" | "premium" | null>(null);
 
   useEffect(() => {
     api
@@ -57,6 +58,11 @@ function CastingCallDetailContent() {
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this casting call."));
     api.trackCastingCallView(params.id).catch(() => {});
   }, [params.id]);
+
+  useEffect(() => {
+    if (!token || user?.role !== "talent") return;
+    api.getMyTalentProfile(token).then((p) => setTalentTier(p.tier)).catch(() => {});
+  }, [token, user]);
 
   async function handleApply(e: FormEvent) {
     e.preventDefault();
@@ -108,6 +114,11 @@ function CastingCallDetailContent() {
         {call.is_featured && (
           <span className="inline-flex items-center gap-1 rounded-sm bg-amber-400 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-zinc-900">
             <Star className="h-3 w-3" fill="currentColor" strokeWidth={0} /> Featured
+          </span>
+        )}
+        {call.premium_talent_only && (
+          <span className="inline-flex items-center gap-1 rounded-sm bg-zinc-900 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white dark:bg-zinc-100 dark:text-zinc-900">
+            Premium talent only
           </span>
         )}
         <span className={badgeClass(statusTone(call.status))}>{call.status}</span>
@@ -217,6 +228,14 @@ function CastingCallDetailContent() {
           </p>
         ) : user.role !== "talent" ? (
           <p className="text-sm text-zinc-500">Only talent accounts can apply to casting calls.</p>
+        ) : call.premium_talent_only && talentTier !== "premium" ? (
+          <p className="text-sm text-zinc-500">
+            This talent hunt is open to Premium talent only.{" "}
+            <Link href="/dashboard" className="font-semibold text-rose-600 hover:underline">
+              Upgrade your account
+            </Link>{" "}
+            to apply.
+          </p>
         ) : applied ? (
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
             <Check className="h-4 w-4" /> Application submitted.

@@ -237,3 +237,121 @@ def test_apply_with_upload_still_rejects_duplicate_role(client, talent_headers, 
         client, talent_headers, casting_call, role_id, sample_video_bytes, "take.mp4", "video/mp4", "video",
     )
     assert second.status_code == 400
+
+
+def test_application_viewed_at_null_before_recruiter_lists(client, talent_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    application = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers
+    ).json()
+    assert application["viewed_at"] is None
+
+
+def test_recruiter_listing_applications_stamps_viewed_at(client, talent_headers, recruiter_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers)
+
+    resp = client.get(f"/api/v1/casting-calls/{casting_call['id']}/applications", headers=recruiter_headers)
+    assert resp.status_code == 200
+    assert resp.json()[0]["viewed_at"] is not None
+
+
+def test_free_talent_cannot_apply_to_premium_talent_only_call(client, talent_headers, recruiter_headers, recruiter_profile):
+    create_talent_profile(client, talent_headers)
+    client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
+    call = client.post(
+        "/api/v1/casting-calls",
+        json={
+            "title": "Exclusive role",
+            "description": "x",
+            "category": "acting",
+            "roles": [{"title": "Exclusive role"}],
+            "premium_talent_only": True,
+        },
+        headers=recruiter_headers,
+    ).json()
+
+    resp = client.post(
+        f"/api/v1/casting-calls/{call['id']}/applications",
+        json={"role_id": call["roles"][0]["id"]},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 403
+
+
+def test_premium_talent_can_apply_to_premium_talent_only_call(client, talent_headers, recruiter_headers, recruiter_profile):
+    create_talent_profile(client, talent_headers)
+    client.post("/api/v1/talents/me/upgrade", headers=talent_headers)
+    client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
+    call = client.post(
+        "/api/v1/casting-calls",
+        json={
+            "title": "Exclusive role",
+            "description": "x",
+            "category": "acting",
+            "roles": [{"title": "Exclusive role"}],
+            "premium_talent_only": True,
+        },
+        headers=recruiter_headers,
+    ).json()
+
+    resp = client.post(
+        f"/api/v1/casting-calls/{call['id']}/applications",
+        json={"role_id": call["roles"][0]["id"]},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+
+def test_free_recruiter_sees_no_match_score(client, talent_headers, recruiter_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers)
+
+    resp = client.get(f"/api/v1/casting-calls/{casting_call['id']}/applications", headers=recruiter_headers)
+    assert resp.status_code == 200
+    assert resp.json()[0]["match_score"] is None
+
+
+def test_premium_recruiter_sees_match_score_sorted_best_first(client, recruiter_headers, recruiter_profile, casting_call, db_session):
+    from tests.conftest import auth_headers, register_and_verify
+
+    client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
+    role_id = casting_call["roles"][0]["id"]
+
+    strong_token = register_and_verify(client, db_session, "strong-fit@example.com", role="talent")
+    strong_headers = auth_headers(strong_token)
+    create_talent_profile(
+        client, strong_headers, display_name="Strong Fit", category="acting", experience_years=10,
+        skills=["lead role in short film"],
+    )
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=strong_headers)
+
+    weak_token = register_and_verify(client, db_session, "weak-fit@example.com", role="talent")
+    weak_headers = auth_headers(weak_token)
+    create_talent_profile(client, weak_headers, display_name="Weak Fit", category="painting")
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=weak_headers)
+
+    resp = client.get(f"/api/v1/casting-calls/{casting_call['id']}/applications", headers=recruiter_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert all(a["match_score"] is not None for a in body)
+    assert body[0]["match_score"] >= body[1]["match_score"]
+    assert body[0]["talent_id"] != body[1]["talent_id"]
+
+
+def test_talent_sees_viewed_at_after_recruiter_lists(client, talent_headers, recruiter_headers, casting_call):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    client.post(f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers)
+
+    # Talent's own view of the application still shows unseen until the recruiter lists it.
+    before = client.get("/api/v1/talents/me/applications", headers=talent_headers).json()
+    assert before[0]["viewed_at"] is None
+
+    client.get(f"/api/v1/casting-calls/{casting_call['id']}/applications", headers=recruiter_headers)
+
+    after = client.get("/api/v1/talents/me/applications", headers=talent_headers).json()
+    assert after[0]["viewed_at"] is not None

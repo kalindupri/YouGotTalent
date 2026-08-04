@@ -180,6 +180,45 @@ def test_non_owner_cannot_update_or_delete_casting_call(client, casting_call, db
     assert resp.json()["title"] == casting_call["title"]
 
 
+def test_free_recruiter_cannot_create_premium_talent_only_call(client, recruiter_headers, recruiter_profile):
+    resp = client.post(
+        "/api/v1/casting-calls",
+        json={
+            "title": "Exclusive role",
+            "description": "x",
+            "category": "acting",
+            "roles": [{"title": "x"}],
+            "premium_talent_only": True,
+        },
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 403
+
+
+def test_premium_recruiter_can_create_premium_talent_only_call(client, recruiter_headers, recruiter_profile):
+    client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
+    resp = client.post(
+        "/api/v1/casting-calls",
+        json={
+            "title": "Exclusive role",
+            "description": "x",
+            "category": "acting",
+            "roles": [{"title": "x"}],
+            "premium_talent_only": True,
+        },
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["premium_talent_only"] is True
+
+
+def test_free_recruiter_cannot_update_call_to_premium_talent_only(client, recruiter_headers, casting_call):
+    resp = client.patch(
+        f"/api/v1/casting-calls/{casting_call['id']}", json={"premium_talent_only": True}, headers=recruiter_headers
+    )
+    assert resp.status_code == 403
+
+
 def test_update_unknown_casting_call_404(client, recruiter_headers):
     resp = client.patch(
         "/api/v1/casting-calls/00000000-0000-0000-0000-000000000000",

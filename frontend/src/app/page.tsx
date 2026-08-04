@@ -11,14 +11,20 @@ import TitlePoster from "@/components/TitlePoster";
 
 export default function Home() {
   const [talents, setTalents] = useState<TalentProfile[]>([]);
+  const [featuredTalent, setFeaturedTalent] = useState<TalentProfile[]>([]);
   const [calls, setCalls] = useState<CastingCall[]>([]);
   const [titles, setTitles] = useState<Title[]>([]);
 
   useEffect(() => {
     api.listTalents().then(setTalents).catch(() => {});
+    api.listFeaturedTalent().then(setFeaturedTalent).catch(() => {});
     api.listCastingCalls().then(setCalls).catch(() => {});
     api.listTitles().then(setTitles).catch(() => {});
   }, []);
+
+  // Capped, weekly-rotating premium+verified carousel — falls back to the newest talent while
+  // no one has both upgraded and been verified yet, so the section isn't empty during rollout.
+  const featured = featuredTalent.length > 0 ? featuredTalent : talents.slice(0, 6);
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
@@ -82,7 +88,7 @@ export default function Home() {
         </div>
       </section>
 
-      {talents.length > 0 && (
+      {featured.length > 0 && (
         <section className="mx-auto w-full max-w-6xl px-6 pb-20">
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
@@ -93,7 +99,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-            {talents.slice(0, 6).map((t) => (
+            {featured.map((t) => (
               <Link
                 key={t.id}
                 href={`/talents/${t.id}`}

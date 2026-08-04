@@ -3,15 +3,21 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_recruiter_profile, get_current_talent_profile, require_talent
+from app.api.deps import (
+    get_current_recruiter_profile,
+    get_current_talent_profile,
+    get_optional_recruiter_profile,
+    require_talent,
+)
 from app.core.config import settings
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud import subscription as subscription_crud
 from app.crud.credit import create_credit, delete_credit, get_credit, update_credit
+from app.crud.profile_view import count_profile_views, list_distinct_viewers, record_profile_view
 from app.crud.review import get_talent_review_summary
 from app.crud.saved_talent import get_saved_talent, save_talent, unsave_talent
 from app.crud.talent_profile import (
@@ -24,6 +30,7 @@ from app.crud.talent_profile import (
     get_media,
     get_talent_profile,
     get_talent_profile_by_user,
+    list_featured_talent,
     list_talent_profiles,
     request_verification,
     update_media,
@@ -35,6 +42,7 @@ from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentCategory, TalentProfile
 from app.models.user import User
 from app.schemas.credit import CreditCreate, CreditRead, CreditUpdate
+from app.schemas.profile_view import ProfileViewSummary
 from app.schemas.review import TalentReviewSummary
 from app.schemas.talent_profile import (
     MediaCreate,
@@ -58,11 +66,14 @@ def browse_talents(
     experience_min: int | None = None,
     experience_max: int | None = None,
     verified_only: bool = False,
+    instruments: list[str] | None = Query(default=None),
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
 ):
-    return list_talent_profiles(db, category, city, q, skip, limit, experience_min, experience_max, verified_only)
+    return list_talent_profiles(
+        db, category, city, q, skip, limit, experience_min, experience_max, verified_only, instruments
+    )
 
 
 @router.get("/me", response_model=TalentProfileRead)
@@ -70,11 +81,32 @@ def read_my_profile(profile: TalentProfile = Depends(get_current_talent_profile)
     return profile
 
 
+@router.get("/me/profile-views", response_model=ProfileViewSummary)
+def read_my_profile_views(
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    count = count_profile_views(db, profile.id)
+    viewers = list_distinct_viewers(db, profile.id) if profile.tier == "premium" else []
+    return ProfileViewSummary(count=count, viewers=viewers)
+
+
+@router.get("/featured", response_model=list[TalentProfileRead])
+def read_featured_talent(db: Session = Depends(get_db)):
+    return list_featured_talent(db, settings.PREMIUM_FEATURED_SLOT_LIMIT)
+
+
 @router.get("/{talent_id}", response_model=TalentProfileRead)
-def get_talent(talent_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_talent(
+    talent_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    viewer: RecruiterProfile | None = Depends(get_optional_recruiter_profile),
+):
     profile = get_talent_profile(db, talent_id)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+    if viewer is not None:
+        record_profile_view(db, profile.id, viewer.id)
     return profile
 
 

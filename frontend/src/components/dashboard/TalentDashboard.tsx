@@ -2,18 +2,21 @@
 
 import { FormEvent, createElement, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Crown, FileCheck2, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { Calendar, Check, ChevronLeft, ChevronRight, Crown, Eye, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import {
   Application,
   ApiError,
   AvailabilityWindow,
   Booking,
+  CalendarEntry,
+  CalendarEvent,
   Credit,
   CreditProjectType,
   Follow,
   Invitation,
   Media,
   MediaType,
+  ProfileViewSummary,
   TALENT_CATEGORIES,
   TalentCategory,
   TalentProfile,
@@ -30,6 +33,7 @@ import {
   badgeClass,
   bookingStatusTone,
   formatBookingRange,
+  formatRelativeTime,
   btnPrimary,
   btnSecondary,
   btnSmall,
@@ -40,7 +44,9 @@ import {
   creditProjectTypeIcon,
   creditProjectTypeLabel,
   formatCategory,
+  formatInstrument,
   formatTimeOfDay,
+  INSTRUMENT_GROUPS,
   inputClass,
   invitationStatusTone,
   labelClass,
@@ -51,6 +57,7 @@ import {
   verifiedBadgeClass,
 } from "@/lib/ui";
 import TalentAvatar from "@/components/TalentAvatar";
+import BookingAgreementSection from "@/components/BookingAgreementSection";
 import BookingReviewForm from "@/components/BookingReviewForm";
 import MediaCard from "@/components/MediaCard";
 import HeadshotUploader from "@/components/HeadshotUploader";
@@ -72,6 +79,7 @@ export default function TalentDashboard() {
   const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [following, setFollowing] = useState<Follow[]>([]);
+  const [profileViews, setProfileViews] = useState<ProfileViewSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -92,6 +100,7 @@ export default function TalentDashboard() {
     api.listMyAvailability(token).then(setAvailability).catch(() => {});
     api.listMyBookingsAsTalent(token).then(setBookings).catch(() => {});
     api.listMyFollowing(token).then(setFollowing).catch(() => {});
+    api.getMyProfileViews(token).then(setProfileViews).catch(() => {});
   }, [token, profile]);
 
   async function handleUnfollow(recruiterId: string) {
@@ -118,10 +127,12 @@ export default function TalentDashboard() {
     <div className="flex flex-col gap-6">
       <ProfileSummary profile={profile} onUpdated={setProfile} token={token!} />
       <MembershipCard profile={profile} onUpdated={setProfile} token={token!} />
+      <ProfileViewsCard views={profileViews} isPremium={profile.tier === "premium"} />
       <NotificationPreferencesCard profile={profile} onUpdated={setProfile} token={token!} />
       <IntroVideoCard profile={profile} onUpdated={setProfile} token={token!} />
       <SocialLinksCard profile={profile} onUpdated={setProfile} token={token!} />
       <AttributesCard profile={profile} onUpdated={setProfile} token={token!} />
+      <InstrumentsCard profile={profile} onUpdated={setProfile} token={token!} />
       <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
       <MediaGalleryCard profile={profile} onUpdated={setProfile} token={token!} />
       <AddMediaForm
@@ -175,6 +186,8 @@ export default function TalentDashboard() {
         )}
       </section>
 
+      <WorkCalendarCard token={token!} />
+
       <AvailabilityCard availability={availability} onChange={setAvailability} token={token!} />
 
       <section className={sectionClass}>
@@ -205,9 +218,11 @@ export default function TalentDashboard() {
                   />
                 )}
                 {b.status === "accepted" && (
-                  <AgreementSection
+                  <BookingAgreementSection
                     booking={b}
                     token={token!}
+                    viewerRole="talent"
+                    otherPartyLabel={b.recruiter_company_name}
                     onUpdated={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
                   />
                 )}
@@ -258,7 +273,17 @@ export default function TalentDashboard() {
                 <Link href={`/casting-calls/${a.casting_call_id}`} className="text-rose-600 hover:underline">
                   View opportunity
                 </Link>
-                <span className={badgeClass(statusTone(a.status))}>{a.status}</span>
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1 text-xs text-zinc-500">
+                    <Eye className="h-3.5 w-3.5" />
+                    {a.viewed_at
+                      ? profile.tier === "premium"
+                        ? `Seen ${formatRelativeTime(a.viewed_at)}`
+                        : "Seen"
+                      : "Not yet seen"}
+                  </span>
+                  <span className={badgeClass(statusTone(a.status))}>{a.status}</span>
+                </div>
               </li>
             ))}
           </ul>
@@ -626,6 +651,40 @@ function MembershipCard({
   );
 }
 
+function ProfileViewsCard({ views, isPremium }: { views: ProfileViewSummary | null; isPremium: boolean }) {
+  if (!views) return null;
+
+  return (
+    <section className={sectionClass}>
+      <div className="flex items-center gap-2">
+        <Eye className="h-5 w-5 text-zinc-400" />
+        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Profile views</h2>
+      </div>
+      <p className="mt-2 text-2xl font-black text-zinc-900 dark:text-zinc-50">{views.count}</p>
+      {isPremium ? (
+        views.viewers.length === 0 ? (
+          <p className="mt-1 text-sm text-zinc-500">No recruiters have viewed your profile yet.</p>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {views.viewers.map((v) => (
+              <li key={v.recruiter_id} className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-zinc-900 dark:text-zinc-50">{v.company_name}</span>
+                <span className="text-xs text-zinc-500">{formatRelativeTime(v.viewed_at)}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : (
+        <p className="mt-1 text-sm text-zinc-500">
+          {views.count > 0
+            ? "Upgrade to Premium to see which recruiters viewed your profile."
+            : "Upgrade to Premium to see who views your profile as views come in."}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function InvitationResponseButtons({
   invitation,
   token,
@@ -668,6 +727,231 @@ function InvitationResponseButtons({
         )}
       </button>
     </div>
+  );
+}
+
+function currentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function shiftMonthKey(month: string, delta: number): string {
+  const [year, mon] = month.split("-").map(Number);
+  const d = new Date(year, mon - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(month: string): string {
+  const [year, mon] = month.split("-").map(Number);
+  return new Date(year, mon - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+function buildMonthGrid(month: string): (string | null)[] {
+  const [year, mon] = month.split("-").map(Number);
+  const firstDay = new Date(year, mon - 1, 1);
+  const leading = (firstDay.getDay() + 6) % 7; // Monday-first grid
+  const daysInMonth = new Date(year, mon, 0).getDate();
+  const cells: (string | null)[] = Array(leading).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${year}-${String(mon).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function WorkCalendarCard({ token }: { token: string }) {
+  const [month, setMonth] = useState(currentMonthKey());
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [entries, setEntries] = useState<CalendarEntry[]>([]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api.getMyCalendar(month, token).then(setEvents).catch(() => {});
+  }, [month, token]);
+
+  useEffect(() => {
+    api.listMyCalendarEntries(token).then(setEntries).catch(() => {});
+  }, [token]);
+
+  const grid = buildMonthGrid(month);
+
+  function eventsOnDay(day: string): CalendarEvent[] {
+    return events.filter((e) => day >= e.start_at.slice(0, 10) && day <= e.end_at.slice(0, 10));
+  }
+
+  function openFormForDay(day: string) {
+    setSelectedDay(day);
+    setTitle("");
+    setStartDate(day);
+    setEndDate(day);
+    setNotes("");
+    setIsPublic(true);
+    setError(null);
+    setShowForm(true);
+  }
+
+  async function handleAddEntry(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const entry = await api.addMyCalendarEntry(
+        { title, start_date: startDate, end_date: endDate, notes: notes || null, is_public: isPublic },
+        token
+      );
+      setEntries((prev) => [...prev, entry].sort((a, b) => a.start_date.localeCompare(b.start_date)));
+      setEvents((prev) =>
+        [
+          ...prev,
+          { id: entry.id, kind: "entry" as const, title: entry.title, start_at: entry.start_date, end_at: entry.end_date, status: "confirmed" },
+        ].sort((a, b) => a.start_at.localeCompare(b.start_at))
+      );
+      setShowForm(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not add this calendar entry.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDeleteEntry(entryId: string) {
+    await api.deleteMyCalendarEntry(entryId, token);
+    setEntries((prev) => prev.filter((e) => e.id !== entryId));
+    setEvents((prev) => prev.filter((e) => !(e.kind === "entry" && e.id === entryId)));
+  }
+
+  return (
+    <section className={sectionClass}>
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
+          <Calendar className="h-5 w-5" /> Work calendar
+        </h2>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setMonth((m) => shiftMonthKey(m, -1))} className={btnSmall} aria-label="Previous month">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="min-w-[9rem] text-center text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            {monthLabel(month)}
+          </span>
+          <button onClick={() => setMonth((m) => shiftMonthKey(m, 1))} className={btnSmall} aria-label="Next month">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <p className="mt-1 text-sm text-zinc-500">
+        Bookings made on YouGotTalent and gigs you add yourself, in one place. Click a day to add an entry.
+      </p>
+
+      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs font-semibold text-zinc-500">
+        {DAYS_OF_WEEK.map((d) => (
+          <span key={d}>{d.slice(0, 3)}</span>
+        ))}
+      </div>
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {grid.map((day, i) => {
+          const dayEvents = day ? eventsOnDay(day) : [];
+          const isToday = day === new Date().toISOString().slice(0, 10);
+          return (
+            <button
+              key={i}
+              disabled={!day}
+              onClick={() => day && openFormForDay(day)}
+              className={`flex min-h-[4.5rem] flex-col items-start gap-0.5 rounded-md border p-1 text-left text-xs ${
+                day
+                  ? "border-zinc-200 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+                  : "border-transparent"
+              } ${isToday ? "ring-1 ring-rose-500" : ""}`}
+            >
+              {day && <span className="font-semibold text-zinc-700 dark:text-zinc-300">{parseInt(day.slice(8), 10)}</span>}
+              {dayEvents.slice(0, 2).map((ev) => (
+                <span
+                  key={ev.id}
+                  className={`w-full truncate rounded-sm px-1 py-0.5 text-[10px] ${
+                    ev.kind === "booking" ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  }`}
+                >
+                  {ev.title}
+                </span>
+              ))}
+              {dayEvents.length > 2 && <span className="text-[10px] text-zinc-400">+{dayEvents.length - 2} more</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {showForm && selectedDay && (
+        <form onSubmit={handleAddEntry} className="mt-4 flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Add calendar entry</p>
+          <label className={labelClass}>
+            Title
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Wedding shoot in Kandy"
+              required
+              className={inputClass}
+            />
+          </label>
+          <div className="flex flex-wrap gap-3">
+            <label className={labelClass}>
+              Start date
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className={inputClass} />
+            </label>
+            <label className={labelClass}>
+              End date
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required className={inputClass} />
+            </label>
+          </div>
+          <label className={labelClass}>
+            Notes (optional)
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+            <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+            Show this title to talent hunters checking my availability (otherwise they just see &ldquo;busy&rdquo;)
+          </label>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-2">
+            <button type="submit" disabled={submitting} className={btnPrimary}>
+              {submitting ? "Adding…" : "Add entry"}
+            </button>
+            <button type="button" onClick={() => setShowForm(false)} className={btnSecondary}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {entries.length > 0 && (
+        <ul className="mt-4 flex flex-col gap-2">
+          {entries.map((e) => (
+            <li
+              key={e.id}
+              className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-2 text-sm dark:border-zinc-800"
+            >
+              <span>
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200">{e.title}</span>{" "}
+                <span className="text-zinc-500">
+                  {e.start_date}
+                  {e.end_date !== e.start_date ? ` – ${e.end_date}` : ""}
+                </span>
+              </span>
+              <button onClick={() => handleDeleteEntry(e.id)} className="text-zinc-400 hover:text-red-600" aria-label="Remove">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -804,70 +1088,6 @@ function BookingResponseButtons({
         )}
       </button>
     </div>
-  );
-}
-
-function AgreementSection({
-  booking,
-  token,
-  onUpdated,
-}: {
-  booking: Booking;
-  token: string;
-  onUpdated: (updated: Booking) => void;
-}) {
-  const [documentUrl, setDocumentUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  if (booking.agreement_status === "signed") {
-    return (
-      <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-        <FileCheck2 className="h-4 w-4" /> Agreement signed
-        {booking.agreement_document_url && (
-          <a
-            href={booking.agreement_document_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-normal text-rose-600 hover:underline"
-          >
-            View document
-          </a>
-        )}
-      </p>
-    );
-  }
-
-  async function handleSign(e: FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const updated = await api.signBookingAgreement(booking.id, documentUrl || undefined, token);
-      onUpdated(updated);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSign} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/60">
-      <label className={labelClass}>
-        Link to signed agreement (optional)
-        <input
-          type="url"
-          value={documentUrl}
-          onChange={(e) => setDocumentUrl(e.target.value)}
-          placeholder="https://…"
-          className={inputClass}
-        />
-      </label>
-      <button type="submit" disabled={submitting} className={btnSmall}>
-        <FileCheck2 className="h-3.5 w-3.5" /> Mark agreement signed
-      </button>
-      <p className="mt-1 w-full text-xs text-zinc-400">
-        No e-signature provider (DocuSign or similar) is wired up yet — mark this once the agreement has been signed
-        outside the platform.
-      </p>
-    </form>
   );
 }
 
@@ -1173,6 +1393,69 @@ function AttributesCard({
           </button>
         </form>
       )}
+    </section>
+  );
+}
+
+function InstrumentsCard({
+  profile,
+  onUpdated,
+  token,
+}: {
+  profile: TalentProfile;
+  onUpdated: (p: TalentProfile) => void;
+  token: string;
+}) {
+  const [selected, setSelected] = useState<string[]>(profile.instruments ?? []);
+  const [saving, setSaving] = useState(false);
+
+  if (profile.category !== "music") return null;
+
+  function toggle(instrument: string) {
+    setSelected((prev) => (prev.includes(instrument) ? prev.filter((i) => i !== instrument) : [...prev, instrument]));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const updated = await api.updateMyTalentProfile({ instruments: selected }, token);
+      onUpdated(updated);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className={sectionClass}>
+      <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Instruments</h2>
+      <p className="mt-1 text-sm text-zinc-500">
+        Pick everything you play — helps talent hunts searching for a specific instrument find you.
+      </p>
+      <div className="mt-4 flex flex-col gap-3">
+        {INSTRUMENT_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">{group.label}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {group.instruments.map((i) => (
+                <label
+                  key={i}
+                  className={`cursor-pointer rounded-full border-2 px-3 py-1 text-xs font-semibold transition-colors ${
+                    selected.includes(i)
+                      ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                      : "border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  <input type="checkbox" checked={selected.includes(i)} onChange={() => toggle(i)} className="hidden" />
+                  {formatInstrument(i)}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <button onClick={handleSave} disabled={saving} className={`mt-4 ${btnSmall}`}>
+        {saving ? "Saving…" : "Save instruments"}
+      </button>
     </section>
   );
 }

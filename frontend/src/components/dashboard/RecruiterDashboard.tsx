@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Crown, Eye, FileCheck2, ShieldCheck, Star } from "lucide-react";
+import { BarChart3, Crown, Eye, ShieldCheck, Sparkles, Star } from "lucide-react";
 import {
   ApiError,
   Booking,
@@ -14,6 +14,7 @@ import {
   SavedSearch,
   TALENT_CATEGORIES,
   TalentCategory,
+  TalentList,
   TalentProfile,
   api,
 } from "@/lib/api";
@@ -40,6 +41,7 @@ import {
   verifiedBadgeClass,
 } from "@/lib/ui";
 import TalentAvatar from "@/components/TalentAvatar";
+import BookingAgreementSection from "@/components/BookingAgreementSection";
 import BookingReviewForm from "@/components/BookingReviewForm";
 
 function parseSkills(raw: string): string[] {
@@ -59,6 +61,8 @@ export default function RecruiterDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [analytics, setAnalytics] = useState<RecruiterAnalytics | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [talentLists, setTalentLists] = useState<TalentList[]>([]);
+  const [newArrivals, setNewArrivals] = useState<TalentProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [callActionId, setCallActionId] = useState<string | null>(null);
   const [callActionError, setCallActionError] = useState<string | null>(null);
@@ -85,12 +89,20 @@ export default function RecruiterDashboard() {
     api.listMyBookingsAsRecruiter(token).then(setBookings).catch(() => {});
     api.getMyAnalytics(token).then(setAnalytics).catch(() => {});
     api.listMyReviews(token).then(setReviews).catch(() => {});
+    api.listMyTalentLists(token).then(setTalentLists).catch(() => {});
+    api.listNewArrivals(token).then(setNewArrivals).catch(() => {});
   }, [token, profile]);
 
   async function handleDeleteSavedSearch(id: string) {
     if (!token) return;
     await api.deleteSavedSearch(id, token);
     setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  async function handleAddToList(listId: string, talentId: string) {
+    if (!token) return;
+    const member = await api.addTalentToList(listId, { talent_id: talentId }, token);
+    setTalentLists((prev) => prev.map((l) => (l.id === listId ? { ...l, members: [...l.members, member] } : l)));
   }
 
   async function handleToggleCallStatus(call: CastingCall) {
@@ -171,7 +183,7 @@ export default function RecruiterDashboard() {
 
       <MembershipCard profile={profile} onUpdated={setProfile} token={token!} />
 
-      <PostCastingCallForm token={token!} onPosted={(c) => setMyCalls((prev) => [c, ...prev])} />
+      <PostCastingCallForm token={token!} isPremium={profile.tier === "premium"} onPosted={(c) => setMyCalls((prev) => [c, ...prev])} />
 
       {analytics && (
         <section className={sectionClass}>
@@ -268,19 +280,16 @@ export default function RecruiterDashboard() {
         )}
       </section>
 
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Saved talent</h2>
-        {savedTalents.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            No saved talent yet — browse{" "}
-            <Link href="/talents" className="text-rose-600 hover:underline">
-              talent profiles
-            </Link>{" "}
-            and save the ones you like.
+      {profile.tier === "premium" && newArrivals.length > 0 && (
+        <section className={sectionClass}>
+          <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
+            <Sparkles className="h-5 w-5" /> New talent this week
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Fresh sign-ups in your posted categories, from the last 48 hours — a premium early look.
           </p>
-        ) : (
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {savedTalents.map((t) => (
+            {newArrivals.map((t) => (
               <Link
                 key={t.id}
                 href={`/talents/${t.id}`}
@@ -295,8 +304,62 @@ export default function RecruiterDashboard() {
               </Link>
             ))}
           </div>
+        </section>
+      )}
+
+      <section className={sectionClass}>
+        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Saved talent</h2>
+        {savedTalents.length === 0 ? (
+          <p className="mt-2 text-sm text-zinc-500">
+            No saved talent yet — browse{" "}
+            <Link href="/talents" className="text-rose-600 hover:underline">
+              talent profiles
+            </Link>{" "}
+            and save the ones you like.
+          </p>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {savedTalents.map((t) => (
+              <div key={t.id} className="overflow-hidden rounded-2xl border-2 border-zinc-100 dark:border-zinc-800">
+                <Link href={`/talents/${t.id}`} className="block">
+                  <div className="aspect-square overflow-hidden bg-zinc-100 dark:bg-zinc-900">
+                    <TalentAvatar name={t.display_name} coverUrl={coverPhotoUrl(t.media)} className="h-full w-full text-xl" />
+                  </div>
+                  <div className="p-2 pb-1">
+                    <p className="truncate text-xs font-medium text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
+                  </div>
+                </Link>
+                {profile.tier === "premium" && talentLists.length > 0 && (
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) handleAddToList(e.target.value, t.id);
+                      e.target.value = "";
+                    }}
+                    className="w-full border-t border-zinc-100 bg-transparent px-2 py-1.5 text-[11px] text-zinc-500 dark:border-zinc-800"
+                  >
+                    <option value="">Add to list…</option>
+                    {talentLists.map((l) => (
+                      <option key={l.id} value={l.id} disabled={l.members.some((m) => m.talent_id === t.id)}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </section>
+
+      <TalentListsCard
+        profile={profile}
+        lists={talentLists}
+        onCreated={(l) => setTalentLists((prev) => [l, ...prev])}
+        onDeleted={(id) => setTalentLists((prev) => prev.filter((l) => l.id !== id))}
+        onUpdated={(updated) => setTalentLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)))}
+        token={token!}
+      />
 
       <section className={sectionClass}>
         <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">My booking requests</h2>
@@ -326,9 +389,11 @@ export default function RecruiterDashboard() {
                   />
                 )}
                 {b.status === "accepted" && (
-                  <RecruiterAgreementSection
+                  <BookingAgreementSection
                     booking={b}
                     token={token!}
+                    viewerRole="recruiter"
+                    otherPartyLabel={b.talent_display_name}
                     onUpdated={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
                   />
                 )}
@@ -444,70 +509,6 @@ function CancelBookingButton({
   );
 }
 
-function RecruiterAgreementSection({
-  booking,
-  token,
-  onUpdated,
-}: {
-  booking: Booking;
-  token: string;
-  onUpdated: (updated: Booking) => void;
-}) {
-  const [documentUrl, setDocumentUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  if (booking.agreement_status === "signed") {
-    return (
-      <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-        <FileCheck2 className="h-4 w-4" /> Agreement signed
-        {booking.agreement_document_url && (
-          <a
-            href={booking.agreement_document_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-normal text-rose-600 hover:underline"
-          >
-            View document
-          </a>
-        )}
-      </p>
-    );
-  }
-
-  async function handleSign(e: FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const updated = await api.signBookingAgreement(booking.id, documentUrl || undefined, token);
-      onUpdated(updated);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSign} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/60">
-      <label className={labelClass}>
-        Link to signed agreement (optional)
-        <input
-          type="url"
-          value={documentUrl}
-          onChange={(e) => setDocumentUrl(e.target.value)}
-          placeholder="https://…"
-          className={inputClass}
-        />
-      </label>
-      <button type="submit" disabled={submitting} className={btnSmall}>
-        <FileCheck2 className="h-3.5 w-3.5" /> Mark agreement signed
-      </button>
-      <p className="mt-1 w-full text-xs text-zinc-400">
-        No e-signature provider (DocuSign or similar) is wired up yet — mark this once the agreement has been signed
-        outside the platform.
-      </p>
-    </form>
-  );
-}
-
 function MembershipCard({
   profile,
   onUpdated,
@@ -601,6 +602,115 @@ function MembershipCard({
   );
 }
 
+function TalentListsCard({
+  profile,
+  lists,
+  token,
+  onCreated,
+  onDeleted,
+  onUpdated,
+}: {
+  profile: RecruiterProfile;
+  lists: TalentList[];
+  token: string;
+  onCreated: (l: TalentList) => void;
+  onDeleted: (id: string) => void;
+  onUpdated: (l: TalentList) => void;
+}) {
+  const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCreate(e: FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setError(null);
+    setCreating(true);
+    try {
+      const list = await api.createTalentList(name.trim(), token);
+      onCreated(list);
+      setName("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create this list.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleRemoveMember(listId: string, member: TalentList["members"][number]) {
+    await api.removeTalentFromList(listId, member.id, token);
+    const list = lists.find((l) => l.id === listId);
+    if (list) onUpdated({ ...list, members: list.members.filter((m) => m.id !== member.id) });
+  }
+
+  return (
+    <section className={sectionClass}>
+      <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Talent lists</h2>
+      {profile.tier !== "premium" ? (
+        <p className="mt-2 text-sm text-zinc-500">
+          Talent lists are a Premium feature — upgrade above to organize candidates into named lists per
+          project, with notes on each.
+        </p>
+      ) : (
+        <>
+          <form onSubmit={handleCreate} className="mt-4 flex flex-wrap gap-2">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Monsoon Diaries — Lead"
+              className={`${inputClass} max-w-xs`}
+            />
+            <button type="submit" disabled={creating || !name.trim()} className={btnSmall}>
+              {creating ? "Adding…" : "+ New list"}
+            </button>
+          </form>
+          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          {lists.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">
+              No lists yet — create one above, then add saved talent to it from the list above.
+            </p>
+          ) : (
+            <div className="mt-4 flex flex-col gap-3">
+              {lists.map((l) => (
+                <div key={l.id} className="rounded-2xl border-2 border-zinc-100 p-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                      {l.name} <span className="text-xs font-normal text-zinc-500">· {l.members.length}</span>
+                    </p>
+                    <button
+                      onClick={async () => {
+                        await api.deleteTalentList(l.id, token);
+                        onDeleted(l.id);
+                      }}
+                      className={btnSmall}
+                    >
+                      Delete list
+                    </button>
+                  </div>
+                  {l.members.length > 0 && (
+                    <ul className="mt-3 flex flex-col gap-1.5">
+                      {l.members.map((m) => (
+                        <li key={m.id} className="flex items-center justify-between gap-2 text-sm">
+                          <Link href={`/talents/${m.talent_id}`} className="font-medium text-rose-600 hover:underline">
+                            {m.talent_display_name}
+                          </Link>
+                          <button onClick={() => handleRemoveMember(l.id, m)} className="text-xs text-zinc-400 hover:text-red-600">
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 function CreateRecruiterProfileForm({
   token,
   onCreated,
@@ -685,7 +795,15 @@ function emptyRole(): RoleDraft {
   return { title: "", criteria: "", category: "", compensation: "" };
 }
 
-function PostCastingCallForm({ token, onPosted }: { token: string; onPosted: (c: CastingCall) => void }) {
+function PostCastingCallForm({
+  token,
+  isPremium,
+  onPosted,
+}: {
+  token: string;
+  isPremium: boolean;
+  onPosted: (c: CastingCall) => void;
+}) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<TalentCategory>("acting");
@@ -695,6 +813,7 @@ function PostCastingCallForm({ token, onPosted }: { token: string; onPosted: (c:
   const [auditionReferenceUrl, setAuditionReferenceUrl] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [shootDetails, setShootDetails] = useState("");
+  const [premiumTalentOnly, setPremiumTalentOnly] = useState(false);
   const [roles, setRoles] = useState<RoleDraft[]>([emptyRole()]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -719,6 +838,7 @@ function PostCastingCallForm({ token, onPosted }: { token: string; onPosted: (c:
           audition_reference_url: auditionReferenceUrl || undefined,
           tags: parseSkills(tagsInput).length > 0 ? parseSkills(tagsInput) : undefined,
           shoot_details: shootDetails || undefined,
+          premium_talent_only: premiumTalentOnly,
           roles: roles.map((r) => ({
             title: r.title.trim() || title,
             criteria: r.criteria.trim() || undefined,
@@ -737,6 +857,7 @@ function PostCastingCallForm({ token, onPosted }: { token: string; onPosted: (c:
       setAuditionReferenceUrl("");
       setTagsInput("");
       setShootDetails("");
+      setPremiumTalentOnly(false);
       setRoles([emptyRole()]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not post this talent hunt.");
@@ -828,6 +949,21 @@ function PostCastingCallForm({ token, onPosted }: { token: string; onPosted: (c:
             className={inputClass}
           />
         </label>
+        {isPremium ? (
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={premiumTalentOnly}
+              onChange={(e) => setPremiumTalentOnly(e.target.checked)}
+              className="accent-rose-600"
+            />
+            Premium talent only
+          </label>
+        ) : (
+          <p className="text-xs text-zinc-400">
+            Upgrade to Premium to restrict this posting to Premium talent only.
+          </p>
+        )}
 
         <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
           <div>

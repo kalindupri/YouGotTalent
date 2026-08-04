@@ -201,11 +201,11 @@ def test_agreement_cannot_be_signed_before_accepted(client, talent_headers, tale
         headers=recruiter_headers,
     ).json()
 
-    resp = client.patch(f"/api/v1/bookings/{booking['id']}/agreement", json={}, headers=talent_headers)
+    resp = client.patch(f"/api/v1/bookings/{booking['id']}/agreement/sign", json={"signature_name": "Amila"}, headers=talent_headers)
     assert resp.status_code == 400
 
 
-def test_either_party_can_mark_agreement_signed(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+def test_first_signer_leaves_agreement_pending(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
     set_monday_9_to_5(client, talent_headers)
     start = next_weekday_at(0, 10)
     booking = client.post(
@@ -216,14 +216,94 @@ def test_either_party_can_mark_agreement_signed(client, talent_headers, talent_p
     client.patch(f"/api/v1/bookings/{booking['id']}/respond", json={"status": "accepted"}, headers=talent_headers)
 
     resp = client.patch(
-        f"/api/v1/bookings/{booking['id']}/agreement",
-        json={"agreement_document_url": "https://example.com/signed.pdf"},
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Recruiter"},
         headers=recruiter_headers,
     )
     assert resp.status_code == 200
     body = resp.json()
+    assert body["agreement_status"] == "pending"
+    assert body["recruiter_signature_name"] == "Fixture Recruiter"
+    assert body["recruiter_signed_at"] is not None
+    assert body["talent_signed_at"] is None
+
+
+def test_both_parties_signing_marks_agreement_signed(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+    set_monday_9_to_5(client, talent_headers)
+    start = next_weekday_at(0, 10)
+    booking = client.post(
+        f"/api/v1/talents/{talent_profile['id']}/bookings",
+        json={"start_at": start.isoformat(), "end_at": (start + timedelta(hours=1)).isoformat()},
+        headers=recruiter_headers,
+    ).json()
+    client.patch(f"/api/v1/bookings/{booking['id']}/respond", json={"status": "accepted"}, headers=talent_headers)
+
+    client.patch(
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Recruiter"},
+        headers=recruiter_headers,
+    )
+    resp = client.patch(
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Talent"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
     assert body["agreement_status"] == "signed"
-    assert body["agreement_document_url"] == "https://example.com/signed.pdf"
+    assert body["talent_signature_name"] == "Fixture Talent"
+    assert body["recruiter_signature_name"] == "Fixture Recruiter"
+
+
+def test_same_party_cannot_sign_twice(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+    set_monday_9_to_5(client, talent_headers)
+    start = next_weekday_at(0, 10)
+    booking = client.post(
+        f"/api/v1/talents/{talent_profile['id']}/bookings",
+        json={"start_at": start.isoformat(), "end_at": (start + timedelta(hours=1)).isoformat()},
+        headers=recruiter_headers,
+    ).json()
+    client.patch(f"/api/v1/bookings/{booking['id']}/respond", json={"status": "accepted"}, headers=talent_headers)
+
+    client.patch(
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Recruiter"},
+        headers=recruiter_headers,
+    )
+    resp = client.patch(
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Recruiter Again"},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_cannot_sign_after_both_parties_signed(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):
+    set_monday_9_to_5(client, talent_headers)
+    start = next_weekday_at(0, 10)
+    booking = client.post(
+        f"/api/v1/talents/{talent_profile['id']}/bookings",
+        json={"start_at": start.isoformat(), "end_at": (start + timedelta(hours=1)).isoformat()},
+        headers=recruiter_headers,
+    ).json()
+    client.patch(f"/api/v1/bookings/{booking['id']}/respond", json={"status": "accepted"}, headers=talent_headers)
+    client.patch(
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Recruiter"},
+        headers=recruiter_headers,
+    )
+    client.patch(
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Talent"},
+        headers=talent_headers,
+    )
+
+    resp = client.patch(
+        f"/api/v1/bookings/{booking['id']}/agreement/sign",
+        json={"signature_name": "Fixture Talent"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 400
 
 
 def test_talent_and_recruiter_list_own_bookings(client, talent_headers, talent_profile, recruiter_headers, recruiter_profile):

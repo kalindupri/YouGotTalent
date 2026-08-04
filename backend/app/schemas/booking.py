@@ -21,8 +21,8 @@ class BookingStatusUpdate(BaseModel):
     status: str
 
 
-class BookingAgreementUpdate(BaseModel):
-    agreement_document_url: str | None = None
+class BookingAgreementSign(BaseModel):
+    signature_name: str
 
 
 class BookingRead(BaseModel):
@@ -37,7 +37,10 @@ class BookingRead(BaseModel):
     message: str | None
     status: str
     agreement_status: str
-    agreement_document_url: str | None
+    talent_signature_name: str | None
+    talent_signed_at: datetime | None
+    recruiter_signature_name: str | None
+    recruiter_signed_at: datetime | None
     created_at: datetime
     talent_display_name: str
     recruiter_company_name: str

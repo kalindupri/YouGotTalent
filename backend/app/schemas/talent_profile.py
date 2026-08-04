@@ -16,6 +16,7 @@ class TalentProfileCreate(BaseModel):
     date_of_birth: date | None = None
     experience_years: int | None = None
     skills: list[str] | None = None
+    instruments: list[str] | None = None
     instagram_url: str | None = None
     facebook_url: str | None = None
     tiktok_url: str | None = None
@@ -35,6 +36,7 @@ class TalentProfileUpdate(BaseModel):
     date_of_birth: date | None = None
     experience_years: int | None = None
     skills: list[str] | None = None
+    instruments: list[str] | None = None
     instagram_url: str | None = None
     facebook_url: str | None = None
     tiktok_url: str | None = None
@@ -79,6 +81,7 @@ class TalentProfileRead(BaseModel):
     date_of_birth: date | None
     experience_years: int | None
     skills: list[str] | None
+    instruments: list[str] | None
     tier: str
     is_verified: bool
     verification_requested_at: datetime | None

@@ -66,6 +66,64 @@ def test_duplicate_invite_rejected(client, recruiter_headers, talent_headers, ca
     assert resp2.status_code == 400
 
 
+def test_free_recruiter_cannot_bulk_invite_more_than_one(client, recruiter_headers, talent_headers, casting_call, db_session):
+    talent_a = create_talent_profile(client, talent_headers)
+    other_token = register_and_verify(client, db_session, "second-talent@example.com", role="talent")
+    other_headers = auth_headers(other_token)
+    talent_b = create_talent_profile(client, other_headers, display_name="Second")
+
+    resp = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/invitations/bulk",
+        json={"talent_ids": [talent_a["id"], talent_b["id"]]},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 403
+
+
+def test_free_recruiter_can_bulk_invite_a_single_talent(client, recruiter_headers, talent_headers, casting_call):
+    talent = create_talent_profile(client, talent_headers)
+    resp = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/invitations/bulk",
+        json={"talent_ids": [talent["id"]]},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert len(body["invited"]) == 1
+    assert body["skipped"] == []
+
+
+def test_premium_recruiter_bulk_invites_multiple_and_skips_bad_ones(
+    client, recruiter_headers, talent_headers, casting_call, db_session
+):
+    client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
+    talent_a = create_talent_profile(client, talent_headers)
+    other_token = register_and_verify(client, db_session, "third-talent@example.com", role="talent")
+    other_headers = auth_headers(other_token)
+    talent_b = create_talent_profile(client, other_headers, display_name="Third")
+
+    unknown_id = "00000000-0000-0000-0000-000000000000"
+    resp = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/invitations/bulk",
+        json={"talent_ids": [talent_a["id"], talent_b["id"], unknown_id]},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert len(body["invited"]) == 2
+    assert body["skipped"] == [unknown_id]
+
+    # A repeat bulk invite for the same two talent skips them as duplicates.
+    resp2 = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/invitations/bulk",
+        json={"talent_ids": [talent_a["id"], talent_b["id"]]},
+        headers=recruiter_headers,
+    )
+    body2 = resp2.json()
+    assert body2["invited"] == []
+    assert sorted(body2["skipped"]) == sorted([talent_a["id"], talent_b["id"]])
+
+
 def test_talent_lists_own_invitations(client, recruiter_headers, talent_headers, casting_call):
     talent = create_talent_profile(client, talent_headers)
     client.post(

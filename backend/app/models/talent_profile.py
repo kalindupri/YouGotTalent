@@ -42,6 +42,11 @@ class TalentProfile(Base):
     date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     skills: Mapped[list[str] | None] = mapped_column(ARRAY(String(60)), nullable=True)
+    # Structured, filterable instrument tags for music-category talent (e.g. "drums",
+    # "sitar") — deliberately a dedicated column, not overloaded onto the generic
+    # `attributes` JSONB (shared by every category) or conflated with the freeform `skills`
+    # array (which mixes instruments and genres today).
+    instruments: Mapped[list[str] | None] = mapped_column(ARRAY(String(60)), nullable=True)
 
     # Plain string, not a native enum, for the same reason as `category`: adding a tier
     # later (e.g. "pro") shouldn't require an ALTER TYPE migration.

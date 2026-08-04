@@ -20,6 +20,9 @@ from app.models.subscription import Subscription, SubscriptionPayment
 from app.models.pricing import PricingVersion
 from app.models.title import Title, TitleReview
 from app.models.discussion import DiscussionThread, DiscussionReply
+from app.models.profile_view import ProfileView
+from app.models.talent_list import TalentList, TalentListMember
+from app.models.calendar_entry import CalendarEntry
 
 __all__ = [
     "User",
@@ -47,4 +50,8 @@ __all__ = [
     "TitleReview",
     "DiscussionThread",
     "DiscussionReply",
+    "ProfileView",
+    "TalentList",
+    "TalentListMember",
+    "CalendarEntry",
 ]

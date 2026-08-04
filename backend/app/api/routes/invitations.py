@@ -20,7 +20,13 @@ from app.db.session import get_db
 from app.models.invitation import INVITATION_STATUSES
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentProfile
-from app.schemas.invitation import InvitationCreate, InvitationRead, InvitationStatusUpdate
+from app.schemas.invitation import (
+    BulkInvitationCreate,
+    BulkInvitationResult,
+    InvitationCreate,
+    InvitationRead,
+    InvitationStatusUpdate,
+)
 
 router = APIRouter(tags=["invitations"])
 
@@ -54,6 +60,53 @@ def invite_talent_to_casting_call(
         f"View the invitation here: {settings.FRONTEND_URL}/dashboard",
     )
     return invitation
+
+
+@router.post(
+    "/casting-calls/{casting_call_id}/invitations/bulk",
+    response_model=BulkInvitationResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def bulk_invite_talent_to_casting_call(
+    casting_call_id: uuid.UUID,
+    payload: BulkInvitationCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    call = get_casting_call(db, casting_call_id)
+    if call is None or call.recruiter_id != recruiter.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Casting call not found")
+    if len(payload.talent_ids) > 1 and recruiter.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inviting more than one talent at once is a Premium feature. Upgrade your organizer account, or invite one at a time.",
+        )
+
+    invited = []
+    skipped = []
+    for talent_id in payload.talent_ids:
+        talent = get_talent_profile(db, talent_id)
+        if talent is None:
+            skipped.append(talent_id)
+            continue
+        try:
+            invitation = create_invitation(
+                db, casting_call_id, recruiter.id, InvitationCreate(talent_id=talent_id, message=payload.message)
+            )
+        except IntegrityError:
+            db.rollback()
+            skipped.append(talent_id)
+            continue
+        invited.append(invitation)
+        background_tasks.add_task(
+            send_email,
+            talent.user.email,
+            f"You've been invited to audition for {call.title}",
+            f"{recruiter.company_name} invited you to audition for \"{call.title}\".\n\n"
+            f"View the invitation here: {settings.FRONTEND_URL}/dashboard",
+        )
+    return BulkInvitationResult(invited=invited, skipped=skipped)
 
 
 @router.get("/casting-calls/{casting_call_id}/invitations", response_model=list[InvitationRead])

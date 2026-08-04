@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import ARRAY, Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import ARRAY, Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,6 +43,10 @@ class CastingCall(Base):
     # Incremented each time the public detail page is loaded — a simple view counter for the
     # recruiter's own analytics, not a unique-visitor count.
     view_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+    # Premium-recruiter-only to set; when true, only premium talent can apply (still visible to
+    # everyone in listings — hiding it entirely would waste the upgrade-FOMO effect).
+    premium_talent_only: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

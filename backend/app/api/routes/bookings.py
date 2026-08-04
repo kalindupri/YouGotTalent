@@ -19,7 +19,7 @@ from app.crud.booking import (
     has_overlapping_booking,
     list_bookings_for_recruiter,
     list_bookings_for_talent,
-    mark_agreement_signed,
+    sign_agreement,
     slot_within_availability,
     update_booking_status,
 )
@@ -30,7 +30,7 @@ from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentProfile
 from app.models.user import User
 from app.schemas.availability import AvailabilityWindowCreate, AvailabilityWindowRead
-from app.schemas.booking import BookingAgreementUpdate, BookingCreate, BookingRead, BookingStatusUpdate
+from app.schemas.booking import BookingAgreementSign, BookingCreate, BookingRead, BookingStatusUpdate
 from app.schemas.review import ReviewCreate, ReviewRead
 
 router = APIRouter(tags=["bookings"])
@@ -152,22 +152,27 @@ def cancel_booking(
     return update_booking_status(db, booking, "cancelled")
 
 
-@router.patch("/bookings/{booking_id}/agreement", response_model=BookingRead)
+@router.patch("/bookings/{booking_id}/agreement/sign", response_model=BookingRead)
 def sign_booking_agreement(
     booking_id: uuid.UUID,
-    agreement_in: BookingAgreementUpdate,
+    agreement_in: BookingAgreementSign,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     booking = get_booking(db, booking_id)
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
-    is_party = booking.talent.user_id == user.id or booking.recruiter.user_id == user.id
-    if not is_party:
+    if booking.talent.user_id == user.id:
+        party = "talent"
+    elif booking.recruiter.user_id == user.id:
+        party = "recruiter"
+    else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     if booking.status != "accepted" or booking.agreement_status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No pending agreement to sign for this booking")
-    return mark_agreement_signed(db, booking, agreement_in.agreement_document_url)
+    if (party == "talent" and booking.talent_signed_at) or (party == "recruiter" and booking.recruiter_signed_at):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You've already signed this agreement")
+    return sign_agreement(db, booking, party, agreement_in.signature_name)
 
 
 @router.post("/bookings/{booking_id}/reviews", response_model=ReviewRead, status_code=status.HTTP_201_CREATED)

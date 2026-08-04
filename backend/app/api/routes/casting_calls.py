@@ -63,6 +63,11 @@ def create_new_casting_call(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Free accounts can have up to {settings.FREE_TIER_OPEN_CASTING_CALL_LIMIT} open talent hunts at a time. Upgrade to Premium for unlimited postings.",
         )
+    if call_in.premium_talent_only and recruiter.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Restricting a talent hunt to Premium talent is a Premium feature. Upgrade your organizer account to use it.",
+        )
     call = create_casting_call(db, recruiter.id, call_in)
     notified_emails: set[str] = set()
 
@@ -110,6 +115,11 @@ def update_my_casting_call(
     recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
 ):
     call = _get_own_casting_call(db, casting_call_id, recruiter)
+    if call_in.premium_talent_only and recruiter.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Restricting a talent hunt to Premium talent is a Premium feature. Upgrade your organizer account to use it.",
+        )
     return update_casting_call(db, call, call_in)
 
 

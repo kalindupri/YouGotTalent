@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 from functools import reduce
 
-from sqlalchemy import case, func, or_
+from sqlalchemy import String, case, cast, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.media import Media, MediaType
@@ -27,6 +28,7 @@ def list_talent_profiles(
     experience_min: int | None = None,
     experience_max: int | None = None,
     verified_only: bool = False,
+    instruments: list[str] | None = None,
 ) -> list[TalentProfile]:
     query = db.query(TalentProfile)
     if category:
@@ -39,6 +41,13 @@ def list_talent_profiles(
         query = query.filter(TalentProfile.experience_years >= experience_min)
     if experience_max is not None:
         query = query.filter(TalentProfile.experience_years <= experience_max)
+    if instruments:
+        # Postgres array overlap ("any of the selected instruments") — the "multi-layered"
+        # search requested: pick several instrument families and match talent with ANY of them.
+        # `.op("&&")` rather than `.overlap()` since the column uses the generic sa.ARRAY type
+        # (matching `skills`/`tags` elsewhere), not the postgresql-dialect-specific ARRAY class
+        # whose comparator adds `.overlap()`.
+        query = query.filter(TalentProfile.instruments.op("&&")(instruments))
 
     # Premium talent get priority placement in results, ahead of relevance/recency.
     tier_boost = case((TalentProfile.tier == "premium", 1), else_=0)
@@ -75,6 +84,38 @@ def list_talent_profiles_for_job_alert(db: Session, categories: set[str]) -> lis
     return (
         db.query(TalentProfile)
         .filter(TalentProfile.category.in_(categories), TalentProfile.job_alert_emails.is_(True))
+        .all()
+    )
+
+
+def list_featured_talent(db: Session, limit: int) -> list[TalentProfile]:
+    """A capped, rotating "Featured talent" carousel — premium + verified talent only, ordered
+    by a hash of (talent id, ISO week number). This gives a stable-for-the-week, changes-next-
+    week rotation with zero cron/scheduler needed (the app has none), unlike the uncapped
+    `tier_boost` sort in list_talent_profiles() which just puts every premium talent first.
+    """
+    rotation_key = func.md5(func.concat(cast(TalentProfile.id, String), func.to_char(func.now(), "IYYY-IW")))
+    return (
+        db.query(TalentProfile)
+        .filter(TalentProfile.tier == "premium", TalentProfile.is_verified.is_(True))
+        .order_by(rotation_key)
+        .limit(limit)
+        .all()
+    )
+
+
+def list_new_arrivals(db: Session, categories: set[str], hours: int = 48) -> list[TalentProfile]:
+    """A curated early-look feed for premium recruiters — deliberately additive, not
+    exclusionary: new talent are still fully visible everywhere else (normal browse/search)
+    from the moment they sign up, this just surfaces them here too before the window elapses.
+    """
+    if not categories:
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    return (
+        db.query(TalentProfile)
+        .filter(TalentProfile.category.in_(categories), TalentProfile.created_at >= cutoff)
+        .order_by(TalentProfile.created_at.desc())
         .all()
     )
 

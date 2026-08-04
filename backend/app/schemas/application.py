@@ -27,3 +27,5 @@ class ApplicationRead(BaseModel):
     submission_url: str | None
     status: ApplicationStatus
     applied_at: datetime
+    viewed_at: datetime | None
+    match_score: int | None

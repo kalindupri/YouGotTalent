@@ -113,6 +113,10 @@ PROJECT_ADJECTIVES = ["Monsoon", "Golden", "Silent", "Broken", "Crimson", "Midni
 PROJECT_NOUNS = ["Diaries", "Skies", "Harbor", "Echoes", "Horizon", "Garden", "Tides", "Legacy", "Reverie", "Crossing"]
 
 
+def random_instruments() -> list[str]:
+    return random.sample(INSTRUMENTS, k=random.randint(1, 3))
+
+
 def random_height() -> str:
     feet, inches = 5, random.randint(0, 11)
     cm = 150 + random.randint(0, 45)
@@ -149,8 +153,8 @@ def build_attributes(category: str) -> dict[str, str] | None:
         return {"height": random_height(), "build": random.choice(BUILDS)}
     if category == "singing":
         return {"vocal_range": random.choice(VOCAL_RANGES), "voice_type": random.choice(VOICE_TYPES)}
-    if category == "music":
-        return {"primary_instrument": random.choice(INSTRUMENTS)}
+    # Music no longer uses this generic attributes map for instruments — see
+    # random_instruments() / TalentProfile.instruments, a dedicated structured column.
     if category == "painting":
         return {"primary_medium": random.choice(MEDIUMS)}
     if category == "script_writing":
@@ -536,6 +540,7 @@ def seed_talents(db, count: int = 100) -> None:
             tier="premium" if created % 5 == 0 else "free",
             is_verified=created % 4 == 0,
             attributes=build_attributes(category),
+            instruments=random_instruments() if category == "music" else None,
             # Placeholder profile links, not real third-party accounts — pointed at the
             # reserved example.com domain so they never resolve to an unrelated real profile.
             instagram_url=f"https://example.com/instagram/{handle}" if created % 2 == 0 else None,

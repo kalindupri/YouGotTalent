@@ -26,3 +26,13 @@ class InvitationRead(BaseModel):
     status: str
     created_at: datetime
     casting_call: CastingCallRead
+
+
+class BulkInvitationCreate(BaseModel):
+    talent_ids: list[uuid.UUID]
+    message: str | None = None
+
+
+class BulkInvitationResult(BaseModel):
+    invited: list[InvitationRead]
+    skipped: list[uuid.UUID]

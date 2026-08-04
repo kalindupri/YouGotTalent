@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     FREE_TIER_VIDEO_LIMIT: int = 1
     PREMIUM_TIER_VIDEO_LIMIT: int = 5
 
+    # Capped, rotating "Featured talent" slots — see list_featured_talent().
+    PREMIUM_FEATURED_SLOT_LIMIT: int = 6
+
     # Raw (pre-compression) upload size cap, enforced before any ffmpeg work is done.
     MAX_UPLOAD_SIZE_BYTES: int = 200 * 1024 * 1024
 

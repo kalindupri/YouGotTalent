@@ -42,6 +42,11 @@ def _create_application_and_notify(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Casting call not found")
     if not any(r.id == application_in.role_id for r in call.roles):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That role doesn't belong to this casting call")
+    if call.premium_talent_only and talent.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This talent hunt is open to Premium talent only. Upgrade your account to apply.",
+        )
 
     try:
         application = create_application(db, casting_call_id, talent.id, application_in)
@@ -130,7 +135,7 @@ def list_casting_call_applications(
     call = get_casting_call(db, casting_call_id)
     if call is None or call.recruiter_id != recruiter.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Casting call not found")
-    return list_applications_for_casting_call(db, casting_call_id)
+    return list_applications_for_casting_call(db, casting_call_id, score=recruiter.tier == "premium")
 
 
 @router.get("/talents/me/applications", response_model=list[ApplicationRead])

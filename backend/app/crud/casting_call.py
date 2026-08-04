@@ -51,6 +51,11 @@ def delete_casting_call(db: Session, call: CastingCall) -> None:
     db.commit()
 
 
+def get_recruiter_categories(db: Session, recruiter_id: uuid.UUID) -> set[str]:
+    rows = db.query(CastingCall.category).filter(CastingCall.recruiter_id == recruiter_id).distinct().all()
+    return {row[0] for row in rows}
+
+
 def get_recruiter_analytics(db: Session, recruiter_id: uuid.UUID) -> dict:
     calls = db.query(CastingCall).filter(CastingCall.recruiter_id == recruiter_id).order_by(CastingCall.created_at.desc()).all()
 

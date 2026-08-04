@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -81,9 +82,18 @@ def update_booking_status(db: Session, booking: Booking, status: str) -> Booking
     return _attach_summary_fields(booking)
 
 
-def mark_agreement_signed(db: Session, booking: Booking, document_url: str | None) -> Booking:
-    booking.agreement_status = "signed"
-    booking.agreement_document_url = document_url
+def sign_agreement(db: Session, booking: Booking, party: str, signature_name: str) -> Booking:
+    now = datetime.now(timezone.utc)
+    if party == "talent":
+        booking.talent_signature_name = signature_name
+        booking.talent_signed_at = now
+    else:
+        booking.recruiter_signature_name = signature_name
+        booking.recruiter_signed_at = now
+
+    if booking.talent_signed_at and booking.recruiter_signed_at:
+        booking.agreement_status = "signed"
+
     db.commit()
     db.refresh(booking)
     return _attach_summary_fields(booking)

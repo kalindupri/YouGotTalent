@@ -299,6 +299,22 @@ def test_browse_filters_by_experience_range(client, talent_headers, db_session):
     assert names == {"Veteran"}
 
 
+def test_browse_filters_by_instruments(client, talent_headers, db_session):
+    create_profile(client, talent_headers, category="music", instruments=["drums", "cajon"])
+    token_b = register_and_verify(client, db_session, "violinist@example.com", role="talent")
+    create_profile(client, auth_headers(token_b), display_name="Violinist", category="music", instruments=["violin"])
+
+    resp = client.get("/api/v1/talents", params={"instruments": ["drums"]})
+    assert resp.status_code == 200
+    names = {t["display_name"] for t in resp.json()}
+    assert names == {"Test Talent"}
+
+    resp = client.get("/api/v1/talents", params={"instruments": ["drums", "violin"]})
+    assert resp.status_code == 200
+    names = {t["display_name"] for t in resp.json()}
+    assert names == {"Test Talent", "Violinist"}
+
+
 def test_browse_verified_only_filter(client, talent_headers, db_session):
     from app.models.talent_profile import TalentProfile
 

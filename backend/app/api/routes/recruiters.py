@@ -1,11 +1,12 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_recruiter_profile, require_recruiter
 from app.crud import subscription as subscription_crud
-from app.crud.casting_call import get_recruiter_analytics
+from app.crud.casting_call import get_recruiter_analytics, get_recruiter_categories
 from app.crud.recruiter_profile import (
     create_recruiter_profile,
     get_recruiter_profile,
@@ -15,6 +16,17 @@ from app.crud.recruiter_profile import (
 from app.crud.review import get_recruiter_review_summary, list_reviews_for_recruiter
 from app.crud.saved_search import create_saved_search, delete_saved_search, get_saved_search, list_saved_searches
 from app.crud.saved_talent import list_saved_talents
+from app.crud.talent_list import (
+    add_member,
+    create_talent_list,
+    delete_talent_list,
+    get_member,
+    get_talent_list,
+    list_talent_lists,
+    remove_member,
+    update_member_notes,
+)
+from app.crud.talent_profile import get_talent_profile, list_new_arrivals
 from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.user import User
@@ -22,6 +34,13 @@ from app.schemas.analytics import RecruiterAnalytics
 from app.schemas.recruiter_profile import RecruiterProfileCreate, RecruiterProfileRead
 from app.schemas.review import RecruiterReviewSummary, ReviewRead
 from app.schemas.saved_search import SavedSearchCreate, SavedSearchRead
+from app.schemas.talent_list import (
+    TalentListCreate,
+    TalentListMemberCreate,
+    TalentListMemberNotesUpdate,
+    TalentListMemberRead,
+    TalentListRead,
+)
 from app.schemas.talent_profile import TalentProfileRead
 
 router = APIRouter(prefix="/recruiters", tags=["recruiters"])
@@ -125,6 +144,107 @@ def delete_my_saved_search(
     if saved_search is None or saved_search.recruiter_id != recruiter.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saved search not found")
     delete_saved_search(db, saved_search)
+
+
+@router.get("/me/new-arrivals", response_model=list[TalentProfileRead])
+def read_new_arrivals(
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    if recruiter.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Early access to new talent sign-ups is a Premium feature. Upgrade your organizer account to see them first.",
+        )
+    categories = get_recruiter_categories(db, recruiter.id)
+    return list_new_arrivals(db, categories)
+
+
+@router.get("/me/talent-lists", response_model=list[TalentListRead])
+def read_my_talent_lists(
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    return list_talent_lists(db, recruiter.id)
+
+
+@router.post("/me/talent-lists", response_model=TalentListRead, status_code=status.HTTP_201_CREATED)
+def create_my_talent_list(
+    list_in: TalentListCreate,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    if recruiter.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Talent lists are a Premium feature. Upgrade your organizer account to organize talent into lists.",
+        )
+    return create_talent_list(db, recruiter.id, list_in)
+
+
+def _get_own_talent_list(db: Session, list_id: uuid.UUID, recruiter: RecruiterProfile):
+    talent_list = get_talent_list(db, list_id)
+    if talent_list is None or talent_list.recruiter_id != recruiter.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent list not found")
+    return talent_list
+
+
+@router.delete("/me/talent-lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_talent_list(
+    list_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    talent_list = _get_own_talent_list(db, list_id, recruiter)
+    delete_talent_list(db, talent_list)
+
+
+@router.post(
+    "/me/talent-lists/{list_id}/members", response_model=TalentListMemberRead, status_code=status.HTTP_201_CREATED
+)
+def add_talent_to_list(
+    list_id: uuid.UUID,
+    member_in: TalentListMemberCreate,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    _get_own_talent_list(db, list_id, recruiter)
+    if get_talent_profile(db, member_in.talent_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+    try:
+        return add_member(db, list_id, member_in)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This talent is already on that list")
+
+
+@router.patch("/me/talent-lists/{list_id}/members/{member_id}", response_model=TalentListMemberRead)
+def update_talent_list_member(
+    list_id: uuid.UUID,
+    member_id: uuid.UUID,
+    notes_in: TalentListMemberNotesUpdate,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    _get_own_talent_list(db, list_id, recruiter)
+    member = get_member(db, member_id)
+    if member is None or member.list_id != list_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List member not found")
+    return update_member_notes(db, member, notes_in.notes)
+
+
+@router.delete("/me/talent-lists/{list_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_talent_from_list(
+    list_id: uuid.UUID,
+    member_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    _get_own_talent_list(db, list_id, recruiter)
+    member = get_member(db, member_id)
+    if member is None or member.list_id != list_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List member not found")
+    remove_member(db, member)
 
 
 # These two routes must stay below every /me* route above — {recruiter_id} would otherwise

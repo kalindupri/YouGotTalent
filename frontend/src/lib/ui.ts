@@ -338,7 +338,9 @@ export const CATEGORY_ATTRIBUTES: Record<string, AttributeField[]> = {
     { key: "vocal_range", label: "Vocal range", placeholder: "e.g. mezzo-soprano" },
     { key: "voice_type", label: "Voice type", placeholder: "e.g. belt/pop, classical" },
   ],
-  music: [{ key: "primary_instrument", label: "Primary instrument", placeholder: "e.g. guitar" }],
+  // Instruments are handled separately via INSTRUMENT_GROUPS/TalentProfile.instruments (a
+  // structured, filterable column), not this generic free-text attributes map.
+  music: [],
   painting: [{ key: "primary_medium", label: "Primary medium", placeholder: "e.g. oil on canvas" }],
   script_writing: [{ key: "primary_language", label: "Primary writing language", placeholder: "e.g. Sinhala" }],
   photography: [{ key: "camera_gear", label: "Camera gear", placeholder: "e.g. Sony A7IV, 24-70mm f/2.8" }],
@@ -352,6 +354,21 @@ export const CATEGORY_ATTRIBUTES: Record<string, AttributeField[]> = {
   design: [{ key: "software_tools", label: "Software / tools", placeholder: "e.g. Figma, Adobe Illustrator" }],
   other: [],
 };
+
+// Controlled instrument taxonomy for music-category talent — structured tagging (used both
+// for the profile edit form and the "multi-layered" browse filter: pick several families and
+// match talent playing ANY of them).
+export const INSTRUMENT_GROUPS: { label: string; instruments: string[] }[] = [
+  { label: "Percussion", instruments: ["drums", "tabla", "cajon", "mridangam", "congas"] },
+  { label: "Strings", instruments: ["guitar", "violin", "sitar", "veena", "bass"] },
+  { label: "Keys", instruments: ["piano", "keyboard", "synth"] },
+  { label: "Wind", instruments: ["flute", "saxophone", "trumpet", "clarinet"] },
+  { label: "Other", instruments: ["other"] },
+];
+
+export function formatInstrument(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 export function categoryAttributeFields(category: string): AttributeField[] {
   return CATEGORY_ATTRIBUTES[category] ?? [];

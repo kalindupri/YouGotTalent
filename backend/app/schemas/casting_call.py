@@ -19,6 +19,7 @@ class CastingCallCreate(BaseModel):
     audition_reference_url: str | None = None
     tags: list[str] | None = None
     shoot_details: str | None = None
+    premium_talent_only: bool = False
     # A job post always has at least one applicable role/stream — for the common single-role
     # case, the frontend just submits one row.
     roles: list[CastingCallRoleCreate] = Field(min_length=1)
@@ -36,6 +37,7 @@ class CastingCallUpdate(BaseModel):
     audition_reference_url: str | None = None
     tags: list[str] | None = None
     shoot_details: str | None = None
+    premium_talent_only: bool | None = None
 
 
 class CastingCallRead(BaseModel):
@@ -54,6 +56,7 @@ class CastingCallRead(BaseModel):
     audition_reference_url: str | None
     tags: list[str] | None
     shoot_details: str | None
+    premium_talent_only: bool
     is_featured: bool
     view_count: int
     created_at: datetime
