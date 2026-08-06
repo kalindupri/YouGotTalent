@@ -8,16 +8,35 @@ logger = logging.getLogger("app.email")
 
 
 def send_email(to: str, subject: str, body: str) -> None:
-    """Send an email, or log it if no SMTP server is configured.
+    """Send an email via Azure Communication Services (production), SMTP (local/dev), or log
+    it if neither is configured.
 
-    Safe default for local/dev environments: without SMTP_HOST set, nothing is actually
-    sent over the network — the content is logged instead so the notification flow can
-    still be exercised and verified.
+    Safe default for local/dev environments: without any mail provider configured, nothing
+    is actually sent over the network — the content is logged instead so the notification
+    flow can still be exercised and verified.
     """
-    if not settings.SMTP_HOST:
-        logger.info("EMAIL (SMTP not configured, logging instead of sending)\nTo: %s\nSubject: %s\n\n%s", to, subject, body)
-        return
+    if settings.AZURE_COMMUNICATION_CONNECTION_STRING:
+        _send_via_acs(to, subject, body)
+    elif settings.SMTP_HOST:
+        _send_via_smtp(to, subject, body)
+    else:
+        logger.info("EMAIL (no mail provider configured, logging instead of sending)\nTo: %s\nSubject: %s\n\n%s", to, subject, body)
 
+
+def _send_via_acs(to: str, subject: str, body: str) -> None:
+    from azure.communication.email import EmailClient
+
+    client = EmailClient.from_connection_string(settings.AZURE_COMMUNICATION_CONNECTION_STRING)
+    message = {
+        "senderAddress": settings.EMAIL_FROM,
+        "recipients": {"to": [{"address": to}]},
+        "content": {"subject": subject, "plainText": body},
+    }
+    poller = client.begin_send(message)
+    poller.result()
+
+
+def _send_via_smtp(to: str, subject: str, body: str) -> None:
     message = EmailMessage()
     message["From"] = settings.EMAIL_FROM
     message["To"] = to

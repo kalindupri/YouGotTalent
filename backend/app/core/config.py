@@ -94,8 +94,11 @@ class Settings(BaseSettings):
     STRIPE_TALENT_PRICE: int = 500  # cents
     STRIPE_RECRUITER_PRICE: int = 1500  # cents
 
-    # SMTP config for outgoing email. If SMTP_HOST is unset, emails are logged instead of sent
-    # (safe default for local/dev environments with no mail credentials configured).
+    # Outgoing email. Checked in order: Azure Communication Services (production, sends via
+    # the ACS Email REST API using key-based auth) -> SMTP (local/dev, e.g. Gmail) -> log-only
+    # if neither is configured, so the notification flow can still be exercised without any
+    # mail credentials.
+    AZURE_COMMUNICATION_CONNECTION_STRING: str | None = None
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USER: str | None = None

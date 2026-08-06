@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouGotTalent — Coming Soon</title>
+<meta name="description" content="Sri Lanka's talent marketplace. Every skill, one stage. Coming soon to yougottalent.lk." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%225%22 fill=%22%23e11d48%22/><text x=%2212%22 y=%2217%22 font-size=%2214%22 font-family=%22Arial%2C sans-serif%22 font-weight=%22900%22 fill=%22white%22 text-anchor=%22middle%22>Y</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #09090b;
+    --grid: rgba(255,255,255,0.05);
+    --rose: #e11d48;
+    --rose-soft: #f43f5e;
+    --text-muted: #a1a1aa;
+    --border: #27272a;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: #fff;
+    font-family: 'Inter', Arial, Helvetica, sans-serif;
+    min-height: 100%;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .bg-glow {
+    position: fixed;
+    top: 0;
+    right: -8rem;
+    width: 50%;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to left, rgba(225, 29, 72, 0.18), transparent);
+  }
+
+  header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.75rem 1.5rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Archivo', Arial, sans-serif;
+    font-weight: 900;
+    font-size: 1.15rem;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+
+  .logo .mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background: var(--rose);
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem 1.5rem 4rem;
+    max-width: 46rem;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  h1 {
+    font-family: 'Archivo', Arial, sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    font-size: clamp(2.75rem, 8vw, 5rem);
+    margin: 1.75rem 0 0;
+  }
+
+  h1 .accent { color: var(--rose-soft); }
+
+  .subtitle {
+    margin: 1.5rem 0 0;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    max-width: 34rem;
+  }
+
+  .status {
+    margin-top: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--rose-soft);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.75); }
+  }
+
+  .categories {
+    margin-top: 2.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    max-width: 34rem;
+  }
+
+  .categories span {
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    background: #18181b;
+    border: 1px solid var(--border);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  footer {
+    position: relative;
+    z-index: 1;
+    padding: 1.75rem 1.5rem 2.25rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #52525b;
+  }
+
+  footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  footer a:hover {
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <header>
+    <div class="logo"><span class="mark">Y</span>YouGotTalent</div>
+  </header>
+
+  <main>
+    <span class="eyebrow">Sri Lanka's talent marketplace</span>
+    <h1>Every skill.<br /><span class="accent">One stage.</span></h1>
+    <p class="subtitle">
+      Acting, singing, dancing, script writing, music, comedy, and more — YouGotTalent
+      is where Sri Lankan talent gets discovered and talent hunts find exactly who
+      they're looking for. We're putting the finishing touches on things.
+    </p>
+    <span class="status"><span class="dot"></span> Launching soon at yougottalent.lk</span>
+    <div class="categories">
+      <span>Acting</span>
+      <span>Singing</span>
+      <span>Dancing</span>
+      <span>Music</span>
+      <span>Photography</span>
+      <span>Script Writing</span>
+      <span>Comedy</span>
+      <span>Modeling</span>
+      <span>and more</span>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2026 YouGotTalent &middot; <a href="mailto:hello@yougottalent.lk">hello@yougottalent.lk</a>
+  </footer>
+</body>
+</html>
