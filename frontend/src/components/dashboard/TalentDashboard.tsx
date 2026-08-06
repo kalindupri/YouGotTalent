@@ -595,8 +595,8 @@ function MembershipCard({
           <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Membership</h2>
           <p className="mt-1 text-sm text-zinc-500">
             {profile.tier === "premium"
-              ? "You're on Premium — unlimited portfolio items and priority placement in search."
-              : "Free plan: up to 3 portfolio items. Upgrade for unlimited auditions and priority placement."}
+              ? "You're on Premium — unlimited portfolio items, boosted placement, who-viewed-your-profile, and exact read-receipt times."
+              : "Free plan: up to 3 portfolio items. Upgrade for unlimited auditions, boosted placement, who-viewed-your-profile, and exact read-receipt times."}
           </p>
         </div>
         <span className={profile.tier === "premium" ? premiumBadgeClass : badgeClass("neutral")}>

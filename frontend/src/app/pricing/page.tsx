@@ -8,10 +8,27 @@ import { useAuth } from "@/lib/auth-context";
 import { redirectToCheckout } from "@/lib/billing";
 import { btnPrimary, btnSecondary, eyebrowClass } from "@/lib/ui";
 
-const TALENT_FREE_FEATURES = ["Full public profile", "Unlimited browsing & applications", "3 portfolio items, 1 audition video", "Standard search ranking"];
-const TALENT_PREMIUM_FEATURES = ["Unlimited portfolio items", "5 audition videos", "Boosted search placement", "Verified badge queue priority"];
-const RECRUITER_FREE_FEATURES = ["2 open talent hunts at a time", "Full applicant tracking board", "Standard listing placement"];
-const RECRUITER_PREMIUM_FEATURES = ["Unlimited open postings", "Automatic \"Featured\" placement", "Saved searches with alerts", "Recruiter analytics dashboard"];
+const TALENT_FREE_FEATURES = ["Full public profile", "Unlimited browsing & applications", "3 portfolio items, 1 audition video", "Standard search ranking", "Work calendar & e-signature", "Application seen/not-seen status"];
+const TALENT_PREMIUM_FEATURES = [
+  "Unlimited portfolio items & 5 audition videos",
+  "Boosted search placement + verified badge priority",
+  "See who viewed your profile",
+  "Exact read-receipt times on your applications",
+  "Apply to Premium-talent-only exclusive talent hunts",
+  "Rotating spotlight on the homepage (once verified)",
+];
+const RECRUITER_FREE_FEATURES = ["2 open talent hunts at a time", "Full applicant tracking board", "Standard listing placement", "Work calendar & e-signature"];
+const RECRUITER_PREMIUM_FEATURES = [
+  "Unlimited open postings",
+  "AI-assisted match scoring on every applicant",
+  "Talent CRM — save candidates into named lists",
+  "Bulk-invite talent to a talent hunt",
+  "Early access to new talent sign-ups",
+  "Post Premium-talent-only exclusive calls",
+  "Automatic \"Featured\" placement",
+  "Saved searches with alerts",
+  "Recruiter analytics dashboard",
+];
 
 export default function PricingPage() {
   const { user, token } = useAuth();
