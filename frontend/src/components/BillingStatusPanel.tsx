@@ -19,7 +19,19 @@ const REASON_OPTIONS: { value: CancellationReasonCode; label: string }[] = [
 
 type FlowStep = "closed" | "offer" | "reason" | "done";
 
-export default function BillingStatusPanel({ token, onCanceled }: { token: string; onCanceled?: () => void }) {
+export default function BillingStatusPanel({
+  token,
+  onCanceled,
+  refreshKey,
+}: {
+  token: string;
+  onCanceled?: () => void;
+  // Bumped by the parent (e.g. with the profile's tier) whenever a subscription may have
+  // changed outside this component — MembershipCard's "Start free trial" flips the profile's
+  // tier via a sibling action this panel has no other way to hear about, so without this the
+  // panel stays stuck showing no subscription until the page is manually reloaded.
+  refreshKey?: string | number;
+}) {
   const [sub, setSub] = useState<Subscription | null | undefined>(undefined);
   const [reactivating, setReactivating] = useState(false);
   const [step, setStep] = useState<FlowStep>("closed");
@@ -36,7 +48,7 @@ export default function BillingStatusPanel({ token, onCanceled }: { token: strin
       .catch(() => setSub(null));
   }
 
-  useEffect(refresh, [token]);
+  useEffect(refresh, [token, refreshKey]);
 
   async function handleReactivate() {
     setReactivating(true);

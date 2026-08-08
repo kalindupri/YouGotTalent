@@ -595,7 +595,11 @@ function MembershipCard({
             </button>
           ))}
       </div>
-      <BillingStatusPanel token={token} onCanceled={() => api.getMyRecruiterProfile(token).then(onUpdated)} />
+      <BillingStatusPanel
+        token={token}
+        refreshKey={profile.tier}
+        onCanceled={() => api.getMyRecruiterProfile(token).then(onUpdated)}
+      />
       <PaymentHistoryList token={token} />
       <p className="mt-3 text-xs text-zinc-400">Verification is reviewed manually for now.</p>
     </section>
