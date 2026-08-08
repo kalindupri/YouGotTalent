@@ -30,7 +30,11 @@ class DiscordErrorHandler(logging.Handler):
         try:
             signature = _signature(record)
             now = time.monotonic()
-            if now - _last_alerted.get(signature, 0) < _ALERT_COOLDOWN_SECONDS:
+            # A default of 0 here would falsely look "recent" (within the cooldown window)
+            # for any signature seen for the first time during the first 5 minutes after
+            # process start, since time.monotonic() itself starts near 0 at boot — silencing
+            # every alert right after a deploy/restart. -inf means "never alerted" always fires.
+            if now - _last_alerted.get(signature, float("-inf")) < _ALERT_COOLDOWN_SECONDS:
                 return
             _last_alerted[signature] = now
 
