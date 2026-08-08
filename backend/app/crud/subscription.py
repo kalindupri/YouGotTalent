@@ -166,6 +166,15 @@ def start_checkout(
     plan = SubscriptionPlan.TALENT_PREMIUM if talent_profile else SubscriptionPlan.RECRUITER_PREMIUM
     price = price_lkr_for(db, plan, billing_cycle)
 
+    # Trial-eligible only the first time a subscriber's checkout is actually confirmed — PENDING
+    # (or no row at all) means no prior attempt ever got past "checkout started," so an abandoned
+    # checkout doesn't burn the trial. Skipped entirely for gateways that activate immediately
+    # (the mock gateway) since there's no real charge to defer with a trial in the first place.
+    never_confirmed = subscription is None or subscription.status == SubscriptionStatus.PENDING
+    trial_days = 0
+    if never_confirmed and not gateway.activates_immediately:
+        trial_days = settings.TALENT_TRIAL_DAYS if talent_profile else settings.RECRUITER_TRIAL_DAYS
+
     if subscription is None:
         subscription = Subscription(
             talent_profile_id=talent_profile.id if talent_profile else None,
@@ -184,10 +193,12 @@ def start_checkout(
         subscription.status = SubscriptionStatus.PENDING
         # A fresh checkout supersedes any in-flight cancellation/discount from a previous cycle.
         subscription.cancel_at_period_end = False
+
+    subscription.trial_end = datetime.now(timezone.utc) + timedelta(days=trial_days) if trial_days > 0 else None
     db.commit()
     db.refresh(subscription)
 
-    checkout = gateway.start_checkout(subscription, return_url)
+    checkout = gateway.start_checkout(subscription, return_url, trial_days=trial_days)
 
     if gateway.activates_immediately:
         period_end = _period_end(billing_cycle)
@@ -214,7 +225,19 @@ def apply_webhook_event(db: Session, event: WebhookEvent) -> Subscription | None
     if event.gateway_subscription_id and not subscription.gateway_subscription_id:
         subscription.gateway_subscription_id = event.gateway_subscription_id
 
-    new_status = SubscriptionStatus(event.status)
+    event_status = event.status
+    if event_status == "active" and subscription.trial_end:
+        trial_end = subscription.trial_end
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        if trial_end > datetime.now(timezone.utc):
+            # checkout.session.completed fires as soon as the card is authorized, even when a
+            # trial_period_days was set — the gateway hasn't actually charged anything yet, so
+            # this is "trialing," not "active." The real invoice.paid webhook (sent once the
+            # trial ends and Stripe charges the card) is what promotes this to active for real.
+            event_status = "trialing"
+
+    new_status = SubscriptionStatus(event_status)
     was_past_due = subscription.status == SubscriptionStatus.PAST_DUE
     subscription.status = new_status
 

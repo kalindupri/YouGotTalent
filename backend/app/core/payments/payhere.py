@@ -29,7 +29,10 @@ class PayHereGateway(PaymentGateway):
 
     name = PaymentGatewayName.PAYHERE
 
-    def start_checkout(self, subscription: Subscription, return_url: str) -> CheckoutSession:
+    def start_checkout(self, subscription: Subscription, return_url: str, trial_days: int = 0) -> CheckoutSession:
+        # trial_days isn't wired up here yet — PayHere's recurring-billing fields (recurrence/
+        # duration) don't have a documented free-trial equivalent to the ones used below. Not
+        # urgent since no live PayHere merchant account is configured yet.
         order_id = str(subscription.id)
         amount = f"{subscription.price_lkr:.2f}"
         merchant_secret_hash = _hash(settings.PAYHERE_MERCHANT_SECRET or "")

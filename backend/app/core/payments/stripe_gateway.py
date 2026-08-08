@@ -16,7 +16,7 @@ class StripeGateway(PaymentGateway):
 
     name = PaymentGatewayName.STRIPE
 
-    def start_checkout(self, subscription: Subscription, return_url: str) -> CheckoutSession:
+    def start_checkout(self, subscription: Subscription, return_url: str, trial_days: int = 0) -> CheckoutSession:
         stripe.api_key = settings.STRIPE_SECRET_KEY
         is_talent = subscription.plan == SubscriptionPlan.TALENT_PREMIUM
         price_id = settings.STRIPE_TALENT_PRICE_ID if is_talent else settings.STRIPE_RECRUITER_PRICE_ID
@@ -42,13 +42,20 @@ class StripeGateway(PaymentGateway):
                 "quantity": 1,
             }
 
-        session = stripe.checkout.Session.create(
+        session_kwargs = dict(
             mode="subscription",
             line_items=[line_item],
             success_url=f"{return_url}?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=return_url,
             client_reference_id=str(subscription.id),
         )
+        if trial_days > 0:
+            # Card is collected now but not charged until the trial ends — Stripe manages the
+            # trial natively on its own subscription object, so no separate reminder/charge
+            # logic is needed on our side beyond the webhook handling in apply_webhook_event.
+            session_kwargs["subscription_data"] = {"trial_period_days": trial_days}
+
+        session = stripe.checkout.Session.create(**session_kwargs)
         return CheckoutSession(redirect_url=session.url, method="get")
 
     def verify_webhook(self, payload: bytes, headers: dict[str, str]) -> WebhookEvent | None:

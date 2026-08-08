@@ -5,9 +5,13 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
+from app.core.payments.base import CheckoutSession, PaymentGateway, WebhookEvent
+from app.core.payments.factory import get_gateway
 from app.core.payments.payhere import PayHereGateway
 from app.core.payments.stripe_gateway import StripeGateway
-from app.models.subscription import Subscription, SubscriptionStatus
+from app.crud import subscription as subscription_crud
+from app.main import app
+from app.models.subscription import PaymentGatewayName, Subscription, SubscriptionStatus
 
 
 def test_upgrade_starts_a_trial(client, talent_headers, talent_profile):
@@ -255,6 +259,82 @@ def test_mock_checkout_records_a_payment(client, talent_headers, talent_profile)
     assert len(payments) == 1
     assert payments[0]["status"] == "succeeded"
     assert payments[0]["amount_lkr"] == settings.PREMIUM_TALENT_PRICE_LKR
+
+
+class _FakeRemoteGateway(PaymentGateway):
+    """Stands in for Stripe/PayHere in tests — a real remote gateway that doesn't activate the
+    subscription until a webhook arrives, unlike the mock gateway used by default in tests.
+    """
+
+    name = PaymentGatewayName.STRIPE
+    activates_immediately = False
+
+    def __init__(self):
+        self.last_trial_days: int | None = None
+
+    def start_checkout(self, subscription, return_url, trial_days: int = 0) -> CheckoutSession:
+        self.last_trial_days = trial_days
+        return CheckoutSession(redirect_url=f"{return_url}?fake=1", method="get")
+
+    def verify_webhook(self, payload, headers):
+        return None
+
+    def cancel(self, subscription):
+        pass
+
+
+def test_remote_gateway_checkout_grants_a_trial_and_waits_for_webhook(client, talent_headers, talent_profile):
+    fake_gateway = _FakeRemoteGateway()
+    app.dependency_overrides[get_gateway] = lambda: fake_gateway
+
+    resp = client.post("/api/v1/billing/checkout", json={"billing_cycle": "monthly"}, headers=talent_headers)
+    assert resp.status_code == 201, resp.text
+    assert fake_gateway.last_trial_days == settings.TALENT_TRIAL_DAYS
+
+    resp = client.get("/api/v1/billing/me", headers=talent_headers)
+    body = resp.json()
+    # Checkout only *started* — no webhook has confirmed it yet, so it stays pending.
+    assert body["status"] == "pending"
+    assert body["trial_end"] is not None
+
+    resp = client.get("/api/v1/talents/me", headers=talent_headers)
+    assert resp.json()["tier"] == "free"
+
+
+def test_remote_gateway_webhook_confirms_trialing_not_active(client, talent_headers, talent_profile, db_session):
+    fake_gateway = _FakeRemoteGateway()
+    app.dependency_overrides[get_gateway] = lambda: fake_gateway
+    client.post("/api/v1/billing/checkout", json={"billing_cycle": "monthly"}, headers=talent_headers)
+
+    sub_id = client.get("/api/v1/billing/me", headers=talent_headers).json()["id"]
+    # checkout.session.completed reports "active" even when a trial_period_days was set —
+    # nothing has actually been charged, so this should land as "trialing," not "active".
+    subscription_crud.apply_webhook_event(
+        db_session, WebhookEvent(status="active", our_subscription_id=sub_id, gateway_subscription_id="gw_sub_1")
+    )
+
+    resp = client.get("/api/v1/billing/me", headers=talent_headers)
+    body = resp.json()
+    assert body["status"] == "trialing"
+    assert body["trial_end"] is not None
+
+    resp = client.get("/api/v1/talents/me", headers=talent_headers)
+    assert resp.json()["tier"] == "premium"
+
+    resp = client.get("/api/v1/billing/payments", headers=talent_headers)
+    assert resp.json() == []  # nothing charged yet during the trial
+
+
+def test_resubscribing_after_confirmed_checkout_gets_no_second_trial(client, talent_headers, talent_profile, db_session):
+    fake_gateway = _FakeRemoteGateway()
+    app.dependency_overrides[get_gateway] = lambda: fake_gateway
+    client.post("/api/v1/billing/checkout", json={"billing_cycle": "monthly"}, headers=talent_headers)
+
+    sub_id = client.get("/api/v1/billing/me", headers=talent_headers).json()["id"]
+    subscription_crud.apply_webhook_event(db_session, WebhookEvent(status="canceled", our_subscription_id=sub_id))
+
+    client.post("/api/v1/billing/checkout", json={"billing_cycle": "monthly"}, headers=talent_headers)
+    assert fake_gateway.last_trial_days == 0
 
 
 def test_mock_subscription_auto_renews_past_period_end(client, talent_headers, talent_profile, db_session):

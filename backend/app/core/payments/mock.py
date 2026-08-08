@@ -13,7 +13,9 @@ class MockGateway(PaymentGateway):
     name = PaymentGatewayName.MOCK
     activates_immediately = True
 
-    def start_checkout(self, subscription: Subscription, return_url: str) -> CheckoutSession:
+    def start_checkout(self, subscription: Subscription, return_url: str, trial_days: int = 0) -> CheckoutSession:
+        # Ignored — the mock gateway always activates immediately (see activates_immediately),
+        # so there's no real charge to defer with a trial in the first place.
         return CheckoutSession(redirect_url=f"{return_url}?mock=1", method="get")
 
     def verify_webhook(self, payload: bytes, headers: dict[str, str]) -> WebhookEvent | None:
