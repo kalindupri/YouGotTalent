@@ -91,8 +91,15 @@ class Settings(BaseSettings):
     # Stripe doesn't settle in LKR — pricing for the Stripe path is charged in this currency
     # instead, independent of the LKR prices above which are only for the local PayHere path.
     STRIPE_CURRENCY: str = "usd"
+    # Fallback used only when no pre-created Price object is configured below (e.g. for the
+    # annual cycle, which doesn't have its own Price ID yet).
     STRIPE_TALENT_PRICE: int = 500  # cents
     STRIPE_RECRUITER_PRICE: int = 1500  # cents
+    # Pre-created recurring Price IDs from the Stripe dashboard (monthly). When set, checkout
+    # uses these directly instead of building price_data inline — the standard Stripe pattern,
+    # and required for the customer-facing product/price name to show correctly at checkout.
+    STRIPE_TALENT_PRICE_ID: str | None = None
+    STRIPE_RECRUITER_PRICE_ID: str | None = None
 
     # Outgoing email. Checked in order: Azure Communication Services (production, sends via
     # the ACS Email REST API using key-based auth) -> SMTP (local/dev, e.g. Gmail) -> log-only

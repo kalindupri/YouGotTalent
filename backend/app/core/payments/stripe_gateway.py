@@ -18,25 +18,33 @@ class StripeGateway(PaymentGateway):
 
     def start_checkout(self, subscription: Subscription, return_url: str) -> CheckoutSession:
         stripe.api_key = settings.STRIPE_SECRET_KEY
-        unit_amount = (
-            settings.STRIPE_TALENT_PRICE if subscription.plan == SubscriptionPlan.TALENT_PREMIUM else settings.STRIPE_RECRUITER_PRICE
-        )
-        interval = "year" if subscription.billing_cycle == BillingCycle.ANNUAL else "month"
-        product_name = subscription.plan.value.replace("_", " ").title()
+        is_talent = subscription.plan == SubscriptionPlan.TALENT_PREMIUM
+        price_id = settings.STRIPE_TALENT_PRICE_ID if is_talent else settings.STRIPE_RECRUITER_PRICE_ID
+
+        # Prefer a pre-created Price object from the Stripe dashboard (monthly only, for now —
+        # there's no separate annual Price ID configured yet). Falls back to building price_data
+        # inline, which is the only option for the annual cycle.
+        if price_id and subscription.billing_cycle == BillingCycle.MONTHLY:
+            line_item = {"price": price_id, "quantity": 1}
+        else:
+            unit_amount = settings.STRIPE_TALENT_PRICE if is_talent else settings.STRIPE_RECRUITER_PRICE
+            if subscription.billing_cycle == BillingCycle.ANNUAL:
+                unit_amount *= settings.ANNUAL_BILLING_MONTHS_CHARGED
+            interval = "year" if subscription.billing_cycle == BillingCycle.ANNUAL else "month"
+            product_name = subscription.plan.value.replace("_", " ").title()
+            line_item = {
+                "price_data": {
+                    "currency": settings.STRIPE_CURRENCY,
+                    "product_data": {"name": product_name},
+                    "unit_amount": unit_amount,
+                    "recurring": {"interval": interval},
+                },
+                "quantity": 1,
+            }
 
         session = stripe.checkout.Session.create(
             mode="subscription",
-            line_items=[
-                {
-                    "price_data": {
-                        "currency": settings.STRIPE_CURRENCY,
-                        "product_data": {"name": product_name},
-                        "unit_amount": unit_amount,
-                        "recurring": {"interval": interval},
-                    },
-                    "quantity": 1,
-                }
-            ],
+            line_items=[line_item],
             success_url=f"{return_url}?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=return_url,
             client_reference_id=str(subscription.id),
