@@ -73,6 +73,7 @@ def test_duplicate_application_to_same_role_rejected(client, talent_headers, cas
 
 def test_apply_to_two_different_roles_on_same_call(client, talent_headers, recruiter_headers, recruiter_profile):
     create_talent_profile(client, talent_headers, category="modeling")
+    assert client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers).status_code == 200
     call = client.post(
         "/api/v1/casting-calls",
         json={

@@ -77,6 +77,7 @@ def test_role_level_category_also_triggers_a_match(client, db_session, monkeypat
 
     actor_token = register_and_verify(client, db_session, "roleactor@example.com", role="talent")
     create_talent(client, auth_headers(actor_token), category="acting")
+    assert client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers).status_code == 200
 
     # The overall call is "modeling", but one of its roles is specifically for actors —
     # an actor should still be matched via that role's category.

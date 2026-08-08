@@ -68,6 +68,11 @@ def create_new_casting_call(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Restricting a talent hunt to Premium talent is a Premium feature. Upgrade your organizer account to use it.",
         )
+    if len(call_in.roles) > 1 and recruiter.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Posting multiple roles in one talent hunt is a Premium feature. Upgrade your organizer account, or post each role as a separate talent hunt.",
+        )
     call = create_casting_call(db, recruiter.id, call_in)
     notified_emails: set[str] = set()
 

@@ -63,8 +63,8 @@ class Settings(BaseSettings):
     ANNUAL_BILLING_MONTHS_CHARGED: int = 10
 
     # How long a first-time upgrade stays in trial before payment is required.
-    TALENT_TRIAL_DAYS: int = 30
-    RECRUITER_TRIAL_DAYS: int = 14
+    TALENT_TRIAL_DAYS: int = 90
+    RECRUITER_TRIAL_DAYS: int = 90
 
     # Dunning: how long a subscriber keeps premium access after a renewal payment fails before
     # being downgraded to free, and when mid-grace-period the reminder email goes out.

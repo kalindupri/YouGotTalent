@@ -1019,13 +1019,19 @@ function PostCastingCallForm({
               </div>
             </div>
           ))}
-          <button
-            type="button"
-            onClick={() => setRoles((prev) => [...prev, emptyRole()])}
-            className={`w-fit ${btnSmall}`}
-          >
-            + Add another role
-          </button>
+          {isPremium ? (
+            <button
+              type="button"
+              onClick={() => setRoles((prev) => [...prev, emptyRole()])}
+              className={`w-fit ${btnSmall}`}
+            >
+              + Add another role
+            </button>
+          ) : (
+            <p className="text-xs text-zinc-400">
+              Posting multiple roles in one talent hunt is a Premium feature — upgrade above to add more.
+            </p>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

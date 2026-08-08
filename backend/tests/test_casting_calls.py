@@ -22,6 +22,9 @@ def test_create_single_role_casting_call(client, recruiter_headers, recruiter_pr
 
 
 def test_create_multi_role_casting_call(client, recruiter_headers, recruiter_profile):
+    resp = client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
+    assert resp.status_code == 200, resp.text
+
     resp = client.post(
         "/api/v1/casting-calls",
         json={
@@ -46,6 +49,21 @@ def test_create_multi_role_casting_call(client, recruiter_headers, recruiter_pro
     assert titles == {"Content creators", "Models", "Actors/Performers"}
     assert body["tags"] == ["Product Demo / Explainer Video"]
     assert body["shoot_details"] == "Shoots remotely at home."
+
+
+def test_free_recruiter_cannot_create_multi_role_casting_call(client, recruiter_headers, recruiter_profile):
+    resp = client.post(
+        "/api/v1/casting-calls",
+        json={
+            "title": "Two roles",
+            "description": "x",
+            "category": "acting",
+            "roles": [{"title": "Role one"}, {"title": "Role two"}],
+        },
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 403
+    assert "Premium" in resp.json()["detail"]
 
 
 def test_create_casting_call_requires_at_least_one_role(client, recruiter_headers, recruiter_profile):
