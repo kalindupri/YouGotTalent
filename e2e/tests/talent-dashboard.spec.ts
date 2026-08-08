@@ -34,6 +34,9 @@ test.describe("talent dashboard", () => {
   test("add an intro video and see it embedded on the public profile", async ({ page }) => {
     const section = sectionByHeading(page, "Intro video");
     await section.getByRole("button", { name: "Add" }).click();
+    // The form now offers "Upload a file" / "Paste a link" first (upload is the default) —
+    // the URL field only renders after choosing "Paste a link".
+    await section.getByRole("button", { name: "Paste a link" }).click();
     await page.getByLabel("Video URL").fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     await page.getByRole("button", { name: "Save intro video" }).click();
     await expect(section.getByRole("button", { name: "Edit" })).toBeVisible();
@@ -67,7 +70,9 @@ test.describe("talent dashboard", () => {
 
     await section.getByLabel("URL").fill("https://example.com/photo-4th.jpg");
     await section.getByRole("button", { name: "Add audition" }).click();
-    await expect(page.getByText(/premium/i)).toBeVisible();
+    // Scoped to this section — the page now also has unrelated Premium upsell copy elsewhere
+    // (profile views, work library), so an unscoped /premium/i match is ambiguous.
+    await expect(section.getByText(/premium/i)).toBeVisible();
   });
 
   test("public profile reflects display name and category", async ({ page }) => {

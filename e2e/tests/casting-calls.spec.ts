@@ -14,6 +14,11 @@ test("recruiter posts a multi-role casting call and it appears on the public lis
   await registerAndVerify(page, { email: recruiterEmail, fullName: "CC Recruiter", role: "recruiter" });
   await createRecruiterProfile(page, { companyName: "CC Studios" });
 
+  // Multi-role posting is a Premium feature — a free-tier recruiter never sees the
+  // "+ Add another role" control, only an upgrade prompt.
+  await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
+  await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
+
   const title = `Multi-role shoot ${Date.now()}`;
   await postCastingCall(page, {
     title,
@@ -37,6 +42,10 @@ test("talent applies to a specific role and the recruiter board tags it correctl
   await registerAndVerify(page, { email: recruiterEmail, fullName: "Apply Recruiter", role: "recruiter" });
   await createRecruiterProfile(page, { companyName: "Apply Studios" });
 
+  // Multi-role posting is a Premium feature.
+  await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
+  await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
+
   const title = `Casting for two roles ${Date.now()}`;
   await postCastingCall(page, {
     title,
@@ -45,7 +54,7 @@ test("talent applies to a specific role and the recruiter board tags it correctl
     roles: [{ title: "Lead" }, { title: "Supporting" }],
   });
 
-  const manageLink = sectionByHeading(page, "Your talent hunts").getByRole("link", { name: "View applications" }).first();
+  const manageLink = sectionByHeading(page, "Your talent hunts").getByRole("link", { name: "Manage" }).first();
   const callUrl = await manageLink.getAttribute("href");
   expect(callUrl).toBeTruthy();
 

@@ -33,7 +33,10 @@ test("recruiter messages a talent and receives a reply", async ({ page }) => {
   await logout(page);
   await login(page, talentEmail);
   await page.goto("/messages");
-  await expect(page.getByText("1", { exact: true })).toBeVisible();
+  // Both the nav "Messages" link and this conversation's own list-item now show an unread-count
+  // badge, so an unscoped "1" match is ambiguous — scope to the conversation row itself.
+  const conversationRow = page.getByRole("link", { name: /Msg Studios/ });
+  await expect(conversationRow.getByText("1", { exact: true })).toBeVisible();
   await page.getByText("Msg Studios").click();
   await expect(page.getByText("Hi, are you available next week?")).toBeVisible();
 

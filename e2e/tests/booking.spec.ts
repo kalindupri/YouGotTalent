@@ -66,8 +66,19 @@ test("talent sets availability, recruiter books a slot, talent accepts, and agre
   await talentBookings.getByRole("button", { name: "Accept" }).click();
   await expect(talentBookings.getByText("accepted")).toBeVisible();
 
-  await talentBookings.getByRole("button", { name: "Mark agreement signed" }).click();
-  await expect(talentBookings.getByText("Agreement signed")).toBeVisible();
+  // In-app e-signature: each party types their full legal name and submits — there is no
+  // separate "mark as signed" toggle. "Agreement signed by both parties" only appears once
+  // both sides have done this; after just one party, the UI shows "You signed as ...".
+  await talentBookings.getByLabel("Type your full name to sign").fill("Booking Talent");
+  await talentBookings.getByRole("button", { name: "Sign agreement" }).click();
+  await expect(talentBookings.getByText("You signed as Booking Talent")).toBeVisible();
+
+  await logout(page);
+  await login(page, recruiterEmail);
+  const recruiterBookings2 = sectionByHeading(page, "My booking requests");
+  await recruiterBookings2.getByLabel("Type your full name to sign").fill("Booking Studios");
+  await recruiterBookings2.getByRole("button", { name: "Sign agreement" }).click();
+  await expect(recruiterBookings2.getByText("Agreement signed by both parties")).toBeVisible();
 });
 
 test("booking request outside availability is rejected", async ({ page }) => {

@@ -16,7 +16,10 @@ async function loginAsNewAdmin(page: import("@playwright/test").Page, label: str
   const email = uniqueEmail(label);
   await createAdminAccount(email, ADMIN_PASSWORD, "E2E Admin");
   await login(page, email, ADMIN_PASSWORD);
-  await expect(page.getByRole("heading", { name: "Admin Dashboard" })).toBeVisible();
+  // /dashboard auto-redirects an admin to /admin (Overview) — admin has its own route tree,
+  // not a single page, so each test below navigates to the specific /admin/* section it needs.
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
   return email;
 }
 
@@ -31,6 +34,7 @@ test("admin approves a talent's verification request", async ({ page }) => {
   await logout(page);
 
   await loginAsNewAdmin(page, "admin_verify");
+  await page.goto("/admin/verification");
 
   const queue = sectionByHeading(page, "Verification requests");
   await expect(queue.getByText("Verify Candidate")).toBeVisible();
@@ -47,6 +51,7 @@ test("admin suspends and reactivates a user", async ({ page }) => {
   await logout(page);
 
   await loginAsNewAdmin(page, "admin_suspend");
+  await page.goto("/admin/users");
 
   const users = sectionByHeading(page, "Users");
   await users.getByPlaceholder("Search by name or email").fill(talentEmail);
@@ -66,6 +71,7 @@ test("admin suspends and reactivates a user", async ({ page }) => {
   const adminEmail = uniqueEmail("admin_suspend_2");
   await createAdminAccount(adminEmail, ADMIN_PASSWORD, "E2E Admin 2");
   await login(page, adminEmail, ADMIN_PASSWORD);
+  await page.goto("/admin/users");
   const users2 = sectionByHeading(page, "Users");
   await users2.getByPlaceholder("Search by name or email").fill(talentEmail);
   const row2 = users2.locator("li", { hasText: talentEmail });
@@ -82,6 +88,7 @@ test("admin moderates a casting call", async ({ page }) => {
   await logout(page);
 
   await loginAsNewAdmin(page, "admin_mod");
+  await page.goto("/admin/casting-calls");
 
   const hunts = sectionByHeading(page, "Talent hunts");
   const row = hunts.locator("li", { hasText: title });
@@ -111,6 +118,7 @@ test("admin sees full job details including recruiter and application count", as
   await logout(page);
 
   await loginAsNewAdmin(page, "admin_detail");
+  await page.goto("/admin/casting-calls");
 
   const hunts = sectionByHeading(page, "Talent hunts");
   const row = hunts.locator("li", { hasText: title });
@@ -128,6 +136,7 @@ test("admin views a user's full account detail", async ({ page }) => {
   await logout(page);
 
   await loginAsNewAdmin(page, "admin_account");
+  await page.goto("/admin/users");
 
   const users = sectionByHeading(page, "Users");
   await users.getByPlaceholder("Search by name or email").fill(talentEmail);
@@ -140,11 +149,14 @@ test("financial overview reflects a talent upgrading to premium", async ({ page 
   const talentEmail = uniqueEmail("admin_fin_talent");
   await registerAndVerify(page, { email: talentEmail, fullName: "Financial Talent", role: "talent" });
   await createTalentProfile(page, { displayName: "Financial Talent", category: "acting" });
-  await page.getByRole("button", { name: "Upgrade to Premium" }).click();
+  // Button text is "Start free trial" (mock gateway activates Premium instantly, no payment) —
+  // not "Upgrade to Premium", which is the plan tier's label elsewhere on the page.
+  await page.getByRole("button", { name: "Start free trial" }).click();
   await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
   await logout(page);
 
   await loginAsNewAdmin(page, "admin_fin");
+  await page.goto("/admin/financial");
 
   const financial = sectionByHeading(page, "Financial overview");
   await expect(financial.getByText("Premium talents")).toBeVisible();
