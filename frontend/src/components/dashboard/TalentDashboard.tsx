@@ -14,6 +14,7 @@ import {
   CreditProjectType,
   Follow,
   Invitation,
+  LibraryItem,
   Media,
   MediaType,
   ProfileViewSummary,
@@ -50,6 +51,7 @@ import {
   inputClass,
   invitationStatusTone,
   labelClass,
+  libraryLabel,
   premiumBadgeClass,
   sectionClass,
   skillsQuestion,
@@ -60,6 +62,7 @@ import TalentAvatar from "@/components/TalentAvatar";
 import BookingAgreementSection from "@/components/BookingAgreementSection";
 import BookingReviewForm from "@/components/BookingReviewForm";
 import MediaCard from "@/components/MediaCard";
+import LibraryItemCard from "@/components/LibraryItemCard";
 import HeadshotUploader from "@/components/HeadshotUploader";
 import SubmissionPreview from "@/components/SubmissionPreview";
 
@@ -140,6 +143,8 @@ export default function TalentDashboard() {
         profile={profile}
         onAdded={(m) => setProfile({ ...profile, media: [...profile.media, m] })}
       />
+
+      <LibraryCard profile={profile} token={token!} />
 
       <section className={sectionClass}>
         <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Invitations</h2>
@@ -1943,6 +1948,174 @@ function AddMediaForm({
           className={`w-fit ${btnSecondary}`}
         >
           {submitting ? (isUpload ? "Uploading & compressing…" : "Adding…") : videoLimitReached ? "Video limit reached" : "Add audition"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+const LIBRARY_UPLOAD_TYPES: { value: "photo" | "video" | "audio"; label: string }[] = [
+  { value: "photo", label: "Photo" },
+  { value: "video", label: "Video" },
+  { value: "audio", label: "Audio" },
+];
+
+function LibraryCard({ profile, token }: { profile: TalentProfile; token: string }) {
+  const [items, setItems] = useState<LibraryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"upload" | "url">("upload");
+  const [mediaType, setMediaType] = useState<"photo" | "video" | "audio">("photo");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [url, setUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const isPremium = profile.tier === "premium";
+  const label = libraryLabel(profile.category);
+
+  useEffect(() => {
+    if (!isPremium) return;
+    api.listMyLibrary(token).then(setItems).catch(() => {}).finally(() => setLoading(false));
+  }, [token, isPremium]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const item =
+        mode === "upload"
+          ? await api.uploadMyLibraryItem({ file: file!, media_type: mediaType, title, description: description || undefined }, token)
+          : await api.addMyLibraryItem({ title, description: description || undefined, media_type: mediaType, url }, token);
+      setItems((prev) => [item, ...prev]);
+      setTitle("");
+      setDescription("");
+      setUrl("");
+      setFile(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not add this item.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(itemId: string) {
+    if (!window.confirm("Delete this item from your library?")) return;
+    await api.deleteMyLibraryItem(itemId, token);
+    setItems((prev) => prev.filter((i) => i.id !== itemId));
+  }
+
+  if (!isPremium) {
+    return (
+      <section className={sectionClass}>
+        <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
+          <Crown className="h-5 w-5" /> {label}
+        </h2>
+        <p className="mt-2 text-sm text-zinc-500">
+          A {label.toLowerCase()} is a Premium feature — upgrade above to build a permanent, public showcase of
+          your work that talent hunts can browse anytime, separate from your audition reel.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className={sectionClass}>
+      <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
+        <Crown className="h-5 w-5" /> {label}
+      </h2>
+      <p className="mt-1 text-sm text-zinc-500">
+        A permanent showcase of your work, separate from your audition reel — visible on your public profile.
+      </p>
+
+      {!loading && items.length > 0 && (
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {items.map((item) => (
+            <div key={item.id} className="flex flex-col gap-2">
+              <LibraryItemCard item={item} />
+              <button onClick={() => handleDelete(item.id)} className={`w-fit ${btnSmall}`}>
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="mt-5 flex max-w-md flex-col gap-4">
+        <div className="inline-flex w-fit rounded-full border border-zinc-700 p-1 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setMode("upload")}
+            className={`rounded-full px-3 py-1 transition-colors ${mode === "upload" ? "bg-rose-600 text-white" : "text-zinc-500"}`}
+          >
+            Upload file
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("url")}
+            className={`rounded-full px-3 py-1 transition-colors ${mode === "url" ? "bg-rose-600 text-white" : "text-zinc-500"}`}
+          >
+            Paste a link
+          </button>
+        </div>
+
+        <label className={labelClass}>
+          Title
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required className={inputClass} />
+        </label>
+
+        <fieldset className="grid grid-cols-3 gap-2">
+          {LIBRARY_UPLOAD_TYPES.map((t) => (
+            <button
+              type="button"
+              key={t.value}
+              onClick={() => setMediaType(t.value)}
+              className={`rounded-md border-2 px-3 py-2 text-sm font-medium transition-colors ${
+                mediaType === t.value
+                  ? "border-rose-600 bg-rose-600 text-white"
+                  : "border-zinc-200 text-zinc-700 hover:border-rose-300 hover:bg-rose-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </fieldset>
+
+        {mode === "upload" ? (
+          <label className={labelClass}>
+            File
+            <input
+              required
+              type="file"
+              accept={mediaType === "photo" ? "image/*" : mediaType === "video" ? "video/*" : "audio/*"}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className={inputClass}
+            />
+          </label>
+        ) : (
+          <label className={labelClass}>
+            URL
+            <input
+              required
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://soundcloud.com/…"
+              className={inputClass}
+            />
+          </label>
+        )}
+
+        <label className={labelClass}>
+          Notes (optional)
+          <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} />
+        </label>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button type="submit" disabled={submitting || (mode === "upload" && !file)} className={`w-fit ${btnSecondary}`}>
+          {submitting ? (mode === "upload" ? "Uploading…" : "Adding…") : `Add to ${label.toLowerCase()}`}
         </button>
       </form>
     </section>

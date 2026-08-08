@@ -219,6 +219,26 @@ export function formatCategory(category: string): string {
     .join(" ");
 }
 
+const LIBRARY_LABELS: Record<string, string> = {
+  singing: "Track library",
+  music: "Track library",
+  voice_over: "Voice reel library",
+  acting: "Performance reel",
+  dancing: "Performance reel",
+  choreography: "Performance reel",
+  comedy: "Performance reel",
+  direction: "Reel library",
+  modeling: "Portfolio gallery",
+  photography: "Portfolio gallery",
+  painting: "Portfolio gallery",
+  design: "Portfolio gallery",
+  script_writing: "Writing samples",
+};
+
+export function libraryLabel(category: string): string {
+  return LIBRARY_LABELS[category] ?? "Work library";
+}
+
 export const MEDIA_TYPE_ICONS: Record<string, LucideIcon> = {
   photo: ImageIcon,
   video: Video,

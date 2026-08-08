@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Bookmark, Check, Crown, Share2, ShieldCheck, Star } from "lucide-react";
-import { ApiError, Credit, TalentProfile, TalentReviewSummary, api } from "@/lib/api";
+import { ApiError, Credit, LibraryItem, TalentProfile, TalentReviewSummary, api } from "@/lib/api";
 import {
   CREDIT_PROJECT_TYPES,
   SOCIAL_LINK_FIELDS,
@@ -15,6 +15,7 @@ import {
   categoryShowsIntroVideo,
   coverPhotoUrl,
   formatCategory,
+  libraryLabel,
   premiumBadgeClass,
   verifiedBadgeClass,
 } from "@/lib/ui";
@@ -24,6 +25,7 @@ import MessageTalentButton from "@/components/MessageTalentButton";
 import InviteToRoleButton from "@/components/InviteToRoleButton";
 import BookingRequestButton from "@/components/BookingRequestButton";
 import MediaCard from "@/components/MediaCard";
+import LibraryItemCard from "@/components/LibraryItemCard";
 import SubmissionPreview from "@/components/SubmissionPreview";
 import ReportButton from "@/components/ReportButton";
 
@@ -38,6 +40,7 @@ export default function TalentDetailPage() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reviewSummary, setReviewSummary] = useState<TalentReviewSummary | null>(null);
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
 
   useEffect(() => {
     api
@@ -45,6 +48,7 @@ export default function TalentDetailPage() {
       .then(setTalent)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load this profile."));
     api.getTalentReviews(params.id).then(setReviewSummary).catch(() => {});
+    api.listTalentLibrary(params.id).then(setLibrary).catch(() => {});
   }, [params.id]);
 
   useEffect(() => {
@@ -195,6 +199,17 @@ export default function TalentDetailPage() {
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {talent.media.map((m) => (
               <MediaCard key={m.id} media={m} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {library.length > 0 && (
+        <div className="mt-10">
+          <h2 className="font-heading text-2xl font-bold text-zinc-900 dark:text-zinc-50">{libraryLabel(talent.category)}</h2>
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {library.map((item) => (
+              <LibraryItemCard key={item.id} item={item} />
             ))}
           </div>
         </div>

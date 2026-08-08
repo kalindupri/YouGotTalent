@@ -16,6 +16,7 @@ from app.api.routes import (
     discussions,
     follows,
     invitations,
+    library,
     recruiters,
     reports,
     talents,
@@ -53,6 +54,7 @@ app.include_router(invitations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(bookings.router, prefix=settings.API_V1_PREFIX)
 app.include_router(calendar.router, prefix=settings.API_V1_PREFIX)
+app.include_router(library.router, prefix=settings.API_V1_PREFIX)
 app.include_router(follows.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(billing.router, prefix=settings.API_V1_PREFIX)

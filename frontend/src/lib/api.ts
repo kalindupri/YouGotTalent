@@ -306,6 +306,16 @@ export interface Booking {
   casting_call_title: string | null;
 }
 
+export interface LibraryItem {
+  id: string;
+  talent_id: string;
+  title: string;
+  description: string | null;
+  media_type: string;
+  url: string;
+  created_at: string;
+}
+
 export interface CalendarEntry {
   id: string;
   talent_id: string;
@@ -852,6 +862,39 @@ export const api = {
     }
     return res.json();
   },
+  listMyLibrary: (token: string) => request<LibraryItem[]>("/talents/me/library", {}, token),
+  listTalentLibrary: (talentId: string) => request<LibraryItem[]>(`/talents/${talentId}/library`),
+  addMyLibraryItem: (data: { title: string; description?: string; media_type: string; url: string }, token: string) =>
+    request<LibraryItem>("/talents/me/library", { method: "POST", body: JSON.stringify(data) }, token),
+  uploadMyLibraryItem: async (
+    data: { file: File; media_type: "photo" | "video" | "audio"; title: string; description?: string },
+    token: string
+  ): Promise<LibraryItem> => {
+    const form = new FormData();
+    form.set("media_type", data.media_type);
+    form.set("title", data.title);
+    if (data.description) form.set("description", data.description);
+    form.set("file", data.file);
+
+    const res = await fetch(`${API_URL}/talents/me/library/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === "string") detail = body.detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json();
+  },
+  deleteMyLibraryItem: (itemId: string, token: string) =>
+    request<void>(`/talents/me/library/${itemId}`, { method: "DELETE" }, token),
   uploadMyCoverPhoto: async (file: Blob, token: string): Promise<Media> => {
     const form = new FormData();
     form.set("file", file, "headshot.jpg");

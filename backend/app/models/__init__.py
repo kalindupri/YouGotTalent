@@ -23,6 +23,7 @@ from app.models.discussion import DiscussionThread, DiscussionReply
 from app.models.profile_view import ProfileView
 from app.models.talent_list import TalentList, TalentListMember
 from app.models.calendar_entry import CalendarEntry
+from app.models.library_item import LibraryItem
 
 __all__ = [
     "User",
@@ -54,4 +55,5 @@ __all__ = [
     "TalentList",
     "TalentListMember",
     "CalendarEntry",
+    "LibraryItem",
 ]
