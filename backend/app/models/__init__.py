@@ -24,6 +24,7 @@ from app.models.profile_view import ProfileView
 from app.models.talent_list import TalentList, TalentListMember
 from app.models.calendar_entry import CalendarEntry
 from app.models.library_item import LibraryItem
+from app.models.marketing_post import MarketingPost
 
 __all__ = [
     "User",
@@ -56,4 +57,5 @@ __all__ = [
     "TalentListMember",
     "CalendarEntry",
     "LibraryItem",
+    "MarketingPost",
 ]

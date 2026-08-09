@@ -118,5 +118,19 @@ class Settings(BaseSettings):
     # triage. If unset, notifications are logged instead of sent (see app/core/discord.py).
     DISCORD_WEBHOOK_URL: str | None = None
 
+    # Marketing auto-poster: daily draft -> Discord approval (bot, not the webhook above, since
+    # reading a reaction back requires bot REST calls) -> Facebook Page post. See
+    # app/core/discord_bot.py, app/core/facebook.py, app/crud/marketing_post.py.
+    DISCORD_BOT_TOKEN: str | None = None
+    DISCORD_MARKETING_CHANNEL_ID: str | None = None
+    FACEBOOK_PAGE_ID: str | None = None
+    FACEBOOK_PAGE_ACCESS_TOKEN: str | None = None
+    # Separate from admin JWT auth on purpose: these two endpoints are meant to be hit by an
+    # unattended external cron (same "no scheduler in this app" pattern as the dunning sweep),
+    # and a JWT would expire long before a long-running cron job's next run.
+    MARKETING_CRON_SECRET: str | None = None
+    # How long a draft waits for a Discord reaction before it's considered expired and dropped.
+    MARKETING_APPROVAL_TIMEOUT_HOURS: int = 24
+
 
 settings = Settings()

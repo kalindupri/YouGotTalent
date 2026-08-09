@@ -17,6 +17,7 @@ from app.api.routes import (
     follows,
     invitations,
     library,
+    marketing,
     recruiters,
     reports,
     talents,
@@ -60,6 +61,7 @@ app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(billing.router, prefix=settings.API_V1_PREFIX)
 app.include_router(titles.router, prefix=settings.API_V1_PREFIX)
 app.include_router(discussions.router, prefix=settings.API_V1_PREFIX)
+app.include_router(marketing.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")
