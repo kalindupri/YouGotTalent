@@ -1,0 +1,28 @@
+# Runs the marketing auto-poster pipeline on a timer: asks for a topic in Discord (rate-limited
+# to ~once/day inside the backend itself, see MARKETING_MIN_HOURS_BETWEEN_TOPICS), picks up a
+# human's reply and turns it into a branded draft, and checks Discord reactions to publish
+# approved drafts to Facebook. This app has no built-in cron, so an external scheduler has to
+# call these two endpoints — see backend/app/api/routes/marketing.py.
+name: Marketing Auto-Poster
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+env:
+  BACKEND_URL: https://ygt-backend.icysmoke-0f0ee613.centralus.azurecontainerapps.io
+
+jobs:
+  advance-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Advance marketing pipeline (ask topic / turn reply into draft)
+        run: |
+          curl -sf -X POST "$BACKEND_URL/api/v1/admin/marketing/generate-draft" \
+            -H "X-Cron-Secret: ${{ secrets.MARKETING_CRON_SECRET }}"
+
+      - name: Check Discord reactions and publish approved posts
+        run: |
+          curl -sf -X POST "$BACKEND_URL/api/v1/admin/marketing/check-approvals" \
+            -H "X-Cron-Secret: ${{ secrets.MARKETING_CRON_SECRET }}"
