@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.crud.marketing_post import check_approvals, generate_and_post_draft
 from app.db.session import get_db
-from app.schemas.marketing_post import CheckApprovalsResult, GenerateDraftResult
+from app.models.marketing_post import MarketingPost
+from app.schemas.marketing_post import CheckApprovalsResult, GenerateDraftResult, MarketingPostRead
 
 router = APIRouter(prefix="/admin/marketing", tags=["marketing"])
 
@@ -36,3 +37,11 @@ def trigger_check_approvals(db: Session = Depends(get_db)):
     """
     result = check_approvals(db)
     return CheckApprovalsResult(**result)
+
+
+@router.get("/status", response_model=list[MarketingPostRead], dependencies=[Depends(require_cron_secret)])
+def marketing_status(db: Session = Depends(get_db)):
+    """Read-only diagnostic view of the most recent MarketingPost rows — useful for confirming
+    what channel/message id the pipeline is anchored to without needing direct DB access.
+    """
+    return db.query(MarketingPost).order_by(MarketingPost.created_at.desc()).limit(5).all()

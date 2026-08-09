@@ -94,6 +94,29 @@ def get_latest_human_reply(channel_id: str, after_message_id: str) -> str | None
     return earliest.get("content", "").strip() or None
 
 
+def get_human_replies_after(channel_id: str, after_message_id: str) -> list[str]:
+    """Returns the text of every human (non-bot) message posted after after_message_id,
+    oldest-to-newest. Unlike get_latest_human_reply (which returns only the single earliest
+    reply — correct for "what's the answer to the prompt I just posted"), this returns all of
+    them so a caller scanning for a specific format (e.g. a manual Header:/Body: request) isn't
+    permanently stuck on an old, non-matching message that happens to be the earliest one after
+    that anchor.
+    """
+    bot_user_id = _bot_user_id()
+    resp = httpx.get(
+        f"{DISCORD_API}/channels/{channel_id}/messages",
+        headers=_headers(),
+        params={"after": after_message_id, "limit": 50},
+        timeout=10.0,
+    )
+    resp.raise_for_status()
+    human_messages = [
+        m for m in resp.json() if m["author"]["id"] != bot_user_id and not m["author"].get("bot")
+    ]
+    human_messages.sort(key=lambda m: int(m["id"]))
+    return [m.get("content", "").strip() for m in human_messages if m.get("content", "").strip()]
+
+
 def get_human_reaction(channel_id: str, message_id: str) -> str | None:
     """Returns "approved", "rejected", or None if no human has reacted yet.
 

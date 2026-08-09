@@ -343,11 +343,24 @@ def check_manual_request(db: Session) -> tuple[bool, str, MarketingPost | None] 
     if last is None or not last.discord_channel_id or not last.discord_message_id:
         return None
 
-    reply = discord_bot.get_latest_human_reply(last.discord_channel_id, last.discord_message_id)
-    if reply is None:
+    try:
+        replies = discord_bot.get_human_replies_after(last.discord_channel_id, last.discord_message_id)
+    except Exception:
+        # Best-effort: a transient Discord API hiccup here shouldn't fail the whole
+        # generate-draft poll — just skip the manual-request check this cycle and fall
+        # through to the normal (rate-limited) request_topic() path.
+        return None
+    if not replies:
         return None
 
-    parsed = parse_header_body_reply(reply)
+    # Scan newest-first: an old, unrelated message sitting earlier in the channel's history
+    # (e.g. a stray reply to some earlier prompt) should never permanently block a fresh,
+    # explicit Header:/Body: request from being picked up.
+    parsed = None
+    for reply in reversed(replies):
+        parsed = parse_header_body_reply(reply)
+        if parsed is not None:
+            break
     if parsed is None:
         return None
 

@@ -288,7 +288,7 @@ def test_generate_draft_picks_up_an_unprompted_header_body_message(client, monke
     client.post("/api/v1/admin/marketing/check-approvals", headers=CRON_HEADERS)
 
     manual_text = "Header: Big News\nBody: We just hit 500 talent profiles!"
-    monkeypatch.setattr(discord_bot, "get_latest_human_reply", lambda channel_id, after_message_id: manual_text)
+    monkeypatch.setattr(discord_bot, "get_human_replies_after", lambda channel_id, after_message_id: [manual_text])
     monkeypatch.setattr(discord_bot, "post_draft_for_approval", lambda content, image_bytes: "manual-draft-1")
 
     # A completed cycle would normally rate-limit a fresh request_topic() ask — a manual,
@@ -299,6 +299,34 @@ def test_generate_draft_picks_up_an_unprompted_header_body_message(client, monke
     assert body["post"]["status"] == "pending_approval"
     assert body["post"]["topic"] == "Big News"
     assert "We just hit 500 talent profiles!" in body["post"]["content"]
+
+
+def test_generate_draft_finds_header_body_message_even_behind_an_old_stray_reply(client, monkeypatch):
+    _configure_cron_secret(monkeypatch)
+    _configure_discord(monkeypatch)
+    monkeypatch.setattr(settings, "FACEBOOK_PAGE_ID", "1269877089536606")
+    monkeypatch.setattr(settings, "FACEBOOK_PAGE_ACCESS_TOKEN", "fake-fb-token")
+    monkeypatch.setattr(discord_bot, "get_human_reaction", lambda channel_id, message_id: "approved")
+    monkeypatch.setattr(discord_bot, "notify_channel", lambda content: None)
+    monkeypatch.setattr(facebook, "publish_page_post", lambda message, image_bytes: "fb_post_3")
+
+    _advance_to_pending_draft(client, monkeypatch)
+    client.post("/api/v1/admin/marketing/check-approvals", headers=CRON_HEADERS)
+
+    # An old, unrelated human message sits chronologically earlier in the channel's history
+    # than the real request — the earliest-reply-after-anchor a naive scan would find isn't
+    # the right one to use here (that's what actually happened in production).
+    stray_reply = "Looking for Singer? Just try YouGotTalent"
+    manual_text = "Header: Big News\nBody: We just hit 500 talent profiles!"
+    monkeypatch.setattr(
+        discord_bot, "get_human_replies_after", lambda channel_id, after_message_id: [stray_reply, manual_text]
+    )
+    monkeypatch.setattr(discord_bot, "post_draft_for_approval", lambda content, image_bytes: "manual-draft-2")
+
+    resp = client.post("/api/v1/admin/marketing/generate-draft", headers=CRON_HEADERS)
+    body = resp.json()
+    assert body["created"] is True
+    assert body["post"]["topic"] == "Big News"
 
 
 def test_generate_draft_ignores_non_matching_manual_text_and_falls_back_to_rate_limit(client, monkeypatch):
@@ -315,7 +343,7 @@ def test_generate_draft_ignores_non_matching_manual_text_and_falls_back_to_rate_
 
     # No Header:/Body: message waiting — check_manual_request should find nothing and fall
     # through to the normal (rate-limited) request_topic() path, not silently skip the ask.
-    monkeypatch.setattr(discord_bot, "get_latest_human_reply", lambda channel_id, after_message_id: None)
+    monkeypatch.setattr(discord_bot, "get_human_replies_after", lambda channel_id, after_message_id: [])
 
     resp = client.post("/api/v1/admin/marketing/generate-draft", headers=CRON_HEADERS)
     body = resp.json()
