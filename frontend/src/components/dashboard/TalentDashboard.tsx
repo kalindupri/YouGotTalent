@@ -399,7 +399,7 @@ function ProfileSummary({
 
   return (
     <section className={sectionClass}>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-center gap-1.5">
             <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl">

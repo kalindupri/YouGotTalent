@@ -152,7 +152,7 @@ export default function RecruiterDashboard() {
   return (
     <div className="flex flex-col gap-6">
       <section className={sectionClass}>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-rose-600 text-lg font-black text-white">
               {profile.company_name.slice(0, 2).toUpperCase()}
@@ -175,7 +175,7 @@ export default function RecruiterDashboard() {
               {profile.industry && <p className="mt-0.5 text-sm text-zinc-500">{profile.industry}</p>}
             </div>
           </div>
-          <Link href={`/recruiters/${profile.id}`} className={btnSmall}>
+          <Link href={`/recruiters/${profile.id}`} className={`${btnSmall} self-start sm:self-auto`}>
             View public page
           </Link>
         </div>
