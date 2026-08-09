@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Crown, Sparkles } from "lucide-react";
-import { ApiError, BillingCycle, CurrentPricing, api } from "@/lib/api";
+import { ApiError, BillingCycle, CurrentPricing, Subscription, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { redirectToCheckout } from "@/lib/billing";
 import { btnPrimary, btnSecondary, eyebrowClass } from "@/lib/ui";
@@ -36,10 +36,21 @@ export default function PricingPage() {
   const [loadingPlan, setLoadingPlan] = useState<"talent" | "recruiter" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pricing, setPricing] = useState<CurrentPricing | null>(null);
+  const [mySubscription, setMySubscription] = useState<Subscription | null>(null);
 
   useEffect(() => {
     api.getPricing().then(setPricing).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    api.getMyBilling(token).then(setMySubscription).catch(() => {});
+  }, [token]);
+
+  // Mirrors the backend's own eligibility check (start_checkout in crud/subscription.py) — no
+  // subscription row yet, or one that never got past a pending/abandoned checkout, still gets
+  // the trial. Anything further along (trialing/active/past_due/canceled/expired) already used it.
+  const trialEligible = !mySubscription || mySubscription.status === "pending";
 
   async function subscribe(plan: "talent" | "recruiter") {
     if (!token) return;
@@ -105,6 +116,7 @@ export default function PricingPage() {
           loading={loadingPlan === "talent"}
           onSubscribe={() => subscribe("talent")}
           loggedIn={!!token}
+          trialEligible={trialEligible}
         />
         <PricingColumn
           title="For recruiters"
@@ -123,6 +135,7 @@ export default function PricingPage() {
           loading={loadingPlan === "recruiter"}
           onSubscribe={() => subscribe("recruiter")}
           loggedIn={!!token}
+          trialEligible={trialEligible}
         />
       </section>
 
@@ -142,6 +155,7 @@ function PricingColumn({
   loggedIn,
   loading,
   onSubscribe,
+  trialEligible,
 }: {
   title: string;
   roleLabel: string;
@@ -153,6 +167,7 @@ function PricingColumn({
   loggedIn: boolean;
   loading: boolean;
   onSubscribe: () => void;
+  trialEligible: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -194,7 +209,7 @@ function PricingColumn({
           </Link>
         ) : canSubscribe ? (
           <button onClick={onSubscribe} disabled={loading} className={`mt-5 w-full ${btnPrimary}`}>
-            {loading ? "Starting checkout…" : "Subscribe"}
+            {loading ? "Starting checkout…" : trialEligible ? "Start 3-month free trial" : "Subscribe"}
           </button>
         ) : (
           <p className="mt-5 text-xs text-zinc-400">Sign in with a {roleLabel} account to subscribe to this plan.</p>

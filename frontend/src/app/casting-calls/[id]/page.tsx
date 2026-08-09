@@ -43,7 +43,8 @@ function CastingCallDetailContent() {
   const [submissionUrl, setSubmissionUrl] = useState("");
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
-  const [applied, setApplied] = useState(false);
+  const [appliedRoleIds, setAppliedRoleIds] = useState<Set<string>>(new Set());
+  const [justSubmittedRoleId, setJustSubmittedRoleId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [talentTier, setTalentTier] = useState<"free" | "premium" | null>(null);
 
@@ -63,6 +64,19 @@ function CastingCallDetailContent() {
     if (!token || user?.role !== "talent") return;
     api.getMyTalentProfile(token).then((p) => setTalentTier(p.tier)).catch(() => {});
   }, [token, user]);
+
+  // Without this, the apply button has no idea a previous visit (or session) already applied —
+  // it only knew about a submission made moments ago in this same page load.
+  useEffect(() => {
+    if (!token || !call || user?.role !== "talent") return;
+    api
+      .listMyApplications(token)
+      .then((apps) => {
+        const ids = apps.filter((a) => a.casting_call_id === call.id).map((a) => a.role_id);
+        setAppliedRoleIds(new Set(ids));
+      })
+      .catch(() => {});
+  }, [token, user, call]);
 
   async function handleApply(e: FormEvent) {
     e.preventDefault();
@@ -84,7 +98,8 @@ function CastingCallDetailContent() {
           token
         );
       }
-      setApplied(true);
+      setAppliedRoleIds((prev) => new Set(prev).add(selectedRoleId));
+      setJustSubmittedRoleId(selectedRoleId);
     } catch (err) {
       setApplyError(err instanceof ApiError ? err.message : "Could not submit your application.");
     } finally {
@@ -197,6 +212,7 @@ function CastingCallDetailContent() {
                 role={role}
                 fallbackCategory={call.category}
                 selected={role.id === selectedRoleId}
+                applied={appliedRoleIds.has(role.id)}
                 onApply={() => {
                   setSelectedRoleId(role.id);
                   document.getElementById("apply-section")?.scrollIntoView({ behavior: "smooth" });
@@ -236,9 +252,10 @@ function CastingCallDetailContent() {
             </Link>{" "}
             to apply.
           </p>
-        ) : applied ? (
+        ) : appliedRoleIds.has(selectedRoleId) ? (
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-            <Check className="h-4 w-4" /> Application submitted.
+            <Check className="h-4 w-4" />
+            {justSubmittedRoleId === selectedRoleId ? "Application submitted." : "You've already applied to this role."}
           </p>
         ) : (
           <form onSubmit={handleApply} className="flex flex-col gap-3">
@@ -329,11 +346,13 @@ function RoleCard({
   role,
   fallbackCategory,
   selected,
+  applied,
   onApply,
 }: {
   role: CastingCallRole;
   fallbackCategory: string;
   selected: boolean;
+  applied: boolean;
   onApply: () => void;
 }) {
   return (
@@ -352,15 +371,21 @@ function RoleCard({
           <p className="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-400">{role.compensation}</p>
         )}
       </div>
-      <button onClick={onApply} className={selected ? `${btnSmall} !border-rose-500 !text-rose-600` : btnSmall}>
-        {selected ? (
-          <>
-            <Check className="h-3.5 w-3.5" /> Selected
-          </>
-        ) : (
-          "Apply"
-        )}
-      </button>
+      {applied ? (
+        <span className="flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+          <Check className="h-3.5 w-3.5" /> Applied
+        </span>
+      ) : (
+        <button onClick={onApply} className={selected ? `${btnSmall} !border-rose-500 !text-rose-600` : btnSmall}>
+          {selected ? (
+            <>
+              <Check className="h-3.5 w-3.5" /> Selected
+            </>
+          ) : (
+            "Apply"
+          )}
+        </button>
+      )}
     </div>
   );
 }
