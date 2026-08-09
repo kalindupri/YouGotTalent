@@ -131,6 +131,10 @@ class Settings(BaseSettings):
     MARKETING_CRON_SECRET: str | None = None
     # How long a draft waits for a Discord reaction before it's considered expired and dropped.
     MARKETING_APPROVAL_TIMEOUT_HOURS: int = 24
+    # generate-draft is meant to be polled frequently (so a topic reply is picked up quickly),
+    # but a brand-new topic should only be asked for about once a day — this gates request_topic
+    # so frequent polling doesn't re-ask the moment the previous cycle finishes.
+    MARKETING_MIN_HOURS_BETWEEN_TOPICS: int = 20
 
 
 settings = Settings()

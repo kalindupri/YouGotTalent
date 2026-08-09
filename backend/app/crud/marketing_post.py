@@ -234,10 +234,19 @@ def _post_draft(db: Session, post: MarketingPost, topic: str, content: str) -> t
 
 def request_topic(db: Session) -> tuple[bool, str, MarketingPost | None]:
     """Posts a prompt to the Discord marketing channel asking what today's post should be
-    about, and creates a placeholder row to track the reply.
+    about, and creates a placeholder row to track the reply. Rate-limited to roughly once a
+    day (see MARKETING_MIN_HOURS_BETWEEN_TOPICS) — safe to call this on a frequent poll without
+    it re-asking every time the previous cycle happens to finish quickly.
     """
     if not discord_bot.is_configured():
         return False, "Discord bot is not configured (DISCORD_BOT_TOKEN / DISCORD_MARKETING_CHANNEL_ID)", None
+
+    last = db.query(MarketingPost).order_by(MarketingPost.created_at.desc()).first()
+    if last is not None:
+        created_at = last.created_at if last.created_at.tzinfo else last.created_at.replace(tzinfo=timezone.utc)
+        min_gap = timedelta(hours=settings.MARKETING_MIN_HOURS_BETWEEN_TOPICS)
+        if datetime.now(timezone.utc) - created_at < min_gap:
+            return False, f"Last topic was asked less than {settings.MARKETING_MIN_HOURS_BETWEEN_TOPICS}h ago", None
 
     try:
         message_id = discord_bot.post_topic_prompt(TOPIC_PROMPT)
