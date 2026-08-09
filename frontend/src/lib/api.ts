@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+// `||` not `??` — an unset build arg bakes in as an empty string, not undefined, which `??`
+// would treat as a real (broken) value and never fall back.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export type UserRole = "talent" | "recruiter" | "admin";
 export type TalentCategory =

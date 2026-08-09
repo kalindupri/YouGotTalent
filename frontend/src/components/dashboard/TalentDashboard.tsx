@@ -1214,6 +1214,10 @@ function IntroVideoCard({
           {mode === "upload" ? (
             <label key="intro-file" className={labelClass}>
               Video file
+              {/* No `capture` attribute — on mobile Safari/Chrome, accept="video/*" alone
+                  already opens a picker offering both "record" and "choose from library".
+                  Adding `capture` would force straight to the camera and remove the gallery
+                  option, the opposite of what we want here. */}
               <input
                 type="file"
                 accept="video/*"

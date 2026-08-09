@@ -32,18 +32,23 @@ services:
       - ./backend:/app
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # NEXT_PUBLIC_* vars are baked into the Next.js bundle at build time (see Dockerfile),
+      # not readable from a runtime `environment:` entry — this must be a build arg, or every
+      # API call silently becomes a relative fetch against the frontend's own origin and 404s.
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
     restart: unless-stopped
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
     ports:
       - "3001:3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+    # No source bind mount here on purpose — frontend/Dockerfile is a production multi-stage
+    # build (next build -> standalone node server.js), shared with the Azure deploy image, not
+    # a dev server. Mounting host source over /app replaces the built server.js with nothing
+    # and crash-loops the container. After editing frontend code, rebuild and recreate:
+    #   docker compose build frontend && docker compose up -d --force-recreate frontend
 
 volumes:
   db_data:
