@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from urllib.parse import quote
 
 import httpx
@@ -46,14 +47,23 @@ def post_draft_for_approval(content: str, image_bytes: bytes) -> str:
     message_id = resp.json()["id"]
 
     for emoji in (APPROVE_EMOJI, REJECT_EMOJI):
-        react_resp = httpx.put(
-            f"{DISCORD_API}/channels/{settings.DISCORD_MARKETING_CHANNEL_ID}/messages/{message_id}/reactions/{quote(emoji)}/@me",
-            headers=_headers(),
-            timeout=10.0,
-        )
-        react_resp.raise_for_status()
+        _add_reaction(settings.DISCORD_MARKETING_CHANNEL_ID, message_id, emoji)
 
     return message_id
+
+
+def _add_reaction(channel_id: str, message_id: str, emoji: str) -> None:
+    """Discord's reaction endpoint has a tight per-channel rate limit — adding two reactions
+    back-to-back (as post_draft_for_approval does) can trip it under moderate traffic. Retries
+    once, honoring the exact wait Discord tells us to use via the 429 body's retry_after.
+    """
+    url = f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}/reactions/{quote(emoji)}/@me"
+    resp = httpx.put(url, headers=_headers(), timeout=10.0)
+    if resp.status_code == 429:
+        retry_after = float(resp.json().get("retry_after", 1.0))
+        time.sleep(retry_after + 0.1)
+        resp = httpx.put(url, headers=_headers(), timeout=10.0)
+    resp.raise_for_status()
 
 
 def post_topic_prompt(text: str) -> str:
