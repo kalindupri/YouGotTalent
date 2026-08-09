@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouGotTalent — Development &amp; Operations Reference</title>
+<style>
+  :root {
+    --ink: #121214;
+    --ink-soft: #52525b;
+    --ink-faint: #8a8a92;
+    --paper: #faf9f7;
+    --paper-raised: #ffffff;
+    --paper-sunk: #f1efec;
+    --line: #e7e5e4;
+    --accent: #e11d48;
+    --accent-soft-bg: #fff1f2;
+    --accent-soft-text: #9f1239;
+    --code-bg: #16161a;
+    --code-ink: #e5e5e8;
+    --shadow: 0 1px 2px rgba(18,18,20,0.04), 0 8px 24px rgba(18,18,20,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f0; --ink-soft: #b0b0b6; --ink-faint: #77777d;
+      --paper: #0b0b0d; --paper-raised: #15161a; --paper-sunk: #1c1d21;
+      --line: #2b2c30; --accent: #fb7185;
+      --accent-soft-bg: #2a1418; --accent-soft-text: #fda4af;
+      --code-bg: #0e0e11; --code-ink: #d8d8dc;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #f2f2f0; --ink-soft: #b0b0b6; --ink-faint: #77777d;
+    --paper: #0b0b0d; --paper-raised: #15161a; --paper-sunk: #1c1d21;
+    --line: #2b2c30; --accent: #fb7185;
+    --accent-soft-bg: #2a1418; --accent-soft-text: #fda4af;
+    --code-bg: #0e0e11; --code-ink: #d8d8dc;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --ink: #121214; --ink-soft: #52525b; --ink-faint: #8a8a92;
+    --paper: #faf9f7; --paper-raised: #ffffff; --paper-sunk: #f1efec;
+    --line: #e7e5e4; --accent: #e11d48;
+    --accent-soft-bg: #fff1f2; --accent-soft-text: #9f1239;
+    --code-bg: #16161a; --code-ink: #e5e5e8;
+    --shadow: 0 1px 2px rgba(18,18,20,0.04), 0 8px 24px rgba(18,18,20,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  code, pre, .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  code {
+    background: var(--paper-sunk);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-size: 0.875em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    box-shadow: var(--shadow);
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 20px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 0.75rem;
+  }
+  .brand-title {
+    font-weight: 800;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .brand-title span { color: var(--ink-faint); font-weight: 600; }
+  .menu-btn {
+    display: none;
+    align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    color: var(--ink);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .menu-btn svg { width: 20px; height: 20px; }
+
+  /* ---------- layout ---------- */
+  .layout {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 40px;
+    align-items: start;
+  }
+  .toc {
+    position: sticky;
+    top: 76px;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+  .toc-title {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .toc a {
+    display: block;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+  .toc a:hover { background: var(--paper-sunk); text-decoration: none; color: var(--ink); }
+
+  main { min-width: 0; }
+  main > header {
+    margin-bottom: 8px;
+  }
+  main > header h1 {
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+  }
+  .meta {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    margin: 0 0 28px;
+  }
+  .meta strong { color: var(--ink); }
+  .callout {
+    background: var(--accent-soft-bg);
+    color: var(--accent-soft-text);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.9rem;
+    margin: 16px 0 28px;
+  }
+  .callout code { background: transparent; border: none; padding: 0; color: inherit; }
+
+  section { margin: 0 0 40px; scroll-margin-top: 76px; }
+  section h2 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: -0.005em;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    margin: 0 0 18px;
+  }
+  section h3 {
+    font-size: 1.02rem;
+    font-weight: 800;
+    margin: 24px 0 10px;
+  }
+  section p { margin: 0 0 14px; color: var(--ink-soft); }
+  section p strong, section li strong { color: var(--ink); }
+  section ul, section ol { padding-left: 22px; margin: 0 0 14px; color: var(--ink-soft); }
+  section li { margin-bottom: 6px; }
+  section li::marker { color: var(--ink-faint); }
+
+  .table-wrap { overflow-x: auto; margin: 0 0 20px; border-radius: 10px; border: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; background: var(--paper-raised); }
+  th, td { text-align: left; padding: 10px 14px; vertical-align: top; border-bottom: 1px solid var(--line); }
+  th { background: var(--paper-sunk); font-weight: 700; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td code, th code { white-space: nowrap; }
+
+  .diagram-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 0 0 20px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
+  .mermaid { display: flex; justify-content: center; }
+
+  footer {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 24px 20px 60px;
+    color: var(--ink-faint);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--line);
+  }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; padding-top: 20px; }
+    .toc {
+      position: static;
+      max-height: none;
+      display: none;
+      background: var(--paper-raised);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 10px;
+      margin-bottom: 24px;
+    }
+    .toc.open { display: block; }
+    .menu-btn { display: flex; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">YT</span>
+      <span class="brand-title">YouGotTalent <span>— Dev &amp; Ops Reference</span></span>
+    </div>
+    <button class="menu-btn" id="tocToggle" aria-label="Toggle table of contents" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+    <p class="toc-title">Contents</p>
+    <ol>
+      <li><a href="#what-this-is">1. What this is</a></li>
+      <li><a href="#architecture">2. Architecture</a></li>
+      <li><a href="#repo-layout">3. Repository layout</a></li>
+      <li><a href="#running-locally">4. Running it locally</a></li>
+      <li><a href="#testing">5. Testing</a></li>
+      <li><a href="#env-vars">6. Environment variables</a></li>
+      <li><a href="#azure-resources">7. Azure resources</a></li>
+      <li><a href="#dns">8. DNS</a></li>
+      <li><a href="#pipelines">9. Background pipelines</a></li>
+      <li><a href="#deployment">10. Deployment</a></li>
+      <li><a href="#troubleshooting">11. Troubleshooting</a></li>
+      <li><a href="#known-gaps">12. Known gaps</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header>
+      <h1>YouGotTalent — Development &amp; Operations Reference</h1>
+      <p class="meta">
+        Internal technical reference: architecture, Azure infrastructure, DNS, deployment, and how to
+        run everything manually if the usual tooling isn't available.
+        Last verified against live Azure state on <strong>2026-08-09</strong>.
+      </p>
+    </header>
+
+    <p>
+      For product-level docs (features, walkthroughs), see
+      <a href="product-overview.html">product-overview.html</a> and
+      <a href="walkthrough.html">walkthrough.html</a>. This document is for engineering/ops.
+    </p>
+
+    <section id="what-this-is">
+      <h2>1. What this is</h2>
+      <p>
+        YouGotTalent is a talent marketplace for Sri Lanka's creative industry (actors, singers,
+        dancers, models, photographers, etc.) connecting <strong>talent</strong> with
+        <strong>recruiters</strong> posting casting calls, via a Next.js web app backed by a FastAPI API.
+      </p>
+      <p>
+        Plus a backend-only <strong>marketing automation pipeline</strong> (Discord-driven Facebook
+        auto-poster) and <strong>error monitoring</strong> (Discord alerts), both described in §9.
+      </p>
+      <div class="callout">
+        This repo is web-only — there is no mobile app in this codebase. (If you've seen references
+        to an Expo/mobile app or a separate ASP.NET API elsewhere, that's a different project — not
+        part of YouGotTalent.)
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>2. Architecture</h2>
+      <div class="diagram-card">
+        <pre class="mermaid">
+flowchart TB
+    web["Next.js web app&lt;br/&gt;(browser)"]
+    dns[("yougottalent.lk&lt;br/&gt;Azure DNS Zone")]
+    static["ygt-coming-soon&lt;br/&gt;Static Web App"]
+    ghcr[("GHCR&lt;br/&gt;ghcr.io/kalindupri/*")]
+
+    subgraph azure["Azure (rg-ygt-dev)"]
+        fe["ygt-frontend&lt;br/&gt;Container App"]
+        be["ygt-backend&lt;br/&gt;Container App (FastAPI)"]
+        db[("ygt-pg-dev-4821b&lt;br/&gt;PostgreSQL Flexible Server")]
+        blob[("ygtdevstorage4821&lt;br/&gt;Blob Storage (talent-media)")]
+        acs["ygt-comms / ygt-email&lt;br/&gt;Azure Communication Services"]
+    end
+
+    subgraph external["External services"]
+        stripe["Stripe"]
+        discord["Discord&lt;br/&gt;(bot + webhook)"]
+        facebook["Facebook Graph API"]
+    end
+
+    web --&gt;|app: test.yougottalent.lk| fe
+    web -.-&gt;|root domain| dns
+    dns -.-&gt; static
+    fe --&gt; be
+    be --&gt; db
+    be --&gt; blob
+    be --&gt; acs
+    be --&gt; stripe
+    be --&gt; discord
+    discord -.-&gt; facebook
+    ghcr -. deploys .-&gt; fe
+    ghcr -. deploys .-&gt; be
+        </pre>
+      </div>
+      <ul>
+        <li><strong>App path</strong>: <code>test.yougottalent.lk</code> → <code>ygt-frontend</code> → <code>ygt-backend</code> → Postgres / Blob Storage / Communication Services / Stripe / Discord. Discord approval, once you react, triggers a Facebook Page post (the marketing pipeline, §9).</li>
+        <li><strong>Root domain path</strong>: <code>yougottalent.lk</code> resolves via the DNS zone to the <code>ygt-coming-soon</code> Static Web App — a separate "we're coming" landing page, not the app itself. See §8 for the full DNS breakdown.</li>
+        <li><strong>Deploys</strong>: GHCR holds both container images; Azure Container Apps pulls from there on every deploy (manual today — see §10 for the caveat on whether the CI auto-deploy actually fires).</li>
+      </ul>
+      <p><strong>Backend</strong>: FastAPI + SQLAlchemy 2.0 + Alembic, Python 3.12. JWT auth (OAuth2 password flow). Single monolithic API under <code>/api/v1</code>, routed by feature module (<code>app/api/routes/*.py</code>).</p>
+      <p><strong>Frontend</strong>: Next.js (App Router) + TypeScript + Tailwind v4.</p>
+      <p><strong>Database</strong>: PostgreSQL 16. One schema, Alembic-migrated. No read replicas, no sharding — appropriately small for current scale.</p>
+      <p><strong>Storage</strong>: Azure Blob Storage for talent media (photos/video/audio auditions). Falls back to local disk served by the backend itself if unconfigured (dev only).</p>
+      <p><strong>No cron/queue exists in this app.</strong> Anything that needs to run on a schedule (billing dunning sweep, marketing auto-poster) is a plain authenticated endpoint that an <em>external</em> scheduler calls — currently GitHub Actions <code>schedule</code> triggers. See §9.</p>
+    </section>
+
+    <section id="repo-layout">
+      <h2>3. Repository layout</h2>
+      <pre><code>backend/            FastAPI app
+  app/
+    api/routes/      one file per feature area (auth, talents, recruiters, casting_calls,
+                      applications, conversations, invitations, admin, bookings, calendar,
+                      library, follows, reports, billing, titles, discussions, marketing)
+    core/            config, security, discord/discord_bot/facebook clients, payments,
+                      error_monitoring, storage, media_processing
+    crud/            DB access + business logic, one module per model
+    models/          SQLAlchemy models
+    schemas/         Pydantic request/response models
+  alembic/versions/  migrations (linear history, one head)
+  tests/             pytest, one file per feature area
+  Dockerfile
+  entrypoint.sh       runs `alembic upgrade head` then starts uvicorn — every container
+                      boot self-migrates, local and Azure alike
+frontend/            Next.js app
+e2e/                 Playwright end-to-end tests (run against a live stack, not mocked)
+docs/                Product docs (HTML) + this file
+deploy/              azure-setup.ps1 — one-time infra provisioning script (reference/history)
+infra/               azure-deploy.ps1 — earlier draft of the same (superseded by deploy/)
+coming-soon/         Static "we're coming" landing page source — deployed to Azure Static
+                      Web Apps as ygt-coming-soon, served at the root domain
+.github/workflows/
+  deploy.yml          builds + pushes both images, updates both Container Apps — triggers on
+                      every push to main (see §10 for a caveat on whether this is actually firing)
+  marketing-cron.yml  polls the marketing pipeline endpoints every 30 min (§9)
+docker-compose.yml    local dev stack: postgres + backend + frontend
+.env                  local secrets (gitignored — never committed)</code></pre>
+    </section>
+
+    <section id="running-locally">
+      <h2>4. Running it locally</h2>
+      <h3>Prerequisites</h3>
+      <p>Docker Desktop running. That's it — the compose stack builds both images and runs Postgres too.</p>
+
+      <h3>First-time setup</h3>
+      <ol>
+        <li>Copy <code>.env.example</code> to <code>.env</code> (if <code>.env.example</code> doesn't exist, see §6 for the full variable list — only <code>DATABASE_URL</code>, <code>SECRET_KEY</code>, <code>CORS_ORIGINS</code> are required to get a working dev stack; everything else has safe defaults or degrades gracefully when unset).</li>
+        <li>From the repo root:
+          <pre><code>docker compose up -d</code></pre>
+          This starts Postgres, then the backend (which runs <code>alembic upgrade head</code> automatically on boot — no manual migration step needed), then the frontend.
+        </li>
+        <li>Frontend: <code>http://localhost:3001</code> &nbsp;·&nbsp; Backend API: <code>http://localhost:8000/api/v1</code> &nbsp;·&nbsp; Interactive API docs (Swagger UI): <code>http://localhost:8000/docs</code></li>
+      </ol>
+
+      <h3>Common local operations</h3>
+      <pre><code># Rebuild after changing requirements.txt or the Dockerfile (source-only changes hot-reload
+# inside the container via the bind mount — but Windows has no filesystem-watch hot reload for
+# the backend, so a restart is still needed after most backend edits)
+docker compose build backend
+docker restart yougottalent-backend-1
+
+# Just restart to pick up a code/env change without a full rebuild
+docker compose up -d --force-recreate backend
+
+# Run the backend test suite
+docker exec yougottalent-backend-1 python -m pytest -q
+
+# Run one test file
+docker exec yougottalent-backend-1 python -m pytest tests/test_marketing.py -q
+
+# Open a Postgres shell
+docker exec -it yougottalent-db-1 psql -U ygt -d ygt
+
+# Create an admin user (no public signup path for admin role)
+docker exec yougottalent-backend-1 python scripts/create_admin.py &lt;email&gt; &lt;password&gt; &lt;full_name&gt;</code></pre>
+
+      <h3>Running without Docker (bare metal)</h3>
+      <p>Only needed if Docker itself is unavailable.</p>
+      <pre><code># Backend
+cd backend
+python -m venv venv &amp;&amp; source venv/bin/activate   # or venv\Scripts\activate on Windows
+pip install -r requirements.txt
+# Needs a reachable Postgres — either install locally or point DATABASE_URL at Azure's
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+
+# Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev   # http://localhost:3000 by default outside compose</code></pre>
+      <p><code>ffmpeg</code> must be on <code>PATH</code> for video/audio compression (<code>app/core/media_processing.py</code>) — the Docker image installs it via apt; bare-metal needs it installed manually.</p>
+    </section>
+
+    <section id="testing">
+      <h2>5. Testing</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Suite</th><th>Location</th><th>Run command</th></tr></thead>
+          <tbody>
+            <tr><td>Backend unit/integration</td><td><code>backend/tests/</code></td><td><code>docker exec yougottalent-backend-1 python -m pytest -q</code></td></tr>
+            <tr><td>E2E (Playwright)</td><td><code>e2e/tests/</code></td><td><code>npx playwright test</code> from <code>e2e/</code> — needs the full stack running</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        As of the last full run (2026-08-09): <strong>339 backend tests passing</strong>. E2E suite was
+        last confirmed fully green earlier in the project (72 tests) but hasn't been re-run in this
+        session — re-run before trusting that number is still current.
+      </p>
+      <p>
+        E2E tests hit a live dev stack directly (not mocked) — they need <code>docker compose up</code>
+        running first, and some tests use raw SQL against the dev DB to set up state (e.g. forcing a
+        subscription active) rather than going through the UI for every precondition.
+      </p>
+    </section>
+
+    <section id="env-vars">
+      <h2>6. Environment variables</h2>
+      <p>
+        All variables are read by <code>backend/app/core/config.py</code> (Pydantic Settings, loads from
+        <code>.env</code> locally). <strong>None of the actual secret values are reproduced here</strong> —
+        only names, purpose, and where the real value lives. Locally: <code>.env</code> (gitignored). In
+        Azure: Container App secrets (<code>az containerapp secret list</code>) referenced via
+        <code>secretref:</code> in the app's env vars.
+      </p>
+
+      <h3>Core</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Purpose</th><th>Required?</th></tr></thead>
+          <tbody>
+            <tr><td><code>DATABASE_URL</code></td><td>Postgres connection string (<code>postgresql+psycopg2://...</code>)</td><td>Yes</td></tr>
+            <tr><td><code>SECRET_KEY</code></td><td>JWT signing key</td><td>Yes — must be a real random value in any non-local env</td></tr>
+            <tr><td><code>CORS_ORIGINS</code></td><td>Allowed frontend origin(s), comma-separated or JSON array</td><td>Yes</td></tr>
+            <tr><td><code>FRONTEND_URL</code></td><td>Used to build links in outgoing emails</td><td>Recommended</td></tr>
+            <tr><td><code>BACKEND_PUBLIC_URL</code></td><td>Only used for the local-disk media fallback</td><td>Dev only</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Storage</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>AZURE_STORAGE_CONNECTION_STRING</code></td><td>Blob storage for talent media. Unset → local-disk fallback (dev only)</td></tr>
+            <tr><td><code>AZURE_STORAGE_CONTAINER</code></td><td>Container name, default <code>talent-media</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Payments (Stripe — see <code>app/core/payments/</code>)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>PAYMENT_GATEWAY</code></td><td><code>mock</code> (default, no external calls) / <code>payhere</code> / <code>stripe</code></td></tr>
+            <tr><td><code>STRIPE_SECRET_KEY</code>, <code>STRIPE_PUBLISHABLE_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code></td><td>Stripe API credentials</td></tr>
+            <tr><td><code>STRIPE_TALENT_PRICE_ID</code>, <code>STRIPE_RECRUITER_PRICE_ID</code></td><td>Pre-created recurring Price IDs</td></tr>
+            <tr><td><code>STRIPE_CURRENCY</code></td><td>Stripe doesn't settle LKR — separate currency from the LKR PayHere path</td></tr>
+            <tr><td><code>PAYHERE_MERCHANT_ID</code>, <code>PAYHERE_MERCHANT_SECRET</code>, <code>PAYHERE_SANDBOX</code></td><td>Sri Lanka payment gateway (not currently active — <code>PAYMENT_GATEWAY=stripe</code> on Azure)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Email</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>AZURE_COMMUNICATION_CONNECTION_STRING</code></td><td>Preferred path — Azure Communication Services Email</td></tr>
+            <tr><td><code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASSWORD</code>, <code>SMTP_USE_TLS</code></td><td>Fallback (e.g. Gmail) if ACS isn't configured</td></tr>
+            <tr><td><code>EMAIL_FROM</code></td><td>Sender address, default <code>no-reply@yougottalent.lk</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Order of precedence: ACS → SMTP → log-only (see <code>app/core/config.py</code> comment).</p>
+
+      <h3>Discord / Facebook (see §9)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>DISCORD_WEBHOOK_URL</code></td><td>User-filed content reports → this webhook. <strong>Not currently set on Azure</strong> — reports there fall back to log-only. Local <code>.env</code> has a real value.</td></tr>
+            <tr><td><code>DISCORD_BOT_TOKEN</code></td><td>Bot used for both the marketing pipeline and error alerts</td></tr>
+            <tr><td><code>DISCORD_MARKETING_CHANNEL_ID</code></td><td>Channel the marketing bot posts drafts to</td></tr>
+            <tr><td><code>DISCORD_ERROR_CHANNEL_ID</code></td><td>Channel backend crash/error alerts post to (separate from the report webhook above)</td></tr>
+            <tr><td><code>FACEBOOK_PAGE_ID</code>, <code>FACEBOOK_PAGE_ACCESS_TOKEN</code></td><td>Facebook Page auto-posting. The token is a long-lived <strong>user</strong> token with page permissions, not a Page token — <code>app/core/facebook.py</code> exchanges it for the real Page token on every call, so it never needs to be re-derived manually</td></tr>
+            <tr><td><code>MARKETING_CRON_SECRET</code></td><td>Auth for the two unattended marketing endpoints (<code>X-Cron-Secret</code> header)</td></tr>
+            <tr><td><code>MARKETING_APPROVAL_TIMEOUT_HOURS</code></td><td>Default 24 — how long a draft waits for a Discord reaction</td></tr>
+            <tr><td><code>MARKETING_MIN_HOURS_BETWEEN_TOPICS</code></td><td>Default 20 — rate-limits new topic requests to ~once/day even under frequent polling</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Business rule constants</h3>
+      <p>(all have sane defaults, rarely need overriding)</p>
+      <p><code>FREE_TIER_MEDIA_LIMIT</code>, <code>FREE_TIER_OPEN_CASTING_CALL_LIMIT</code>, <code>FREE_TIER_VIDEO_LIMIT</code>, <code>PREMIUM_TIER_VIDEO_LIMIT</code>, <code>PREMIUM_FEATURED_SLOT_LIMIT</code>, <code>MAX_UPLOAD_SIZE_BYTES</code>, <code>PREMIUM_TALENT_PRICE_LKR</code>, <code>PREMIUM_RECRUITER_PRICE_LKR</code>, <code>ANNUAL_BILLING_MONTHS_CHARGED</code>, <code>TALENT_TRIAL_DAYS</code>, <code>RECRUITER_TRIAL_DAYS</code>, <code>PAST_DUE_GRACE_DAYS</code>, <code>PAST_DUE_REMINDER_AFTER_DAYS</code>, <code>RETENTION_DISCOUNT_PERCENT</code>, <code>RETENTION_DISCOUNT_MONTHS</code>.</p>
+
+      <h3>Frontend</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>NEXT_PUBLIC_API_URL</code></td><td>Backend base URL. <strong>Baked in at Docker build time</strong> (Next.js <code>NEXT_PUBLIC_*</code> convention) — changing it requires a rebuild, not just a container restart/env update</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="azure-resources">
+      <h2>7. Azure resources (live inventory, <code>rg-ygt-dev</code>)</h2>
+      <p>
+        Subscription: <code>az-ygt</code> (<code>b89a1ad9-d445-4696-b509-76b29db599b1</code>), tenant
+        <code>b03baaef-4447-442d-ba60-d7c6628cb9a0</code>, region <strong>Central US</strong> for compute
+        (storage account is in <strong>East US</strong>). Login with <code>az login</code>, then all
+        commands below assume <code>-g rg-ygt-dev</code> / <code>--resource-group rg-ygt-dev</code>.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Resource</th><th>Type</th><th>Name</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Resource group</td><td>—</td><td><code>rg-ygt-dev</code></td><td>Everything lives here — <code>az group delete -n rg-ygt-dev</code> tears down the whole project</td></tr>
+            <tr><td>Container Apps environment</td><td><code>Microsoft.App/managedEnvironments</code></td><td><code>ygt-env</code></td><td>Shared by both apps. Default domain <code>icysmoke-0f0ee613.centralus.azurecontainerapps.io</code></td></tr>
+            <tr><td>Backend</td><td><code>Microsoft.App/containerApps</code></td><td><code>ygt-backend</code></td><td>Image <code>ghcr.io/kalindupri/ygt-backend:&lt;tag&gt;</code>, port 8000, 0.5 vCPU / 1Gi, 0–2 replicas (scales to zero when idle)</td></tr>
+            <tr><td>Frontend</td><td><code>Microsoft.App/containerApps</code></td><td><code>ygt-frontend</code></td><td>Image <code>ghcr.io/kalindupri/ygt-frontend:&lt;tag&gt;</code>, port 3000, 0.5 vCPU / 1Gi, 0–2 replicas</td></tr>
+            <tr><td>Database</td><td><code>Microsoft.DBforPostgreSQL/flexibleServers</code></td><td><code>ygt-pg-dev-4821b</code></td><td>PostgreSQL 16, Burstable <code>Standard_B1ms</code>, 32GB storage, HA disabled, 7-day backup retention</td></tr>
+            <tr><td>Blob storage</td><td><code>Microsoft.Storage/storageAccounts</code></td><td><code>ygtdevstorage4821</code></td><td><code>Standard_LRS</code>, container <code>talent-media</code> (public blob read — matches how the app stores plain URLs, no SAS tokens)</td></tr>
+            <tr><td>Static Web App</td><td><code>Microsoft.Web/staticSites</code></td><td><code>ygt-coming-soon</code></td><td>Serves the coming-soon landing page at the root domain (source: <code>coming-soon/index.html</code>)</td></tr>
+            <tr><td>DNS zone</td><td><code>Microsoft.Network/dnszones</code></td><td><code>yougottalent.lk</code></td><td>See §8</td></tr>
+            <tr><td>Communication Services</td><td><code>Microsoft.Communication/CommunicationServices</code></td><td><code>ygt-comms</code></td><td></td></tr>
+            <tr><td>Email domain</td><td><code>Microsoft.Communication/EmailServices/Domains</code></td><td><code>ygt-email/yougottalent.lk</code></td><td>Verified sending domain (DKIM/DMARC/SPF records in the zone, see §8)</td></tr>
+            <tr><td>Log Analytics workspace</td><td><code>Microsoft.OperationalInsights/workspaces</code></td><td><code>workspace-rgygtdev7I02</code></td><td>Container Apps environment logs</td></tr>
+            <tr><td>Managed certificate</td><td><code>.../managedCertificates</code></td><td><code>mc-ygt-env-test-yougottalen-6718</code></td><td>TLS cert for the <code>test.yougottalent.lk</code> custom domain binding on the frontend</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Backend Container App secrets (names only)</h3>
+      <pre><code>discord-bot-token
+discord-marketing-channel-id
+discord-error-channel-id
+facebook-page-id
+facebook-page-access-token
+marketing-cron-secret
+ghcrio-kalindupri          (GHCR pull credential)</code></pre>
+      <p>List/inspect: <code>az containerapp secret list -g rg-ygt-dev -n ygt-backend</code></p>
+      <p>
+        <strong>Note</strong>: several env vars on the live backend (<code>DATABASE_URL</code>,
+        <code>AZURE_STORAGE_CONNECTION_STRING</code>, <code>STRIPE_*</code>, <code>SMTP_*</code>) are
+        currently set as <strong>plain env vars</strong>, not <code>secretref:</code>-backed secrets —
+        inherited from the original provisioning script (<code>deploy/azure-setup.ps1</code>), which only
+        routed the storage connection string through a secret (semicolons in the value broke shell
+        quoting). Worth migrating the rest to proper secrets at some point; not urgent, just noted here.
+      </p>
+
+      <h3>Postgres firewall rules</h3>
+      <pre><code>AllowMyIP                                    &lt;a specific developer IP&gt;
+AllowAllAzureServicesAndResourcesWithinAzureIps_...   0.0.0.0/0.0.0.0  (Azure's documented
+                                                        special-case meaning "allow Azure
+                                                        services", not open-to-internet)</code></pre>
+    </section>
+
+    <section id="dns">
+      <h2>8. DNS (<code>yougottalent.lk</code>, Azure DNS Zone)</h2>
+      <p>
+        Nameservers (at the registrar): <code>ns1-04.azure-dns.com</code>, <code>ns2-04.azure-dns.net</code>,
+        <code>ns3-04.azure-dns.org</code>, <code>ns4-04.azure-dns.info</code>.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Record</th><th>Type</th><th>Target</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>@</code> (root)</td><td>A (alias)</td><td><code>ygt-coming-soon</code> Static Web App</td><td>Root domain shows the "we're coming" landing page, <strong>not</strong> the main app</td></tr>
+            <tr><td><code>www</code></td><td>CNAME</td><td><code>blue-forest-0223fda10.7.azurestaticapps.net</code></td><td>Same static site</td></tr>
+            <tr><td><code>test</code></td><td>A (alias) + TXT</td><td><code>ygt-frontend</code> Container App</td><td><strong>This is where the actual live web app is</strong> — <code>https://test.yougottalent.lk</code></td></tr>
+            <tr><td><code>asuid.test</code></td><td>TXT</td><td>—</td><td>Azure custom-domain ownership verification for the <code>test</code> binding</td></tr>
+            <tr><td><code>_dmarc</code></td><td>TXT</td><td>—</td><td>Email DMARC policy</td></tr>
+            <tr><td><code>selector1-azurecomm-prod-net._domainkey</code>, <code>selector2-...</code></td><td>CNAME</td><td>—</td><td>DKIM for Azure Communication Services email sending</td></tr>
+            <tr><td><code>@</code></td><td>TXT</td><td>SPF (<code>v=spf1 include:spf.protection.outlook.com -all</code>) + domain verification</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <strong>There is no production domain/environment configured yet.</strong>
+        <code>test.yougottalent.lk</code> is the only live app instance — the "test site" referred to
+        elsewhere in project discussions. A real production cutover will need: a new resource group (or
+        clear separation within this one), a fresh production database (no seed/dummy data), and a new
+        DNS record (likely repointing <code>@</code> or <code>www</code> from the coming-soon site to the
+        frontend once the product is ready to launch, or adding a dedicated subdomain).
+      </p>
+      <p>
+        Backend has <strong>no custom domain</strong> — it's only reachable at its default
+        <code>ygt-backend.icysmoke-0f0ee613.centralus.azurecontainerapps.io</code> FQDN. The frontend
+        calls it via <code>NEXT_PUBLIC_API_URL</code>, baked in at image build time (see §6).
+      </p>
+    </section>
+
+    <section id="pipelines">
+      <h2>9. Background pipelines (no built-in cron — external schedulers required)</h2>
+      <h3>Marketing auto-poster</h3>
+      <p>
+        <code>app/crud/marketing_post.py</code>, <code>app/core/discord_bot.py</code>,
+        <code>app/core/facebook.py</code>, <code>app/core/marketing_image.py</code>,
+        <code>app/api/routes/marketing.py</code>.
+      </p>
+      <p>
+        Flow: bot asks a topic question in the Discord marketing channel (rate-limited to ~once/day) →
+        a human's reply is keyword-matched to one of 7 pre-written templates (deliberately
+        <strong>no LLM</strong> — a cost/complexity decision) → a branded PNG is rendered with Pillow →
+        draft posts to Discord with ✅/❌ reactions → a human reacts → approved drafts publish as a photo
+        post to the Facebook Page.
+      </p>
+      <p>
+        Driven by <code>.github/workflows/marketing-cron.yml</code>, which polls
+        <code>POST /api/v1/admin/marketing/generate-draft</code> and
+        <code>POST /api/v1/admin/marketing/check-approvals</code> every 30 minutes against the deployed
+        backend, authenticated via the <code>MARKETING_CRON_SECRET</code> GitHub Actions repo secret.
+      </p>
+      <h3>Error monitoring</h3>
+      <p>
+        <code>app/core/error_monitoring.py</code> — a <code>logging.Handler</code> on the root logger
+        catches any <code>logger.error()</code>/unhandled exception app-wide, deduplicates repeats of the
+        same error within a 5-minute cooldown, and posts to the dedicated Discord error channel via the
+        bot (falls back to the general report webhook if the dedicated channel isn't configured). No
+        scheduler needed — this fires inline as errors happen.
+      </p>
+    </section>
+
+    <section id="deployment">
+      <h2>10. Deployment</h2>
+      <h3>How images get built and where they live</h3>
+      <p>GHCR (GitHub Container Registry), <strong>not</strong> Azure Container Registry:</p>
+      <ul>
+        <li><code>ghcr.io/kalindupri/ygt-backend:&lt;tag&gt;</code></li>
+        <li><code>ghcr.io/kalindupri/ygt-frontend:&lt;tag&gt;</code></li>
+      </ul>
+      <p>
+        Manual tags in use follow an <code>azure-vNN</code> convention (currently up to
+        <code>azure-v20</code> for backend). <code>.github/workflows/deploy.yml</code> instead tags with
+        <code>latest</code> and the commit SHA — the two schemes have coexisted this project's history
+        because <strong>deploys have mostly been done manually</strong> (see caveat below), not
+        exclusively through that workflow.
+      </p>
+
+      <h3>Manual deploy (the verified-working path)</h3>
+      <pre><code># 1. Build and push
+docker build -t ghcr.io/kalindupri/ygt-backend:azure-vNN ./backend
+docker push ghcr.io/kalindupri/ygt-backend:azure-vNN
+
+# 2. Point the Container App at the new image
+az containerapp update -g rg-ygt-dev -n ygt-backend \
+  --image ghcr.io/kalindupri/ygt-backend:azure-vNN
+
+# Same pattern for frontend, except NEXT_PUBLIC_API_URL must be a --build-arg at build time,
+# not a runtime env var:
+docker build --build-arg NEXT_PUBLIC_API_URL=https://ygt-backend.icysmoke-0f0ee613.centralus.azurecontainerapps.io/api/v1 \
+  -t ghcr.io/kalindupri/ygt-frontend:azure-vNN ./frontend
+docker push ghcr.io/kalindupri/ygt-frontend:azure-vNN
+az containerapp update -g rg-ygt-dev -n ygt-frontend --image ghcr.io/kalindupri/ygt-frontend:azure-vNN</code></pre>
+      <p>
+        Migrations run automatically on container boot (<code>entrypoint.sh</code> →
+        <code>alembic upgrade head</code>) — no separate migration step needed for either path.
+      </p>
+
+      <h3>Adding/updating a secret</h3>
+      <p>(never put the plaintext value in a command you'll keep in shell history or share — use env-var indirection or the Portal)</p>
+      <pre><code>az containerapp secret set -g rg-ygt-dev -n ygt-backend \
+  --secrets some-secret-name="$SOME_LOCAL_ENV_VAR"
+az containerapp update -g rg-ygt-dev -n ygt-backend \
+  --set-env-vars SOME_ENV_VAR=secretref:some-secret-name</code></pre>
+
+      <h3>CI/CD workflow (<code>.github/workflows/deploy.yml</code>)</h3>
+      <p>
+        Triggers on every push to <code>main</code> (and manual dispatch). Builds+pushes both images
+        tagged <code>latest</code> + <code>${{ github.sha }}</code>, then updates both Container Apps via
+        <code>az containerapp update</code> using OIDC federated login (no stored Azure password) —
+        requires repo secrets <code>AZURE_CLIENT_ID</code>, <code>AZURE_TENANT_ID</code>,
+        <code>AZURE_SUBSCRIPTION_ID</code>.
+      </p>
+      <div class="callout">
+        <strong>Caveat</strong>: during this project's actual usage, pushes to <code>main</code> have
+        <strong>not</strong> been observed to trigger a visible redeploy — the live image tag stayed on
+        the last manually-pushed <code>azure-vNN</code> tag after several pushes. Either the OIDC secrets
+        aren't configured, the workflow is failing silently, or it simply hasn't been checked. Worth
+        verifying in the Actions tab before relying on it — until confirmed, treat the manual path above
+        as the source of truth for "did this actually deploy."
+      </div>
+
+      <h3>One-time infra provisioning</h3>
+      <p>
+        <code>deploy/azure-setup.ps1</code> is the canonical (most complete) provisioning script —
+        resource group, budget alert, storage, Postgres, Container Apps environment, initial image
+        build/push/deploy, CORS lockdown. Run once per new environment (e.g. when standing up
+        production). <code>infra/azure-deploy.ps1</code> is an earlier, less complete draft of the same —
+        kept for reference, not the one to run.
+      </p>
+      <p>
+        Not covered by either script (set up separately, ad hoc): DNS zone + custom domain binding +
+        managed certificate, the coming-soon Static Web App, Azure Communication Services + email domain
+        verification, and all of the Discord/Facebook/Stripe secrets. If standing up a fresh environment
+        (e.g. production), budget time for each of these as a manual step.
+      </p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>11. Troubleshooting</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Symptom</th><th>Likely cause / fix</th></tr></thead>
+          <tbody>
+            <tr><td><code>alembic upgrade head</code> fails with <code>DuplicateObject</code> on a Postgres enum</td><td>A migration used the same <code>postgresql.ENUM(...)</code> instance for both the explicit <code>.create()</code> call and <code>op.create_table()</code>. Fix: create a second instance with <code>create_type=False</code> for the <code>create_table</code> call.</td></tr>
+            <tr><td>A Postgres enum column rejects a value that matches the Python enum's <code>.value</code></td><td>This app's convention (<code>SQLAlchemy Enum(SomeEnum)</code>) stores the member's <code>.name</code> (uppercase), not <code>.value</code> — check the actual DB labels with <code>SELECT enumlabel FROM pg_enum WHERE enumtypid = '&lt;type&gt;'::regtype</code>.</td></tr>
+            <tr><td>A test suite makes live calls to Discord/Facebook/Stripe</td><td>Check for missing <code>monkeypatch</code> coverage — local <code>.env</code> has real credentials, so any code path not explicitly mocked in a test will hit the real API. See the <code>_no_dedicated_error_channel_by_default</code> autouse fixture in <code>tests/test_error_monitoring.py</code> for the pattern.</td></tr>
+            <tr><td>Backend container has stale dependencies after editing <code>requirements.txt</code></td><td><code>docker compose build backend</code> (not just <code>--force-recreate</code>) — Windows Docker has no hot dependency reload.</td></tr>
+            <tr><td>Frontend env var change has no effect</td><td><code>NEXT_PUBLIC_*</code> vars are baked in at build time — needs an image rebuild with a new <code>--build-arg</code>, not a container restart.</td></tr>
+            <tr><td>Marketing pipeline "stuck," nothing posting to Discord</td><td>Check <code>MARKETING_MIN_HOURS_BETWEEN_TOPICS</code> rate limiting (~once/day by design) and whether a prior <code>MarketingPost</code> row is stuck in <code>PENDING_APPROVAL</code>/<code>AWAITING_TOPIC</code>/<code>FAILED</code> blocking a new one — query <code>marketing_posts</code> ordered by <code>created_at desc</code>.</td></tr>
+            <tr><td>Discord bot can't read message text</td><td>"Message Content Intent" (a privileged Discord bot permission) must be manually enabled in the Discord Developer Portal — Bot settings → Privileged Gateway Intents. Without it, message <code>content</code> fields come back empty even via REST.</td></tr>
+            <tr><td>Facebook posting fails with a confusing "publish_actions deprecated" error</td><td>The configured token is a <strong>user</strong> token with page permissions, not an actual <strong>Page</strong> token — <code>app/core/facebook.py</code> already handles the exchange automatically (<code>_resolve_page_token</code>), so this shouldn't recur; if it does, the user token itself may have expired or lost its <code>pages_manage_posts</code> scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="known-gaps">
+      <h2>12. Known gaps</h2>
+      <ul>
+        <li>No production environment exists yet — <code>test.yougottalent.lk</code> is the only live deployment.</li>
+        <li><code>DISCORD_WEBHOOK_URL</code> (user-filed content reports) is not configured on the Azure backend — reports there currently just log instead of alerting anyone.</li>
+        <li><code>deploy.yml</code>'s auto-deploy-on-push has not been confirmed to actually fire (see §10).</li>
+        <li>Several Azure env vars carry plaintext values instead of <code>secretref:</code>-backed secrets (inherited from initial provisioning, see §7).</li>
+        <li>No automated approval-gated deploy pipeline (test report → Discord approval → deploy to test → smoke test → Discord approval → deploy to prod) — discussed but not yet built.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer>
+  Converted from <code>docs/DEVELOPMENT.md</code>. Keep both in sync when this changes, or drop the
+  Markdown copy if this becomes the source of truth.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  function currentMermaidTheme() {
+    var explicit = document.documentElement.getAttribute('data-theme');
+    if (explicit === 'dark') return 'dark';
+    if (explicit === 'light') return 'default';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
+  }
+  mermaid.initialize({ startOnLoad: true, theme: currentMermaidTheme(), securityLevel: 'loose' });
+
+  var tocToggle = document.getElementById('tocToggle');
+  var toc = document.getElementById('toc');
+  tocToggle.addEventListener('click', function () {
+    var isOpen = toc.classList.toggle('open');
+    tocToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
+  toc.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A' && window.innerWidth <= 900) {
+      toc.classList.remove('open');
+      tocToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+</script>
+</body>
+</html>
