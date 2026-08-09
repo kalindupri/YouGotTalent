@@ -13,7 +13,12 @@ from app.models.marketing_post import MarketingPost, MarketingPostStatus
 from app.models.talent_profile import TalentCategory, TalentProfile
 
 SITE_LINE = "Discover more at yougottalent.lk"
-TOPIC_PROMPT = "🗓️ What should today's marketing post be about? Reply in this channel with the post text and I'll draft it."
+TOPIC_PROMPT = (
+    "🗓️ What should today's marketing post be about? Reply in this channel with the post text "
+    "and I'll draft it — or send your own copy any time with:\n"
+    "Header: <headline for the image>\n"
+    "Body: <the actual post text>"
+)
 
 
 def _category_label(category: TalentCategory) -> str:
@@ -141,6 +146,35 @@ _TOPIC_KEYWORDS: list[tuple[list[str], Callable[[Session], tuple[str, str] | Non
     (["growth", "platform growth", "total talent", "how many talent", "milestone"], _template_total_talent),
     (["join", "build your profile", "build a profile", "sign up", "get discovered"], _template_talent_cta),
 ]
+
+
+def parse_header_body_reply(text: str) -> tuple[str, str] | None:
+    """Parses a hand-written `Header: ... / Body: ...` message into (topic, content), giving
+    full control over the exact copy instead of the keyword-matched templates. Returns None if
+    the message isn't in that format, so callers can fall back to the normal topic-matching flow.
+    """
+    header: str | None = None
+    body_lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lowered = stripped.lower()
+        if lowered.startswith("header:"):
+            header = stripped.split(":", 1)[1].strip()
+        elif lowered.startswith("body:"):
+            body_lines.append(stripped.split(":", 1)[1].strip())
+        elif body_lines:
+            # A continuation line for a multi-line body, once "Body:" has already started.
+            body_lines.append(stripped)
+
+    if not header or not body_lines:
+        return None
+
+    body = " ".join(body_lines)
+    topic = header if len(header) <= 197 else header[:197] + "..."
+    content = body if SITE_LINE in body else f"{body} {SITE_LINE}"
+    return topic, content
 
 
 def match_topic_from_reply(db: Session, reply: str) -> tuple[str, str]:
@@ -275,7 +309,8 @@ def advance_topic_to_draft(db: Session) -> tuple[bool, str, MarketingPost | None
 
     reply = discord_bot.get_latest_human_reply(awaiting.discord_channel_id, awaiting.discord_message_id)
     if reply is not None:
-        topic, content = match_topic_from_reply(db, reply)
+        parsed = parse_header_body_reply(reply)
+        topic, content = parsed if parsed is not None else match_topic_from_reply(db, reply)
         return _post_draft(db, awaiting, topic, content)
 
     created_at = awaiting.created_at if awaiting.created_at.tzinfo else awaiting.created_at.replace(tzinfo=timezone.utc)
@@ -286,6 +321,46 @@ def advance_topic_to_draft(db: Session) -> tuple[bool, str, MarketingPost | None
         return _post_draft(db, awaiting, topic, content)
 
     return False, "Still waiting on a topic reply in Discord", awaiting
+
+
+def check_manual_request(db: Session) -> tuple[bool, str, MarketingPost | None] | None:
+    """Looks for a proactively-sent `Header:`/`Body:` message in the marketing channel — not a
+    reply to the daily topic prompt, just typing the exact copy whenever there's something to
+    announce. Anchored to the most recent MarketingPost's Discord message id (if any), since
+    only messages posted after the last thing this bot did in the channel are new; by the time
+    this runs, that row is guaranteed to be in a terminal state (POSTED/REJECTED/EXPIRED/FAILED)
+    because generate_and_post_draft only reaches here once pending/awaiting rows are cleared.
+
+    Returns None (not a (False, ...) tuple) when nothing matches, so the caller can fall through
+    to the normal request_topic() flow without treating "nothing found" as an error. Deliberately
+    bypasses MARKETING_MIN_HOURS_BETWEEN_TOPICS — that limit exists to stop the daily nag prompt
+    from re-asking too often, not to throttle an explicit, human-initiated post request.
+    """
+    if not discord_bot.is_configured():
+        return None
+
+    last = db.query(MarketingPost).order_by(MarketingPost.created_at.desc()).first()
+    if last is None or not last.discord_channel_id or not last.discord_message_id:
+        return None
+
+    reply = discord_bot.get_latest_human_reply(last.discord_channel_id, last.discord_message_id)
+    if reply is None:
+        return None
+
+    parsed = parse_header_body_reply(reply)
+    if parsed is None:
+        return None
+
+    topic, content = parsed
+    post = MarketingPost(
+        status=MarketingPostStatus.AWAITING_TOPIC,
+        discord_channel_id=last.discord_channel_id,
+        discord_message_id=last.discord_message_id,
+    )
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+    return _post_draft(db, post, topic, content)
 
 
 def generate_and_post_draft(db: Session) -> tuple[bool, str, MarketingPost | None]:
@@ -300,6 +375,10 @@ def generate_and_post_draft(db: Session) -> tuple[bool, str, MarketingPost | Non
     awaiting = get_awaiting_topic(db)
     if awaiting is not None:
         return advance_topic_to_draft(db)
+
+    manual = check_manual_request(db)
+    if manual is not None:
+        return manual
 
     return request_topic(db)
 

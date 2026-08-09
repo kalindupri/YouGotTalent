@@ -248,6 +248,81 @@ def test_generate_draft_rate_limits_new_topic_requests_after_a_completed_cycle(c
     assert "less than" in body["reason"]
 
 
+def test_parse_header_body_reply_returns_none_for_plain_text():
+    assert marketing_crud.parse_header_body_reply("just a plain topic suggestion, no format") is None
+
+
+def test_parse_header_body_reply_parses_multiline_body():
+    text = "Header: New Feature\nBody: Line one of the post.\nLine two continues here."
+    parsed = marketing_crud.parse_header_body_reply(text)
+    assert parsed is not None
+    topic, content = parsed
+    assert topic == "New Feature"
+    assert "Line one of the post. Line two continues here." in content
+    assert "yougottalent.lk" in content
+
+
+def test_advance_topic_uses_header_body_reply_directly_instead_of_keyword_matching(client, monkeypatch):
+    _configure_cron_secret(monkeypatch)
+    _configure_discord(monkeypatch)
+    reply = "Header: Custom Headline\nBody: This is my own exact wording for the post."
+
+    resp = _advance_to_pending_draft(client, monkeypatch, reply=reply, draft_message_id="333")
+    body = resp.json()
+    assert body["post"]["topic"] == "Custom Headline"
+    assert "This is my own exact wording for the post." in body["post"]["content"]
+
+
+def test_generate_draft_picks_up_an_unprompted_header_body_message(client, monkeypatch):
+    _configure_cron_secret(monkeypatch)
+    _configure_discord(monkeypatch)
+    monkeypatch.setattr(settings, "FACEBOOK_PAGE_ID", "1269877089536606")
+    monkeypatch.setattr(settings, "FACEBOOK_PAGE_ACCESS_TOKEN", "fake-fb-token")
+    monkeypatch.setattr(discord_bot, "get_human_reaction", lambda channel_id, message_id: "approved")
+    monkeypatch.setattr(discord_bot, "notify_channel", lambda content: None)
+    monkeypatch.setattr(facebook, "publish_page_post", lambda message, image_bytes: "fb_post_1")
+
+    # Complete one full cycle first so there's a terminal MarketingPost row to anchor the scan
+    # from — mirrors the real pipeline, where a manual request almost always follows a prior cycle.
+    _advance_to_pending_draft(client, monkeypatch)
+    client.post("/api/v1/admin/marketing/check-approvals", headers=CRON_HEADERS)
+
+    manual_text = "Header: Big News\nBody: We just hit 500 talent profiles!"
+    monkeypatch.setattr(discord_bot, "get_latest_human_reply", lambda channel_id, after_message_id: manual_text)
+    monkeypatch.setattr(discord_bot, "post_draft_for_approval", lambda content, image_bytes: "manual-draft-1")
+
+    # A completed cycle would normally rate-limit a fresh request_topic() ask — a manual,
+    # explicitly-worded post request should bypass that limit entirely.
+    resp = client.post("/api/v1/admin/marketing/generate-draft", headers=CRON_HEADERS)
+    body = resp.json()
+    assert body["created"] is True
+    assert body["post"]["status"] == "pending_approval"
+    assert body["post"]["topic"] == "Big News"
+    assert "We just hit 500 talent profiles!" in body["post"]["content"]
+
+
+def test_generate_draft_ignores_non_matching_manual_text_and_falls_back_to_rate_limit(client, monkeypatch):
+    _configure_cron_secret(monkeypatch)
+    _configure_discord(monkeypatch)
+    monkeypatch.setattr(settings, "FACEBOOK_PAGE_ID", "1269877089536606")
+    monkeypatch.setattr(settings, "FACEBOOK_PAGE_ACCESS_TOKEN", "fake-fb-token")
+    monkeypatch.setattr(discord_bot, "get_human_reaction", lambda channel_id, message_id: "approved")
+    monkeypatch.setattr(discord_bot, "notify_channel", lambda content: None)
+    monkeypatch.setattr(facebook, "publish_page_post", lambda message, image_bytes: "fb_post_2")
+
+    _advance_to_pending_draft(client, monkeypatch)
+    client.post("/api/v1/admin/marketing/check-approvals", headers=CRON_HEADERS)
+
+    # No Header:/Body: message waiting — check_manual_request should find nothing and fall
+    # through to the normal (rate-limited) request_topic() path, not silently skip the ask.
+    monkeypatch.setattr(discord_bot, "get_latest_human_reply", lambda channel_id, after_message_id: None)
+
+    resp = client.post("/api/v1/admin/marketing/generate-draft", headers=CRON_HEADERS)
+    body = resp.json()
+    assert body["created"] is False
+    assert "less than" in body["reason"]
+
+
 def test_content_templates_never_repeat_the_immediately_previous_topic(db_session, talent_profile):
     first_topic, _ = marketing_crud.generate_topic_and_content(db_session)
     post = MarketingPost(topic=first_topic, content="x", status=MarketingPostStatus.POSTED)
