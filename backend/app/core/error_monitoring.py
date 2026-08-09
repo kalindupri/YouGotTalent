@@ -1,6 +1,8 @@
 import logging
 import time
 
+from app.core import discord_bot
+from app.core.config import settings
 from app.core.discord import send_discord_message
 
 # Uncaught exceptions bubble up through Starlette's ServerErrorMiddleware and get logged by
@@ -41,7 +43,13 @@ class DiscordErrorHandler(logging.Handler):
             message = self.format(record)
             if len(message) > 1800:
                 message = message[:1800] + "\n… (truncated)"
-            send_discord_message(f"🔥 **Server error** (`{record.name}`)\n```{message}```")
+            alert = f"🔥 **Server error** (`{record.name}`)\n```{message}```"
+            # Error alerts go to their own Discord channel via the bot; falls back to the
+            # general webhook if that channel isn't configured (e.g. local dev without it set).
+            if settings.DISCORD_BOT_TOKEN and settings.DISCORD_ERROR_CHANNEL_ID:
+                discord_bot.post_to_channel(settings.DISCORD_ERROR_CHANNEL_ID, alert)
+            else:
+                send_discord_message(alert)
         except Exception:
             pass  # alerting must never be the thing that breaks request handling
 

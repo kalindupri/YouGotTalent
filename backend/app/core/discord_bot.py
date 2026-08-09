@@ -127,6 +127,25 @@ def _bot_user_id() -> str:
     return _cached_bot_user_id
 
 
+def post_to_channel(channel_id: str, content: str) -> None:
+    """Best-effort message post to an arbitrary channel via the bot — failures are logged, not
+    raised, since this is used for status notes and alerts, not flows with a required outcome.
+    Requires only DISCORD_BOT_TOKEN (not the marketing channel id), so it also works for
+    channels unrelated to the marketing pipeline, e.g. error alerts.
+    """
+    if not settings.DISCORD_BOT_TOKEN:
+        return
+    try:
+        httpx.post(
+            f"{DISCORD_API}/channels/{channel_id}/messages",
+            headers=_headers(),
+            json={"content": content},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        logger.exception("Failed to post message to Discord channel %s", channel_id)
+
+
 def notify_channel(content: str) -> None:
     """Best-effort status note to the marketing channel (e.g. 'posted to Facebook', 'draft
     generation failed') — failures here are logged, not raised, since this is a courtesy
@@ -134,12 +153,4 @@ def notify_channel(content: str) -> None:
     """
     if not is_configured():
         return
-    try:
-        httpx.post(
-            f"{DISCORD_API}/channels/{settings.DISCORD_MARKETING_CHANNEL_ID}/messages",
-            headers=_headers(),
-            json={"content": content},
-            timeout=10.0,
-        )
-    except httpx.HTTPError:
-        logger.exception("Failed to post marketing status update to Discord")
+    post_to_channel(settings.DISCORD_MARKETING_CHANNEL_ID, content)

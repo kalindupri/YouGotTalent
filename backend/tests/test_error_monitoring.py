@@ -3,6 +3,7 @@ import logging
 import pytest
 
 from app.core import error_monitoring as em
+from app.core.config import settings
 
 
 @pytest.fixture(autouse=True)
@@ -10,6 +11,16 @@ def _clear_alert_cache():
     em._last_alerted.clear()
     yield
     em._last_alerted.clear()
+
+
+@pytest.fixture(autouse=True)
+def _no_dedicated_error_channel_by_default(monkeypatch):
+    # Local/CI .env may have DISCORD_BOT_TOKEN and DISCORD_ERROR_CHANNEL_ID genuinely set (for
+    # the marketing pipeline / real error alerts) — without this, tests here would silently make
+    # live calls to Discord instead of testing the send_discord_message() fallback path. Tests
+    # that specifically want the bot path override these themselves.
+    monkeypatch.setattr(settings, "DISCORD_BOT_TOKEN", None)
+    monkeypatch.setattr(settings, "DISCORD_ERROR_CHANNEL_ID", None)
 
 
 def _attach_handler(logger_name: str) -> tuple[logging.Logger, em.DiscordErrorHandler]:
@@ -82,6 +93,25 @@ def test_unhandled_exception_traceback_is_included(monkeypatch):
 
     assert len(sent) == 1
     assert "ValueError: boom" in sent[0]
+    logger.removeHandler(handler)
+
+
+def test_error_posts_to_dedicated_channel_via_bot_when_configured(monkeypatch):
+    monkeypatch.setattr(settings, "DISCORD_BOT_TOKEN", "fake-token")
+    monkeypatch.setattr(settings, "DISCORD_ERROR_CHANNEL_ID", "999888777")
+
+    webhook_sent = []
+    bot_sent = []
+    monkeypatch.setattr(em, "send_discord_message", lambda msg: webhook_sent.append(msg))
+    monkeypatch.setattr(em.discord_bot, "post_to_channel", lambda channel_id, msg: bot_sent.append((channel_id, msg)))
+    logger, handler = _attach_handler("test.error_monitoring.dedicated_channel")
+
+    logger.error("Something broke")
+
+    assert webhook_sent == []
+    assert len(bot_sent) == 1
+    assert bot_sent[0][0] == "999888777"
+    assert "Something broke" in bot_sent[0][1]
     logger.removeHandler(handler)
 
 

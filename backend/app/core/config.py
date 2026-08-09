@@ -136,5 +136,10 @@ class Settings(BaseSettings):
     # so frequent polling doesn't re-ask the moment the previous cycle finishes.
     MARKETING_MIN_HOURS_BETWEEN_TOPICS: int = 20
 
+    # Backend crash/error alerts (see app/core/error_monitoring.py) post here via the same
+    # Discord bot used for marketing, not the webhook in DISCORD_WEBHOOK_URL — a separate
+    # channel from user-filed content reports, which still use that webhook.
+    DISCORD_ERROR_CHANNEL_ID: str | None = None
+
 
 settings = Settings()
