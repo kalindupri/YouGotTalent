@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.media import MediaType
 from app.models.talent_profile import TalentCategory
@@ -10,7 +10,10 @@ from app.schemas.credit import CreditRead
 
 class TalentProfileCreate(BaseModel):
     display_name: str
-    category: TalentCategory
+    # `category` (singular) is still accepted for backward compatibility with existing
+    # callers — it's folded into `categories` below if that's not given directly.
+    category: TalentCategory | None = None
+    categories: list[TalentCategory] | None = None
     bio: str | None = None
     city: str | None = None
     date_of_birth: date | None = None
@@ -27,10 +30,19 @@ class TalentProfileCreate(BaseModel):
     attributes: dict[str, str] | None = None
     job_alert_emails: bool = True
 
+    @model_validator(mode="after")
+    def _require_at_least_one_category(self) -> "TalentProfileCreate":
+        if not self.categories:
+            if self.category is None:
+                raise ValueError("category or categories is required")
+            self.categories = [self.category]
+        return self
+
 
 class TalentProfileUpdate(BaseModel):
     display_name: str | None = None
     category: TalentCategory | None = None
+    categories: list[TalentCategory] | None = Field(default=None, min_length=1)
     bio: str | None = None
     city: str | None = None
     date_of_birth: date | None = None
@@ -76,6 +88,7 @@ class TalentProfileRead(BaseModel):
     user_id: uuid.UUID
     display_name: str
     category: TalentCategory
+    categories: list[str]
     bio: str | None
     city: str | None
     date_of_birth: date | None

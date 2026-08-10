@@ -60,7 +60,7 @@ router = APIRouter(prefix="/talents", tags=["talents"])
 
 @router.get("", response_model=list[TalentProfileRead])
 def browse_talents(
-    category: TalentCategory | None = None,
+    categories: list[TalentCategory] | None = Query(default=None),
     city: str | None = None,
     q: str | None = None,
     experience_min: int | None = None,
@@ -72,7 +72,7 @@ def browse_talents(
     db: Session = Depends(get_db),
 ):
     return list_talent_profiles(
-        db, category, city, q, skip, limit, experience_min, experience_max, verified_only, instruments
+        db, categories, city, q, skip, limit, experience_min, experience_max, verified_only, instruments
     )
 
 

@@ -13,16 +13,20 @@ from app.crud.availability import (
     get_availability_window,
     list_availability_for_talent,
 )
+from app.crud.application import get_application
 from app.crud.booking import (
     create_booking,
     get_booking,
     has_overlapping_booking,
+    has_pending_offer_for_application,
     list_bookings_for_recruiter,
     list_bookings_for_talent,
     sign_agreement,
     slot_within_availability,
     update_booking_status,
 )
+from app.crud.casting_call import get_casting_call
+from app.crud.notification import create_notification
 from app.crud.review import create_review
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
@@ -86,15 +90,41 @@ def request_booking(
     if has_overlapping_booking(db, talent_id, booking_in):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That time overlaps an existing booking")
 
+    is_offer = booking_in.application_id is not None
+    if is_offer:
+        application = get_application(db, booking_in.application_id)
+        if application is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+        call = get_casting_call(db, application.casting_call_id)
+        if call is None or call.recruiter_id != recruiter.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your casting call")
+        if application.talent_id != talent_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This application doesn't belong to this talent")
+        if has_pending_offer_for_application(db, booking_in.application_id):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An offer is already pending for this application")
+
     booking = create_booking(db, talent_id, recruiter.id, booking_in)
 
-    background_tasks.add_task(
-        send_email,
-        talent.user.email,
-        f"{recruiter.company_name} requested to book a session with you",
-        f"{recruiter.company_name} requested a booking from {booking.start_at} to {booking.end_at}.\n\n"
-        f"Respond here: {settings.FRONTEND_URL}/dashboard",
-    )
+    if is_offer:
+        subject = f"{recruiter.company_name} sent you an offer for {call.title}"
+        email_body = (
+            f"{recruiter.company_name} sent you an offer for \"{call.title}\", proposing "
+            f"{booking.start_at} to {booking.end_at}.\n\n"
+            f"Review and respond here: {settings.FRONTEND_URL}/dashboard"
+        )
+        notification_body = f"Proposing {booking.start_at} to {booking.end_at} for \"{call.title}\"."
+        notification_type = "offer_sent"
+    else:
+        subject = f"{recruiter.company_name} requested to book a session with you"
+        email_body = (
+            f"{recruiter.company_name} requested a booking from {booking.start_at} to {booking.end_at}.\n\n"
+            f"Respond here: {settings.FRONTEND_URL}/dashboard"
+        )
+        notification_body = f"Requested from {booking.start_at} to {booking.end_at}."
+        notification_type = "booking_requested"
+
+    background_tasks.add_task(send_email, talent.user.email, subject, email_body)
+    create_notification(db, talent.user_id, notification_type, subject, notification_body, "/dashboard")
     return booking
 
 
@@ -135,6 +165,14 @@ def respond_to_booking(
         f"{talent.display_name} {status_in.status} your booking request for {updated.start_at}.\n\n"
         f"View it here: {settings.FRONTEND_URL}/dashboard",
     )
+    create_notification(
+        db,
+        updated.recruiter.user_id,
+        "booking_responded",
+        f"{talent.display_name} {status_in.status} your booking request",
+        f"For your requested session on {updated.start_at}.",
+        "/dashboard",
+    )
     return updated
 
 
@@ -156,6 +194,7 @@ def cancel_booking(
 def sign_booking_agreement(
     booking_id: uuid.UUID,
     agreement_in: BookingAgreementSign,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -172,7 +211,32 @@ def sign_booking_agreement(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No pending agreement to sign for this booking")
     if (party == "talent" and booking.talent_signed_at) or (party == "recruiter" and booking.recruiter_signed_at):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You've already signed this agreement")
-    return sign_agreement(db, booking, party, agreement_in.signature_name)
+
+    updated = sign_agreement(db, booking, party, agreement_in.signature_name)
+
+    # Fully signed AND this booking is an offer against a specific application — sign_agreement
+    # already flipped that Application to ACCEPTED; this is the acceptance notice for it,
+    # reusing the same copy pattern applications.py uses for its own status-change emails.
+    if updated.agreement_status == "signed" and updated.application_id is not None:
+        application = updated.application
+        call = application.casting_call if application else None
+        if application is not None and call is not None:
+            background_tasks.add_task(
+                send_email,
+                application.talent.user.email,
+                f"Your application for {call.title} was accepted",
+                f"Both parties have signed the contract for \"{call.title}\" — your application is now accepted.\n\n"
+                f"View it here: {settings.FRONTEND_URL}/casting-calls/{call.id}",
+            )
+            create_notification(
+                db,
+                application.talent.user_id,
+                "application_status_changed",
+                f"Your application for {call.title} was accepted",
+                "Both parties have signed the contract.",
+                f"/casting-calls/{call.id}",
+            )
+    return updated
 
 
 @router.post("/bookings/{booking_id}/reviews", response_model=ReviewRead, status_code=status.HTTP_201_CREATED)

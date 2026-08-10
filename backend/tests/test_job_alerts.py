@@ -93,6 +93,23 @@ def test_role_level_category_also_triggers_a_match(client, db_session, monkeypat
     assert "roleactor@example.com" in recipients
 
 
+def test_secondary_category_still_triggers_a_match(client, db_session, monkeypatch, recruiter_headers, recruiter_profile):
+    # A talent whose PRIMARY category is acting but who also does modeling as a secondary
+    # category must still be matched by a modeling-only casting call — this is the exact
+    # array-overlap behavior the multi-category migration must preserve.
+    recorder = RecordingSendEmail()
+    monkeypatch.setattr(casting_calls_routes, "send_email", recorder)
+
+    talent_token = register_and_verify(client, db_session, "multitalent@example.com", role="talent")
+    create_talent(client, auth_headers(talent_token), categories=["acting", "modeling"])
+
+    resp = post_casting_call(client, recruiter_headers, category="modeling")
+    assert resp.status_code == 201
+
+    recipients = [c["to"] for c in recorder.calls]
+    assert "multitalent@example.com" in recipients
+
+
 def test_multiple_matching_talents_all_emailed(client, db_session, monkeypatch, recruiter_headers, recruiter_profile):
     recorder = RecordingSendEmail()
     monkeypatch.setattr(casting_calls_routes, "send_email", recorder)

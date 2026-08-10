@@ -25,6 +25,13 @@ class Booking(Base):
     casting_call_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("casting_calls.id", ondelete="SET NULL"), nullable=True
     )
+    # Set when this booking IS the offer/contract for a specific job application (recruiter
+    # clicked "Send Offer" on an applicant) — nullable and SET NULL on delete so every
+    # standalone booking (made directly off a talent's availability, unrelated to any
+    # application) is completely unaffected.
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("applications.id", ondelete="SET NULL"), nullable=True
+    )
 
     start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -43,3 +50,4 @@ class Booking(Base):
     talent: Mapped["TalentProfile"] = relationship("TalentProfile")
     recruiter: Mapped["RecruiterProfile"] = relationship("RecruiterProfile")
     casting_call: Mapped["CastingCall | None"] = relationship("CastingCall")
+    application: Mapped["Application | None"] = relationship("Application")

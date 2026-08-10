@@ -153,7 +153,7 @@ def talent_headers(talent_token):
 def talent_profile(client, talent_headers):
     resp = client.post(
         "/api/v1/talents/me",
-        json={"display_name": "Fixture Talent", "category": "acting", "city": "Colombo"},
+        json={"display_name": "Fixture Talent", "categories": ["acting"], "city": "Colombo"},
         headers=talent_headers,
     )
     assert resp.status_code == 201, resp.text

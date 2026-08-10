@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.application import Application, ApplicationStatus
+from app.models.booking import Booking
 from app.schemas.application import ApplicationCreate
 
 
@@ -36,6 +37,28 @@ def _compute_match_score(application: Application) -> int:
     return min(score, 100)
 
 
+def _attach_pending_offer_status(db: Session, applications: list[Application]) -> None:
+    """A single batched query (not N+1 — a board can have 100s of applications) mapping each
+    application to "offer_sent" (a Booking-offer is awaiting the talent's accept/decline) or
+    "awaiting_signature" (accepted, waiting on one or both signatures). None once fully signed
+    (the Application itself is ACCEPTED by then) or if no offer was ever sent / it was declined.
+    """
+    ids = [a.id for a in applications]
+    if not ids:
+        return
+    bookings = (
+        db.query(Booking).filter(Booking.application_id.in_(ids), Booking.status.in_(["pending", "accepted"])).all()
+    )
+    status_by_application: dict[uuid.UUID, str] = {}
+    for booking in bookings:
+        if booking.status == "pending":
+            status_by_application[booking.application_id] = "offer_sent"
+        elif booking.status == "accepted" and booking.agreement_status != "signed":
+            status_by_application[booking.application_id] = "awaiting_signature"
+    for application in applications:
+        application.pending_offer_status = status_by_application.get(application.id)
+
+
 def list_applications_for_casting_call(db: Session, casting_call_id: uuid.UUID, *, score: bool = False) -> list[Application]:
     applications = db.query(Application).filter(Application.casting_call_id == casting_call_id).all()
     unseen = [a for a in applications if a.viewed_at is None]
@@ -47,8 +70,10 @@ def list_applications_for_casting_call(db: Session, casting_call_id: uuid.UUID, 
 
     for application in applications:
         application.match_score = _compute_match_score(application) if score else None
+        application.talent_display_name = application.talent.display_name
     if score:
         applications.sort(key=lambda a: a.match_score, reverse=True)
+    _attach_pending_offer_status(db, applications)
     return applications
 
 
@@ -56,6 +81,8 @@ def list_applications_for_talent(db: Session, talent_id: uuid.UUID) -> list[Appl
     applications = db.query(Application).filter(Application.talent_id == talent_id).all()
     for application in applications:
         application.match_score = None
+        application.talent_display_name = application.talent.display_name
+    _attach_pending_offer_status(db, applications)
     return applications
 
 
@@ -71,6 +98,8 @@ def create_application(db: Session, casting_call_id: uuid.UUID, talent_id: uuid.
     db.commit()
     db.refresh(application)
     application.match_score = None
+    application.pending_offer_status = None
+    application.talent_display_name = application.talent.display_name
     return application
 
 
@@ -79,4 +108,6 @@ def update_application_status(db: Session, application: Application, status: App
     db.commit()
     db.refresh(application)
     application.match_score = None
+    application.pending_offer_status = None
+    application.talent_display_name = application.talent.display_name
     return application

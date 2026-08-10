@@ -13,6 +13,7 @@ def _attach_summary_fields(booking: Booking) -> Booking:
     booking.talent_display_name = booking.talent.display_name
     booking.recruiter_company_name = booking.recruiter.company_name
     booking.casting_call_title = booking.casting_call.title if booking.casting_call else None
+    booking.application_role_title = booking.application.role.title if booking.application else None
     return booking
 
 
@@ -63,6 +64,7 @@ def create_booking(db: Session, talent_id: uuid.UUID, recruiter_id: uuid.UUID, b
         talent_id=talent_id,
         recruiter_id=recruiter_id,
         casting_call_id=booking_in.casting_call_id,
+        application_id=booking_in.application_id,
         start_at=booking_in.start_at,
         end_at=booking_in.end_at,
         message=booking_in.message,
@@ -71,6 +73,18 @@ def create_booking(db: Session, talent_id: uuid.UUID, recruiter_id: uuid.UUID, b
     db.commit()
     db.refresh(booking)
     return _attach_summary_fields(booking)
+
+
+def has_pending_offer_for_application(db: Session, application_id: uuid.UUID) -> bool:
+    """A prior offer that was declined/cancelled must free the application up for a new one —
+    only an in-flight (pending or accepted-but-unsigned) offer blocks sending another.
+    """
+    return (
+        db.query(Booking)
+        .filter(Booking.application_id == application_id, Booking.status.in_(["pending", "accepted"]))
+        .first()
+        is not None
+    )
 
 
 def update_booking_status(db: Session, booking: Booking, status: str) -> Booking:
@@ -83,6 +97,8 @@ def update_booking_status(db: Session, booking: Booking, status: str) -> Booking
 
 
 def sign_agreement(db: Session, booking: Booking, party: str, signature_name: str) -> Booking:
+    from app.models.application import Application, ApplicationStatus
+
     now = datetime.now(timezone.utc)
     if party == "talent":
         booking.talent_signature_name = signature_name
@@ -93,6 +109,13 @@ def sign_agreement(db: Session, booking: Booking, party: str, signature_name: st
 
     if booking.talent_signed_at and booking.recruiter_signed_at:
         booking.agreement_status = "signed"
+        # This booking IS an offer/contract for a specific application — only sign-off from
+        # both parties earns the Application its ACCEPTED status now (see api/routes/
+        # applications.py, which no longer allows setting ACCEPTED directly).
+        if booking.application_id is not None:
+            application = db.query(Application).filter(Application.id == booking.application_id).first()
+            if application is not None:
+                application.status = ApplicationStatus.ACCEPTED
 
     db.commit()
     db.refresh(booking)

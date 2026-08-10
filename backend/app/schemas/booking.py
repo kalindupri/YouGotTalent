@@ -9,6 +9,9 @@ class BookingCreate(BaseModel):
     end_at: datetime
     message: str | None = None
     casting_call_id: uuid.UUID | None = None
+    # Set when this booking IS an offer against a specific job application — see
+    # request_booking() in api/routes/bookings.py for the ownership/duplicate-offer validation.
+    application_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def check_time_order(self) -> "BookingCreate":
@@ -32,6 +35,7 @@ class BookingRead(BaseModel):
     talent_id: uuid.UUID
     recruiter_id: uuid.UUID
     casting_call_id: uuid.UUID | None
+    application_id: uuid.UUID | None
     start_at: datetime
     end_at: datetime
     message: str | None
@@ -45,3 +49,4 @@ class BookingRead(BaseModel):
     talent_display_name: str
     recruiter_company_name: str
     casting_call_title: str | None
+    application_role_title: str | None = None

@@ -20,7 +20,9 @@ from app.crud.application import (
     update_application_status,
 )
 from app.crud.casting_call import get_casting_call
+from app.crud.notification import create_notification
 from app.db.session import get_db
+from app.models.application import ApplicationStatus
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentProfile
 from app.schemas.application import ApplicationCreate, ApplicationRead, ApplicationStatusUpdate
@@ -60,6 +62,14 @@ def _create_application_and_notify(
         f"New application for {call.title}",
         f"{talent.display_name} just applied to your talent hunt \"{call.title}\".\n\n"
         f"Review it here: {settings.FRONTEND_URL}/dashboard/casting-calls/{call.id}",
+    )
+    create_notification(
+        db,
+        call.recruiter.user_id,
+        "application_received",
+        f"New application for {call.title}",
+        f"{talent.display_name} just applied to your talent hunt.",
+        f"/dashboard/casting-calls/{call.id}",
     )
     return application
 
@@ -160,6 +170,11 @@ def update_application(
     call = get_casting_call(db, application.casting_call_id)
     if call is None or call.recruiter_id != recruiter.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your casting call")
+    if status_in.status == ApplicationStatus.ACCEPTED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Applications can't be accepted directly — send an offer and have both parties sign the contract first.",
+        )
     updated = update_application_status(db, application, status_in.status)
 
     background_tasks.add_task(
@@ -168,5 +183,13 @@ def update_application(
         f"Your application for {call.title} was updated",
         f"Your application for \"{call.title}\" is now: {status_in.status.value}.\n\n"
         f"View it here: {settings.FRONTEND_URL}/casting-calls/{call.id}",
+    )
+    create_notification(
+        db,
+        application.talent.user_id,
+        "application_status_changed",
+        f"Your application for {call.title} was updated",
+        f"Your application is now: {status_in.status.value}.",
+        f"/casting-calls/{call.id}",
     )
     return updated

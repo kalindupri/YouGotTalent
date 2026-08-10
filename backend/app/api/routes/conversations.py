@@ -18,6 +18,7 @@ from app.crud.conversation import (
     mark_messages_read,
     unread_count,
 )
+from app.crud.notification import create_notification
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.conversation import Conversation
@@ -115,6 +116,7 @@ def send_message(
 
     is_from_talent = user.id == conversation.talent.user_id
     recipient_email = conversation.recruiter.user.email if is_from_talent else conversation.talent.user.email
+    recipient_user_id = conversation.recruiter.user_id if is_from_talent else conversation.talent.user_id
     sender_name = conversation.talent.display_name if is_from_talent else conversation.recruiter.company_name
     background_tasks.add_task(
         send_email,
@@ -122,5 +124,13 @@ def send_message(
         f"New message from {sender_name}",
         f"{sender_name} sent you a message on YouGotTalent:\n\n\"{message_in.body}\"\n\n"
         f"Reply here: {settings.FRONTEND_URL}/messages/{conversation_id}",
+    )
+    create_notification(
+        db,
+        recipient_user_id,
+        "new_message",
+        f"New message from {sender_name}",
+        message_in.body,
+        f"/messages/{conversation_id}",
     )
     return message

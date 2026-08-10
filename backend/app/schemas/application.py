@@ -29,3 +29,5 @@ class ApplicationRead(BaseModel):
     applied_at: datetime
     viewed_at: datetime | None
     match_score: int | None
+    pending_offer_status: str | None = None
+    talent_display_name: str

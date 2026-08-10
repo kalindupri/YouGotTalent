@@ -264,10 +264,39 @@ def test_browse_filters_by_category(client, talent_headers, db_session):
     token_b = register_and_verify(client, db_session, "actor@example.com", role="talent")
     create_profile(client, auth_headers(token_b), category="acting")
 
-    resp = client.get("/api/v1/talents", params={"category": "singing"})
+    resp = client.get("/api/v1/talents", params={"categories": ["singing"]})
     assert resp.status_code == 200
     categories = {t["category"] for t in resp.json()}
     assert categories == {"singing"}
+
+
+def test_create_profile_with_multiple_categories(client, talent_headers):
+    body = create_profile(client, talent_headers, categories=["singing", "acting", "script_writing"])
+    assert body["categories"] == ["singing", "acting", "script_writing"]
+    # The primary category (used everywhere a single scalar is still needed) is the first one.
+    assert body["category"] == "singing"
+
+
+def test_update_profile_categories_updates_primary_category(client, talent_headers):
+    create_profile(client, talent_headers, categories=["acting"])
+    resp = client.patch("/api/v1/talents/me", json={"categories": ["dancing", "choreography"]}, headers=talent_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["categories"] == ["dancing", "choreography"]
+    assert body["category"] == "dancing"
+
+
+def test_browse_filters_by_categories_returns_union(client, talent_headers, db_session):
+    create_profile(client, talent_headers, categories=["singing"])
+    token_b = register_and_verify(client, db_session, "actor2@example.com", role="talent")
+    create_profile(client, auth_headers(token_b), display_name="Actor", categories=["acting"])
+    token_c = register_and_verify(client, db_session, "dancer2@example.com", role="talent")
+    create_profile(client, auth_headers(token_c), display_name="Dancer", categories=["dancing"])
+
+    resp = client.get("/api/v1/talents", params={"categories": ["singing", "acting"]})
+    assert resp.status_code == 200
+    names = {t["display_name"] for t in resp.json()}
+    assert names == {"Test Talent", "Actor"}
 
 
 def test_browse_filters_by_city(client, talent_headers, db_session):

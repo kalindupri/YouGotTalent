@@ -20,7 +20,7 @@ def get_talent_profile_by_user(db: Session, user_id: uuid.UUID) -> TalentProfile
 
 def list_talent_profiles(
     db: Session,
-    category: TalentCategory | None,
+    categories: list[TalentCategory] | None,
     city: str | None,
     q: str | None,
     skip: int,
@@ -31,8 +31,10 @@ def list_talent_profiles(
     instruments: list[str] | None = None,
 ) -> list[TalentProfile]:
     query = db.query(TalentProfile)
-    if category:
-        query = query.filter(TalentProfile.category == category)
+    if categories:
+        # "Any of the selected categories" — same array-overlap pattern used for instruments
+        # below, so a talent who does both acting and singing is found by filtering on either.
+        query = query.filter(TalentProfile.categories.op("&&")(categories))
     if city:
         query = query.filter(TalentProfile.city.ilike(f"%{city}%"))
     if verified_only:
@@ -56,13 +58,14 @@ def list_talent_profiles(
         tokens = [t for t in q.strip().split() if t]
         if tokens:
             skills_as_text = func.array_to_string(TalentProfile.skills, ",")
+            categories_as_text = func.array_to_string(TalentProfile.categories, ",")
             match_conditions = []
             score_terms = []
             for token in tokens:
                 pattern = f"%{token}%"
                 name_match = TalentProfile.display_name.ilike(pattern)
                 skills_match = skills_as_text.ilike(pattern)
-                category_match = TalentProfile.category.ilike(pattern)
+                category_match = TalentProfile.category.ilike(pattern) | categories_as_text.ilike(pattern)
                 bio_match = TalentProfile.bio.ilike(pattern)
                 match_conditions.extend([name_match, skills_match, category_match, bio_match])
                 # Weight matches by field relevance: name and skills matter most for finding the right talent.
@@ -83,7 +86,7 @@ def list_talent_profiles_for_job_alert(db: Session, categories: set[str]) -> lis
         return []
     return (
         db.query(TalentProfile)
-        .filter(TalentProfile.category.in_(categories), TalentProfile.job_alert_emails.is_(True))
+        .filter(TalentProfile.categories.op("&&")(list(categories)), TalentProfile.job_alert_emails.is_(True))
         .all()
     )
 
@@ -114,14 +117,17 @@ def list_new_arrivals(db: Session, categories: set[str], hours: int = 48) -> lis
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     return (
         db.query(TalentProfile)
-        .filter(TalentProfile.category.in_(categories), TalentProfile.created_at >= cutoff)
+        .filter(TalentProfile.categories.op("&&")(list(categories)), TalentProfile.created_at >= cutoff)
         .order_by(TalentProfile.created_at.desc())
         .all()
     )
 
 
 def create_talent_profile(db: Session, user_id: uuid.UUID, profile_in: TalentProfileCreate) -> TalentProfile:
-    profile = TalentProfile(user_id=user_id, **profile_in.model_dump())
+    data = profile_in.model_dump()
+    categories = data.pop("categories")
+    data.pop("category", None)
+    profile = TalentProfile(user_id=user_id, category=categories[0], categories=categories, **data)
     db.add(profile)
     db.commit()
     db.refresh(profile)
@@ -129,7 +135,20 @@ def create_talent_profile(db: Session, user_id: uuid.UUID, profile_in: TalentPro
 
 
 def update_talent_profile(db: Session, profile: TalentProfile, profile_in: TalentProfileUpdate) -> TalentProfile:
-    for field, value in profile_in.model_dump(exclude_unset=True).items():
+    data = profile_in.model_dump(exclude_unset=True)
+    # `category` (the primary category) is derived from categories[0] so every other place
+    # that filters/matches on a single scalar category stays correct. `category` (singular)
+    # is still accepted as a legacy update path — mirrored into `categories` when it's the
+    # only one given.
+    legacy_category = data.pop("category", None)
+    categories = data.get("categories")
+    if categories:
+        profile.category = categories[0]
+    elif legacy_category is not None:
+        profile.category = legacy_category
+        profile.categories = [legacy_category]
+
+    for field, value in data.items():
         setattr(profile, field, value)
     db.commit()
     db.refresh(profile)

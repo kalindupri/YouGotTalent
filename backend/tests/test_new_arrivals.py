@@ -36,6 +36,23 @@ def test_premium_recruiter_sees_new_talent_in_their_posted_categories(
     assert categories == {"acting"}
 
 
+def test_new_arrival_matched_by_secondary_category(client, recruiter_headers, recruiter_profile, talent_headers):
+    # Primary category is acting, but painting is a secondary category — a painting-only
+    # casting call must still surface this talent in the new-arrivals feed.
+    client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
+    client.post(
+        "/api/v1/casting-calls",
+        json={"title": "Mural project", "description": "x", "category": "painting", "roles": [{"title": "Mural project"}]},
+        headers=recruiter_headers,
+    )
+    create_talent_profile(client, talent_headers, categories=["acting", "painting"])
+
+    resp = client.get("/api/v1/recruiters/me/new-arrivals", headers=recruiter_headers)
+    assert resp.status_code == 200
+    names = {t["display_name"] for t in resp.json()}
+    assert "New Arrival" in names
+
+
 def test_premium_recruiter_with_no_casting_calls_sees_no_arrivals(client, recruiter_headers, recruiter_profile, talent_headers):
     client.post("/api/v1/recruiters/me/upgrade", headers=recruiter_headers)
     create_talent_profile(client, talent_headers, category="acting")

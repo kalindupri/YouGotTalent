@@ -141,6 +141,25 @@ def test_recruiter_updates_application_status(client, talent_headers, recruiter_
     assert resp.json()["status"] == "shortlisted"
 
 
+def test_direct_patch_to_accepted_rejected(client, talent_headers, recruiter_headers, casting_call):
+    # "Accepted" is only reachable through the offer + both-parties-sign flow now — see
+    # test_bookings.py::test_both_parties_signing_offer_auto_accepts_the_application.
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    application = client.post(
+        f"/api/v1/casting-calls/{casting_call['id']}/applications", json={"role_id": role_id}, headers=talent_headers
+    ).json()
+
+    resp = client.patch(
+        f"/api/v1/applications/{application['id']}", json={"status": "accepted"}, headers=recruiter_headers
+    )
+    assert resp.status_code == 400
+    assert "offer" in resp.json()["detail"].lower()
+
+    unchanged = client.get(f"/api/v1/talents/me/applications", headers=talent_headers).json()
+    assert unchanged[0]["status"] == "pending"
+
+
 def test_non_owning_recruiter_cannot_update_status(client, talent_headers, casting_call, db_session):
     create_talent_profile(client, talent_headers)
     role_id = casting_call["roles"][0]["id"]
