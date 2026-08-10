@@ -5,18 +5,30 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class BookingCreate(BaseModel):
-    start_at: datetime
-    end_at: datetime
+    # Required for a standalone booking (application_id is None) — a real calendar slot.
+    # Optional for an offer (application_id set) — an offer is a hire/contract agreement,
+    # not a proposed time, so no date is collected for it.
+    start_at: datetime | None = None
+    end_at: datetime | None = None
     message: str | None = None
     casting_call_id: uuid.UUID | None = None
     # Set when this booking IS an offer against a specific job application — see
     # request_booking() in api/routes/bookings.py for the ownership/duplicate-offer validation.
     application_id: uuid.UUID | None = None
+    # Branded rich-text (HTML) contract drafted by the recruiter for an offer. Sanitized
+    # server-side before storage — see app/core/sanitize.py.
+    contract_content: str | None = None
 
     @model_validator(mode="after")
-    def check_time_order(self) -> "BookingCreate":
-        if self.end_at <= self.start_at:
-            raise ValueError("end_at must be after start_at")
+    def check_dates(self) -> "BookingCreate":
+        if self.application_id is None:
+            if self.start_at is None or self.end_at is None:
+                raise ValueError("start_at and end_at are required for a direct booking request")
+        if self.start_at is not None or self.end_at is not None:
+            if self.start_at is None or self.end_at is None:
+                raise ValueError("start_at and end_at must be provided together")
+            if self.end_at <= self.start_at:
+                raise ValueError("end_at must be after start_at")
         return self
 
 
@@ -36,9 +48,10 @@ class BookingRead(BaseModel):
     recruiter_id: uuid.UUID
     casting_call_id: uuid.UUID | None
     application_id: uuid.UUID | None
-    start_at: datetime
-    end_at: datetime
+    start_at: datetime | None
+    end_at: datetime | None
     message: str | None
+    contract_content: str | None
     status: str
     agreement_status: str
     talent_signature_name: str | None

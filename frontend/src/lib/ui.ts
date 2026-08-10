@@ -130,7 +130,9 @@ export const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 // Bookings are stored and compared as a shared, timezone-naive wall clock (matching the
 // timezone-naive availability windows they're validated against) — display must force UTC
 // so the viewer sees the exact time that was entered, not a shift based on their own timezone.
-export function formatBookingRange(startIso: string, endIso: string): string {
+// An offer-linked booking has no date at all (it's a contract, not a calendar slot).
+export function formatBookingRange(startIso: string | null, endIso: string | null): string {
+  if (!startIso || !endIso) return "";
   const start = new Date(startIso);
   const end = new Date(endIso);
   const startLabel = start.toLocaleString(undefined, {
@@ -143,6 +145,32 @@ export function formatBookingRange(startIso: string, endIso: string): string {
   });
   const endLabel = end.toLocaleTimeString(undefined, { timeZone: "UTC", hour: "numeric", minute: "2-digit" });
   return `${startLabel} – ${endLabel}`;
+}
+
+export function defaultContractTemplate({
+  companyName,
+  talentName,
+  roleTitle,
+}: {
+  companyName: string;
+  talentName: string;
+  roleTitle?: string;
+}): string {
+  const role = roleTitle ? `the role of <strong>${roleTitle}</strong>` : "the engagement described below";
+  return (
+    `<h3>1. Parties</h3>` +
+    `<p>This agreement is entered into between <strong>${companyName}</strong> ("Talent Hunt") and ` +
+    `<strong>${talentName}</strong> ("Talent") for ${role}.</p>` +
+    `<h3>2. Scope of Engagement</h3>` +
+    `<p>Describe the work, deliverables, and schedule here.</p>` +
+    `<h3>3. Compensation</h3>` +
+    `<p>State the agreed fee, payment schedule, and method here.</p>` +
+    `<h3>4. Term &amp; Termination</h3>` +
+    `<p>State the engagement period and how either party may end this agreement.</p>` +
+    `<h3>5. Confidentiality</h3>` +
+    `<p>Both parties agree to keep the terms of this engagement confidential unless otherwise agreed in writing.</p>` +
+    `<p>By signing below, both parties agree to the terms of this engagement.</p>`
+  );
 }
 
 export function formatTimeOfDay(time: string): string {

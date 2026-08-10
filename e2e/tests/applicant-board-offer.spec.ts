@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { createRecruiterProfile, createTalentProfile, login, logout, postCastingCall, registerAndVerify } from "../helpers/actions";
 import { uniqueEmail } from "../helpers/db";
 
-test("recruiter can message an applicant and send an offer from the board; both signing accepts the application", async ({ page }) => {
+test("recruiter can message an applicant and send a contract offer from the board; both signing accepts the application", async ({ page }) => {
   const recruiterEmail = uniqueEmail("board_recruiter");
   const recruiterPassword = "TestPass123!";
   await registerAndVerify(page, { email: recruiterEmail, fullName: "Board Recruiter", role: "recruiter", password: recruiterPassword });
@@ -16,12 +16,6 @@ test("recruiter can message an applicant and send an offer from the board; both 
   const talentPassword = "TestPass123!";
   await registerAndVerify(page, { email: talentEmail, fullName: "Board Talent", role: "talent", password: talentPassword });
   await createTalentProfile(page, { displayName: "Board Talent", category: "acting" });
-  // Availability must cover the offer's proposed time window.
-  await page.goto("/dashboard");
-  await page.getByRole("combobox", { name: "Day" }).selectOption("0");
-  await page.getByRole("textbox", { name: "Start time" }).fill("09:00");
-  await page.getByRole("textbox", { name: "End time" }).fill("17:00");
-  await page.getByRole("button", { name: "Add window" }).click();
 
   await page.goto("/casting-calls");
   await page.getByRole("link", { name: title }).click();
@@ -43,31 +37,32 @@ test("recruiter can message an applicant and send an offer from the board; both 
   await expect(page).toHaveURL(/\/messages\//);
   await page.goBack();
 
-  // Send an offer.
+  // Send offer opens a popup with a rich-text contract editor pre-filled with a branded
+  // template — no date/time is required.
   await page.getByRole("button", { name: "Send offer" }).click();
-  const nextMonday = new Date();
-  nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
-  const dateStr = nextMonday.toISOString().slice(0, 10);
-  await page.locator('input[type="datetime-local"]').first().fill(`${dateStr}T10:00`);
-  await page.locator('input[type="datetime-local"]').nth(1).fill(`${dateStr}T11:00`);
+  await expect(page.getByText("Draft contract offer for Board Talent")).toBeVisible();
+  await expect(page.locator('[contenteditable="true"]')).toContainText("Parties");
   await page.getByRole("button", { name: "Send offer", exact: true }).click();
   await expect(page.getByText("Offer sent — awaiting response")).toBeVisible();
   await logout(page);
 
-  // Talent accepts the booking and signs.
+  // Talent accepts the booking, then views the branded agreement and signs it.
   await login(page, talentEmail, talentPassword);
-  await expect(page.getByText("Board Studios", { exact: true })).toBeVisible();
+  await expect(page.getByText("Contract offer")).toBeVisible();
   await page.getByRole("button", { name: "Accept" }).click();
+  await page.getByRole("button", { name: "View & sign agreement" }).click();
+  await expect(page.getByText("Talent Engagement Agreement")).toBeVisible();
   await page.getByLabel("Type your full name to sign").fill("Board Talent");
-  await page.getByRole("button", { name: "Sign agreement" }).click();
+  await page.getByRole("button", { name: "Sign agreement", exact: true }).click();
   await expect(page.getByText(/signed/i).first()).toBeVisible();
   await logout(page);
 
   // Recruiter signs too — application should now be Accepted.
   await login(page, recruiterEmail, recruiterPassword);
   await page.goto("/dashboard");
+  await page.getByRole("button", { name: "View & sign agreement" }).click();
   await page.getByLabel("Type your full name to sign").fill("Board Recruiter");
-  await page.getByRole("button", { name: "Sign agreement" }).click();
+  await page.getByRole("button", { name: "Sign agreement", exact: true }).click();
 
   await page.getByRole("link", { name: "Manage" }).click();
   await expect(page.getByText("Accepted · 1")).toBeVisible();

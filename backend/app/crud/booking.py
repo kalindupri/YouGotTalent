@@ -23,12 +23,22 @@ def get_booking(db: Session, booking_id: uuid.UUID) -> Booking | None:
 
 
 def list_bookings_for_talent(db: Session, talent_id: uuid.UUID) -> list[Booking]:
-    bookings = db.query(Booking).filter(Booking.talent_id == talent_id).order_by(Booking.start_at.asc()).all()
+    bookings = (
+        db.query(Booking)
+        .filter(Booking.talent_id == talent_id)
+        .order_by(Booking.start_at.asc(), Booking.created_at.desc())
+        .all()
+    )
     return [_attach_summary_fields(b) for b in bookings]
 
 
 def list_bookings_for_recruiter(db: Session, recruiter_id: uuid.UUID) -> list[Booking]:
-    bookings = db.query(Booking).filter(Booking.recruiter_id == recruiter_id).order_by(Booking.start_at.asc()).all()
+    bookings = (
+        db.query(Booking)
+        .filter(Booking.recruiter_id == recruiter_id)
+        .order_by(Booking.start_at.asc(), Booking.created_at.desc())
+        .all()
+    )
     return [_attach_summary_fields(b) for b in bookings]
 
 
@@ -68,6 +78,7 @@ def create_booking(db: Session, talent_id: uuid.UUID, recruiter_id: uuid.UUID, b
         start_at=booking_in.start_at,
         end_at=booking_in.end_at,
         message=booking_in.message,
+        contract_content=booking_in.contract_content,
     )
     db.add(booking)
     db.commit()

@@ -55,7 +55,11 @@ def get_monthly_calendar(db: Session, talent_id: uuid.UUID, month: str) -> list[
     bookings = [
         b
         for b in list_bookings_for_talent(db, talent_id)
-        if b.status in ("pending", "accepted") and b.start_at.date() <= month_end and b.end_at.date() >= month_start
+        if b.status in ("pending", "accepted")
+        and b.start_at is not None
+        and b.end_at is not None
+        and b.start_at.date() <= month_end
+        and b.end_at.date() >= month_start
     ]
     entries = [
         e
@@ -95,7 +99,7 @@ def _to_datetime(d: date) -> datetime:
 def get_busy_dates(db: Session, talent_id: uuid.UUID) -> list[BusyRange]:
     bookings = (
         db.query(Booking)
-        .filter(Booking.talent_id == talent_id, Booking.status == "accepted")
+        .filter(Booking.talent_id == talent_id, Booking.status == "accepted", Booking.start_at.isnot(None))
         .all()
     )
     entries = list_calendar_entries(db, talent_id)

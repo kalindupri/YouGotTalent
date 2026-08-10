@@ -376,7 +376,15 @@ export default function RecruiterDashboard() {
                   <div>
                     <p className="font-semibold text-zinc-900 dark:text-zinc-50">{b.talent_display_name}</p>
                     {b.casting_call_title && <p className="text-xs text-zinc-500">{b.casting_call_title}</p>}
-                    <p className="mt-1 text-zinc-600 dark:text-zinc-400">{formatBookingRange(b.start_at, b.end_at)}</p>
+                    {b.start_at && b.end_at ? (
+                      <p className="mt-1 text-zinc-600 dark:text-zinc-400">{formatBookingRange(b.start_at, b.end_at)}</p>
+                    ) : (
+                      b.application_id && (
+                        <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                          Contract offer{b.application_role_title ? ` — ${b.application_role_title}` : ""}
+                        </p>
+                      )
+                    )}
                   </div>
                   <span className={badgeClass(bookingStatusTone(b.status))}>{b.status}</span>
                 </div>

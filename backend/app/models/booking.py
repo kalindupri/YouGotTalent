@@ -33,9 +33,15 @@ class Booking(Base):
         UUID(as_uuid=True), ForeignKey("applications.id", ondelete="SET NULL"), nullable=True
     )
 
-    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Nullable because an offer (application_id set) is a hire/contract agreement, not a
+    # calendar slot — the recruiter drafts contract_content instead of proposing a time.
+    # Only a standalone booking (application_id is None) is required to carry both.
+    start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Branded, rich-text (sanitized HTML) contract drafted by the recruiter when sending an
+    # offer — rendered as a Word-like document for both parties to review before signing.
+    contract_content: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pending")
     agreement_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="not_required")

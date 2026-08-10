@@ -296,9 +296,10 @@ export interface Booking {
   talent_id: string;
   recruiter_id: string;
   casting_call_id: string | null;
-  start_at: string;
-  end_at: string;
+  start_at: string | null;
+  end_at: string | null;
   message: string | null;
+  contract_content: string | null;
   status: BookingStatus;
   agreement_status: AgreementStatus;
   talent_signature_name: string | null;
@@ -1146,7 +1147,14 @@ export const api = {
 
   requestBooking: (
     talentId: string,
-    data: { start_at: string; end_at: string; message?: string; casting_call_id?: string; application_id?: string },
+    data: {
+      start_at?: string;
+      end_at?: string;
+      message?: string;
+      casting_call_id?: string;
+      application_id?: string;
+      contract_content?: string;
+    },
     token: string
   ) => request<Booking>(`/talents/${talentId}/bookings`, { method: "POST", body: JSON.stringify(data) }, token),
   listMyBookingsAsTalent: (token: string) => request<Booking[]>("/talents/me/bookings", {}, token),

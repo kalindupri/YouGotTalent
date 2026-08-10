@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_recruiter_profile, get_current_talent_profile, get_current_user
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.sanitize import sanitize_contract_html
 from app.crud.availability import (
     create_availability_window,
     delete_availability_window,
@@ -85,10 +86,6 @@ def request_booking(
     talent = get_talent_profile(db, talent_id)
     if talent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
-    if not slot_within_availability(db, talent_id, booking_in):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That time is outside this talent's availability")
-    if has_overlapping_booking(db, talent_id, booking_in):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That time overlaps an existing booking")
 
     is_offer = booking_in.application_id is not None
     if is_offer:
@@ -102,17 +99,25 @@ def request_booking(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This application doesn't belong to this talent")
         if has_pending_offer_for_application(db, booking_in.application_id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An offer is already pending for this application")
+        if booking_in.contract_content:
+            booking_in.contract_content = sanitize_contract_html(booking_in.contract_content)
+    else:
+        # An offer is a hire/contract agreement, not a calendar slot — only a standalone
+        # booking request needs to fit the talent's declared availability.
+        if not slot_within_availability(db, talent_id, booking_in):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That time is outside this talent's availability")
+        if has_overlapping_booking(db, talent_id, booking_in):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That time overlaps an existing booking")
 
     booking = create_booking(db, talent_id, recruiter.id, booking_in)
 
     if is_offer:
-        subject = f"{recruiter.company_name} sent you an offer for {call.title}"
+        subject = f"{recruiter.company_name} sent you a contract offer for {call.title}"
         email_body = (
-            f"{recruiter.company_name} sent you an offer for \"{call.title}\", proposing "
-            f"{booking.start_at} to {booking.end_at}.\n\n"
-            f"Review and respond here: {settings.FRONTEND_URL}/dashboard"
+            f"{recruiter.company_name} sent you a contract offer for \"{call.title}\".\n\n"
+            f"Review and sign it here: {settings.FRONTEND_URL}/dashboard"
         )
-        notification_body = f"Proposing {booking.start_at} to {booking.end_at} for \"{call.title}\"."
+        notification_body = f"Review the contract for \"{call.title}\" and sign to accept."
         notification_type = "offer_sent"
     else:
         subject = f"{recruiter.company_name} requested to book a session with you"
@@ -158,19 +163,22 @@ def respond_to_booking(
 
     updated = update_booking_status(db, booking, status_in.status)
 
+    is_offer = updated.application_id is not None
+    thing = "contract offer" if is_offer else "booking request"
+    detail = "" if is_offer else f" for {updated.start_at}"
     background_tasks.add_task(
         send_email,
         updated.recruiter.user.email,
-        f"{talent.display_name} {status_in.status} your booking request",
-        f"{talent.display_name} {status_in.status} your booking request for {updated.start_at}.\n\n"
+        f"{talent.display_name} {status_in.status} your {thing}",
+        f"{talent.display_name} {status_in.status} your {thing}{detail}.\n\n"
         f"View it here: {settings.FRONTEND_URL}/dashboard",
     )
     create_notification(
         db,
         updated.recruiter.user_id,
         "booking_responded",
-        f"{talent.display_name} {status_in.status} your booking request",
-        f"For your requested session on {updated.start_at}.",
+        f"{talent.display_name} {status_in.status} your {thing}",
+        f"For your {thing}{detail}.",
         "/dashboard",
     )
     return updated

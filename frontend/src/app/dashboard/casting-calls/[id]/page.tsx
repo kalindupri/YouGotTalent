@@ -44,6 +44,7 @@ export default function ManageCastingCallPage() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [companyName, setCompanyName] = useState("");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "match_score">("newest");
 
@@ -55,7 +56,13 @@ export default function ManageCastingCallPage() {
       .then(setApplications)
       .catch(() => setError("Could not load applications for this casting call."));
     api.listInvitationsForCastingCall(params.id, token).then(setInvitations).catch(() => {});
-    api.getMyRecruiterProfile(token).then((p) => setIsPremium(p.tier === "premium")).catch(() => {});
+    api
+      .getMyRecruiterProfile(token)
+      .then((p) => {
+        setIsPremium(p.tier === "premium");
+        setCompanyName(p.company_name);
+      })
+      .catch(() => {});
   }, [params.id, token]);
 
   async function handleStatusChange(applicationId: string, status: ApplicationStatus) {
@@ -181,6 +188,7 @@ export default function ManageCastingCallPage() {
                         key={a.id}
                         application={a}
                         roleTitle={call?.roles.find((r) => r.id === a.role_id)?.title}
+                        companyName={companyName}
                         updating={updatingId === a.id}
                         token={token!}
                         onMove={(status) => handleStatusChange(a.id, status)}
@@ -225,6 +233,7 @@ export default function ManageCastingCallPage() {
 function ApplicationCard({
   application,
   roleTitle,
+  companyName,
   updating,
   token,
   onMove,
@@ -232,6 +241,7 @@ function ApplicationCard({
 }: {
   application: Application;
   roleTitle?: string;
+  companyName: string;
   updating: boolean;
   token: string;
   onMove: (status: ApplicationStatus) => void;
@@ -305,6 +315,9 @@ function ApplicationCard({
         <SendOfferForm
           talentId={application.talent_id}
           applicationId={application.id}
+          talentDisplayName={application.talent_display_name}
+          companyName={companyName}
+          roleTitle={roleTitle}
           token={token}
           onCancel={() => setOffering(false)}
           onSent={() => {

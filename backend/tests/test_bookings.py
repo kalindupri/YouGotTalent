@@ -336,15 +336,14 @@ def _apply_to_casting_call(client, talent_headers, casting_call):
 def test_send_offer_creates_booking_linked_to_application(
     client, talent_headers, talent_profile, recruiter_headers, recruiter_profile, casting_call
 ):
+    # No availability window is set for the talent at all — an offer is a hire/contract
+    # agreement, not a calendar slot, so it must succeed regardless.
     application = _apply_to_casting_call(client, talent_headers, casting_call)
-    set_monday_9_to_5(client, talent_headers)
-    start = next_weekday_at(0, 10)
     resp = client.post(
         f"/api/v1/talents/{talent_profile['id']}/bookings",
         json={
-            "start_at": start.isoformat(),
-            "end_at": (start + timedelta(hours=1)).isoformat(),
             "application_id": application["id"],
+            "contract_content": "<h2>Terms</h2><p>Standard <strong>engagement</strong> terms apply.</p>",
         },
         headers=recruiter_headers,
     )
@@ -352,26 +351,42 @@ def test_send_offer_creates_booking_linked_to_application(
     body = resp.json()
     assert body["application_id"] == application["id"]
     assert body["application_role_title"] == casting_call["roles"][0]["title"]
+    assert body["start_at"] is None
+    assert body["end_at"] is None
+    assert "<strong>engagement</strong>" in body["contract_content"]
+
+
+def test_offer_contract_content_is_sanitized(
+    client, talent_headers, talent_profile, recruiter_headers, recruiter_profile, casting_call
+):
+    application = _apply_to_casting_call(client, talent_headers, casting_call)
+    resp = client.post(
+        f"/api/v1/talents/{talent_profile['id']}/bookings",
+        json={
+            "application_id": application["id"],
+            "contract_content": "<p>Hello</p><script>alert('xss')</script><img src=x onerror=alert(1)>",
+        },
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    contract_content = resp.json()["contract_content"]
+    assert "<script>" not in contract_content
+    assert "onerror" not in contract_content
+    assert "<p>Hello</p>" in contract_content
 
 
 def test_send_offer_for_someone_elses_casting_call_rejected(
     client, db_session, talent_headers, talent_profile, recruiter_headers, recruiter_profile, casting_call
 ):
     application = _apply_to_casting_call(client, talent_headers, casting_call)
-    set_monday_9_to_5(client, talent_headers)
 
     other_token = register_and_verify(client, db_session, "other_recruiter_offer@example.com", role="recruiter")
     other_headers = auth_headers(other_token)
     client.post("/api/v1/recruiters/me", json={"company_name": "Other Co"}, headers=other_headers)
 
-    start = next_weekday_at(0, 10)
     resp = client.post(
         f"/api/v1/talents/{talent_profile['id']}/bookings",
-        json={
-            "start_at": start.isoformat(),
-            "end_at": (start + timedelta(hours=1)).isoformat(),
-            "application_id": application["id"],
-        },
+        json={"application_id": application["id"]},
         headers=other_headers,
     )
     assert resp.status_code == 403
@@ -381,26 +396,14 @@ def test_duplicate_pending_offer_rejected(
     client, talent_headers, talent_profile, recruiter_headers, recruiter_profile, casting_call
 ):
     application = _apply_to_casting_call(client, talent_headers, casting_call)
-    set_monday_9_to_5(client, talent_headers)
-    start = next_weekday_at(0, 10)
-    payload = {
-        "start_at": start.isoformat(),
-        "end_at": (start + timedelta(hours=1)).isoformat(),
-        "application_id": application["id"],
-    }
+    payload = {"application_id": application["id"]}
     first = client.post(f"/api/v1/talents/{talent_profile['id']}/bookings", json=payload, headers=recruiter_headers)
     assert first.status_code == 201
 
-    # A different (non-overlapping) proposed time, same application — still rejected because
-    # the first offer is still pending, not because the time slot conflicts.
-    second_start = start + timedelta(hours=3)
+    # A second offer for the same still-pending application is rejected regardless of content.
     resp = client.post(
         f"/api/v1/talents/{talent_profile['id']}/bookings",
-        json={
-            "start_at": second_start.isoformat(),
-            "end_at": (second_start + timedelta(hours=1)).isoformat(),
-            "application_id": application["id"],
-        },
+        json={"application_id": application["id"]},
         headers=recruiter_headers,
     )
     assert resp.status_code == 400
@@ -411,27 +414,16 @@ def test_declined_offer_frees_application_for_a_new_offer(
     client, talent_headers, talent_profile, recruiter_headers, recruiter_profile, casting_call
 ):
     application = _apply_to_casting_call(client, talent_headers, casting_call)
-    set_monday_9_to_5(client, talent_headers)
-    start = next_weekday_at(0, 10)
     first = client.post(
         f"/api/v1/talents/{talent_profile['id']}/bookings",
-        json={
-            "start_at": start.isoformat(),
-            "end_at": (start + timedelta(hours=1)).isoformat(),
-            "application_id": application["id"],
-        },
+        json={"application_id": application["id"]},
         headers=recruiter_headers,
     ).json()
     client.patch(f"/api/v1/bookings/{first['id']}/respond", json={"status": "declined"}, headers=talent_headers)
 
-    second_start = start + timedelta(hours=3)
     resp = client.post(
         f"/api/v1/talents/{talent_profile['id']}/bookings",
-        json={
-            "start_at": second_start.isoformat(),
-            "end_at": (second_start + timedelta(hours=1)).isoformat(),
-            "application_id": application["id"],
-        },
+        json={"application_id": application["id"]},
         headers=recruiter_headers,
     )
     assert resp.status_code == 201, resp.text
@@ -441,15 +433,9 @@ def test_both_parties_signing_offer_auto_accepts_the_application(
     client, db_session, talent_headers, talent_profile, recruiter_headers, recruiter_profile, casting_call
 ):
     application = _apply_to_casting_call(client, talent_headers, casting_call)
-    set_monday_9_to_5(client, talent_headers)
-    start = next_weekday_at(0, 10)
     booking = client.post(
         f"/api/v1/talents/{talent_profile['id']}/bookings",
-        json={
-            "start_at": start.isoformat(),
-            "end_at": (start + timedelta(hours=1)).isoformat(),
-            "application_id": application["id"],
-        },
+        json={"application_id": application["id"]},
         headers=recruiter_headers,
     ).json()
 
@@ -497,3 +483,15 @@ def test_booking_unknown_talent_404(client, recruiter_headers, recruiter_profile
         headers=recruiter_headers,
     )
     assert resp.status_code == 404
+
+
+def test_standalone_booking_still_requires_start_and_end_at(
+    client, talent_headers, talent_profile, recruiter_headers, recruiter_profile
+):
+    set_monday_9_to_5(client, talent_headers)
+    resp = client.post(
+        f"/api/v1/talents/{talent_profile['id']}/bookings",
+        json={"message": "No dates given"},
+        headers=recruiter_headers,
+    )
+    assert resp.status_code == 422
