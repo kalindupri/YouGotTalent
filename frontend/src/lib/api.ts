@@ -111,6 +111,7 @@ export interface TalentProfile {
   user_id: string;
   display_name: string;
   category: TalentCategory;
+  categories: TalentCategory[];
   bio: string | null;
   city: string | null;
   date_of_birth: string | null;
@@ -136,7 +137,7 @@ export interface TalentProfile {
 
 export interface TalentProfileInput {
   display_name: string;
-  category: TalentCategory;
+  categories: TalentCategory[];
   bio?: string | null;
   city?: string | null;
   date_of_birth?: string | null;
@@ -229,6 +230,8 @@ export interface Application {
   applied_at: string;
   viewed_at: string | null;
   match_score: number | null;
+  pending_offer_status: "offer_sent" | "awaiting_signature" | null;
+  talent_display_name: string;
 }
 
 export interface ProfileViewer {
@@ -306,6 +309,8 @@ export interface Booking {
   talent_display_name: string;
   recruiter_company_name: string;
   casting_call_title: string | null;
+  application_id: string | null;
+  application_role_title: string | null;
 }
 
 export interface LibraryItem {
@@ -701,6 +706,20 @@ export interface Message {
   created_at: string;
 }
 
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link_url: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface UnreadCount {
+  count: number;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -788,7 +807,7 @@ export const api = {
 
   listTalents: (
     params: {
-      category?: TalentCategory;
+      categories?: TalentCategory[];
       city?: string;
       q?: string;
       experience_min?: number;
@@ -798,7 +817,7 @@ export const api = {
     } = {}
   ) => {
     const qs = new URLSearchParams();
-    if (params.category) qs.set("category", params.category);
+    (params.categories ?? []).forEach((c) => qs.append("categories", c));
     if (params.city) qs.set("city", params.city);
     if (params.q) qs.set("q", params.q);
     if (params.experience_min !== undefined) qs.set("experience_min", String(params.experience_min));
@@ -1127,7 +1146,7 @@ export const api = {
 
   requestBooking: (
     talentId: string,
-    data: { start_at: string; end_at: string; message?: string; casting_call_id?: string },
+    data: { start_at: string; end_at: string; message?: string; casting_call_id?: string; application_id?: string },
     token: string
   ) => request<Booking>(`/talents/${talentId}/bookings`, { method: "POST", body: JSON.stringify(data) }, token),
   listMyBookingsAsTalent: (token: string) => request<Booking[]>("/talents/me/bookings", {}, token),
@@ -1177,6 +1196,12 @@ export const api = {
       { method: "POST", body: JSON.stringify({ body }) },
       token
     ),
+
+  listNotifications: (token: string) => request<Notification[]>("/notifications", {}, token),
+  unreadNotificationCount: (token: string) => request<UnreadCount>("/notifications/unread-count", {}, token),
+  markNotificationRead: (notificationId: string, token: string) =>
+    request<Notification>(`/notifications/${notificationId}/read`, { method: "PATCH" }, token),
+  markAllNotificationsRead: (token: string) => request<void>("/notifications/read-all", { method: "PATCH" }, token),
 
   adminGetStats: (token: string) => request<AdminStats>("/admin/stats", {}, token),
   adminGetFinancialOverview: (token: string) => request<FinancialOverview>("/admin/financial-overview", {}, token),

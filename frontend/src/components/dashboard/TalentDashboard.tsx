@@ -300,22 +300,30 @@ export default function TalentDashboard() {
 
 function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p: TalentProfile) => void }) {
   const [displayName, setDisplayName] = useState("");
-  const [category, setCategory] = useState<TalentCategory>("acting");
+  const [categories, setCategories] = useState<TalentCategory[]>(["acting"]);
   const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
   const [skillsInput, setSkillsInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  function toggleCategory(c: TalentCategory) {
+    setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (categories.length === 0) {
+      setError("Select at least one category.");
+      return;
+    }
     setSubmitting(true);
     try {
       const profile = await api.createMyTalentProfile(
         {
           display_name: displayName,
-          category,
+          categories,
           city: city || null,
           bio: bio || null,
           date_of_birth: null,
@@ -343,22 +351,23 @@ function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p:
           Display name
           <input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} />
         </label>
-        <label className={labelClass}>
-          Category
-          <select value={category} onChange={(e) => setCategory(e.target.value as TalentCategory)} className={inputClass}>
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className={labelClass}>Categories — pick all that apply</legend>
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {TALENT_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
+              <label key={c} className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
+                <input type="checkbox" checked={categories.includes(c)} onChange={() => toggleCategory(c)} />
                 {formatCategory(c)}
-              </option>
+              </label>
             ))}
-          </select>
-        </label>
+          </div>
+        </fieldset>
         <label className={labelClass}>
-          {skillsQuestion(category).label} (comma separated)
+          {skillsQuestion(categories[0] ?? "acting").label} (comma separated)
           <input
             value={skillsInput}
             onChange={(e) => setSkillsInput(e.target.value)}
-            placeholder={skillsQuestion(category).placeholder}
+            placeholder={skillsQuestion(categories[0] ?? "acting").placeholder}
             className={inputClass}
           />
         </label>
@@ -392,6 +401,9 @@ function ProfileSummary({
   const [bio, setBio] = useState(profile.bio ?? "");
   const [city, setCity] = useState(profile.city ?? "");
   const [skillsInput, setSkillsInput] = useState((profile.skills ?? []).join(", "));
+  const [categories, setCategories] = useState<TalentCategory[]>(
+    profile.categories?.length ? profile.categories : [profile.category]
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -426,7 +438,11 @@ function ProfileSummary({
               )}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className={categoryBadgeClass(profile.category)}>{formatCategory(profile.category)}</span>
+              {(profile.categories?.length ? profile.categories : [profile.category]).map((c) => (
+                <span key={c} className={categoryBadgeClass(c)}>
+                  {formatCategory(c)}
+                </span>
+              ))}
               {profile.city && <span className="text-xs text-zinc-500">{profile.city}</span>}
             </div>
           </div>
@@ -473,9 +489,11 @@ function ProfileSummary({
           bio={bio}
           city={city}
           skillsInput={skillsInput}
+          categories={categories}
           setBio={setBio}
           setCity={setCity}
           setSkillsInput={setSkillsInput}
+          setCategories={setCategories}
           onSaved={(p) => {
             onUpdated(p);
             setEditing(false);
@@ -496,9 +514,11 @@ function EditProfileForm({
   bio,
   city,
   skillsInput,
+  categories,
   setBio,
   setCity,
   setSkillsInput,
+  setCategories,
   onSaved,
   error,
   setError,
@@ -510,22 +530,32 @@ function EditProfileForm({
   bio: string;
   city: string;
   skillsInput: string;
+  categories: TalentCategory[];
   setBio: (v: string) => void;
   setCity: (v: string) => void;
   setSkillsInput: (v: string) => void;
+  setCategories: (v: TalentCategory[]) => void;
   onSaved: (p: TalentProfile) => void;
   error: string | null;
   setError: (v: string | null) => void;
   submitting: boolean;
   setSubmitting: (v: boolean) => void;
 }) {
+  function toggleCategory(c: TalentCategory) {
+    setCategories(categories.includes(c) ? categories.filter((x) => x !== c) : [...categories, c]);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (categories.length === 0) {
+      setError("Select at least one category.");
+      return;
+    }
     setSubmitting(true);
     try {
       const updated = await api.updateMyTalentProfile(
-        { bio: bio || null, city: city || null, skills: parseSkills(skillsInput) },
+        { bio: bio || null, city: city || null, skills: parseSkills(skillsInput), categories },
         token
       );
       onSaved({ ...updated, media: profile.media });
@@ -538,16 +568,27 @@ function EditProfileForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-5 flex max-w-md flex-col gap-4 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className={labelClass}>Categories — pick all that apply</legend>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {TALENT_CATEGORIES.map((c) => (
+            <label key={c} className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
+              <input type="checkbox" checked={categories.includes(c)} onChange={() => toggleCategory(c)} />
+              {formatCategory(c)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <label className={labelClass}>
         City
         <input value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} />
       </label>
       <label className={labelClass}>
-        {skillsQuestion(profile.category).label} (comma separated)
+        {skillsQuestion(categories[0] ?? profile.category).label} (comma separated)
         <input
           value={skillsInput}
           onChange={(e) => setSkillsInput(e.target.value)}
-          placeholder={skillsQuestion(profile.category).placeholder}
+          placeholder={skillsQuestion(categories[0] ?? profile.category).placeholder}
           className={inputClass}
         />
       </label>

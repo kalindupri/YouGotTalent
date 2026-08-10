@@ -14,8 +14,9 @@ import {
   api,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { badgeClass, btnPrimary, btnSecondary, eyebrowClass, formatCategory, inputClass, invitationStatusTone, labelClass } from "@/lib/ui";
+import { badgeClass, btnPrimary, btnSecondary, btnSmall, eyebrowClass, formatCategory, inputClass, invitationStatusTone, labelClass } from "@/lib/ui";
 import SubmissionPreview from "@/components/SubmissionPreview";
+import SendOfferForm from "@/components/SendOfferForm";
 
 function parseTags(raw: string): string[] {
   return raw
@@ -43,6 +44,8 @@ export default function ManageCastingCallPage() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "match_score">("newest");
 
   useEffect(() => {
     if (!token) return;
@@ -67,6 +70,15 @@ export default function ManageCastingCallPage() {
       setUpdatingId(null);
     }
   }
+
+  const visibleApplications = applications
+    .filter((a) => a.talent_display_name.toLowerCase().includes(search.trim().toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      if (sortBy === "match_score") return (b.match_score ?? -1) - (a.match_score ?? -1);
+      const diff = new Date(a.applied_at).getTime() - new Date(b.applied_at).getTime();
+      return sortBy === "newest" ? -diff : diff;
+    });
 
   async function handleDeleteCall() {
     if (!token || !call) return;
@@ -138,37 +150,54 @@ export default function ManageCastingCallPage() {
           <p className="text-sm text-zinc-500">No applications yet.</p>
         </div>
       ) : (
-        <div className="mt-8 grid grid-cols-1 gap-4 overflow-x-auto sm:grid-cols-2 lg:grid-cols-4">
-          {COLUMNS.map((column) => {
-            const columnApplications = applications.filter((a) => a.status === column.status);
-            return (
-              <div key={column.status} className="flex min-w-[15rem] flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${column.accent}`} />
-                  <span className={eyebrowClass}>
-                    {column.label} · {columnApplications.length}
-                  </span>
+        <>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <input
+              placeholder="Search by talent name"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={`${inputClass} w-auto`}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              {isPremium && <option value="match_score">Best match</option>}
+            </select>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 overflow-x-auto sm:grid-cols-2 lg:grid-cols-4">
+            {COLUMNS.map((column) => {
+              const columnApplications = visibleApplications.filter((a) => a.status === column.status);
+              return (
+                <div key={column.status} className="flex min-w-[15rem] flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${column.accent}`} />
+                    <span className={eyebrowClass}>
+                      {column.label} · {columnApplications.length}
+                    </span>
+                  </div>
+                  <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
+                    {columnApplications.map((a) => (
+                      <ApplicationCard
+                        key={a.id}
+                        application={a}
+                        roleTitle={call?.roles.find((r) => r.id === a.role_id)?.title}
+                        updating={updatingId === a.id}
+                        token={token!}
+                        onMove={(status) => handleStatusChange(a.id, status)}
+                        onOfferSent={(updated) => setApplications((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+                      />
+                    ))}
+                    {columnApplications.length === 0 && (
+                      <div className="rounded-2xl border-2 border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400 dark:border-zinc-800">
+                        Nothing here
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col gap-3">
-                  {columnApplications.map((a) => (
-                    <ApplicationCard
-                      key={a.id}
-                      application={a}
-                      roleTitle={call?.roles.find((r) => r.id === a.role_id)?.title}
-                      updating={updatingId === a.id}
-                      onMove={(status) => handleStatusChange(a.id, status)}
-                    />
-                  ))}
-                  {columnApplications.length === 0 && (
-                    <div className="rounded-2xl border-2 border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400 dark:border-zinc-800">
-                      Nothing here
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {invitations.length > 0 && (
@@ -197,14 +226,31 @@ function ApplicationCard({
   application,
   roleTitle,
   updating,
+  token,
   onMove,
+  onOfferSent,
 }: {
   application: Application;
   roleTitle?: string;
   updating: boolean;
+  token: string;
   onMove: (status: ApplicationStatus) => void;
+  onOfferSent: (updated: Application) => void;
 }) {
-  const otherStatuses = COLUMNS.map((c) => c.status).filter((s) => s !== application.status);
+  const router = useRouter();
+  const otherStatuses = COLUMNS.map((c) => c.status).filter((s) => s !== application.status && s !== "accepted");
+  const [messaging, setMessaging] = useState(false);
+  const [offering, setOffering] = useState(false);
+
+  async function handleMessage() {
+    setMessaging(true);
+    try {
+      const conversation = await api.startConversation(application.talent_id, application.casting_call_id, token);
+      router.push(`/messages/${conversation.id}`);
+    } catch {
+      setMessaging(false);
+    }
+  }
 
   return (
     <div className="rounded-2xl border-2 border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -218,14 +264,23 @@ function ApplicationCard({
           </span>
         )}
       </div>
-      <Link href={`/talents/${application.talent_id}`} className="text-sm font-semibold text-rose-600 hover:underline">
+      <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">{application.talent_display_name}</p>
+      <Link href={`/talents/${application.talent_id}`} className="text-xs font-semibold text-rose-600 hover:underline">
         View talent profile
       </Link>
+      {application.pending_offer_status && (
+        <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+          {application.pending_offer_status === "offer_sent" ? "Offer sent — awaiting response" : "Awaiting signature"}
+        </p>
+      )}
       {application.submission_url && <SubmissionPreview url={application.submission_url} />}
       {application.message && (
         <p className="mt-2 line-clamp-3 text-xs text-zinc-600 dark:text-zinc-400">{application.message}</p>
       )}
       <div className="mt-3 flex flex-wrap gap-1.5">
+        <button type="button" disabled={messaging} onClick={handleMessage} className={btnSmall}>
+          {messaging ? "Opening…" : "Message"}
+        </button>
         {otherStatuses.map((s) => (
           <button
             key={s}
@@ -236,7 +291,28 @@ function ApplicationCard({
             → {s}
           </button>
         ))}
+        {application.status !== "accepted" && application.status !== "rejected" && !application.pending_offer_status && (
+          <button
+            type="button"
+            onClick={() => setOffering((v) => !v)}
+            className="rounded-md border-2 border-emerald-200 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-950"
+          >
+            {offering ? "Cancel offer" : "Send offer"}
+          </button>
+        )}
       </div>
+      {offering && (
+        <SendOfferForm
+          talentId={application.talent_id}
+          applicationId={application.id}
+          token={token}
+          onCancel={() => setOffering(false)}
+          onSent={() => {
+            setOffering(false);
+            onOfferSent({ ...application, pending_offer_status: "offer_sent" });
+          }}
+        />
+      )}
     </div>
   );
 }

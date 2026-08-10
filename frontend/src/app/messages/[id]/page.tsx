@@ -3,9 +3,10 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Check, CheckCheck } from "lucide-react";
 import { ConversationSummary, Message, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { btnPrimary, inputClass } from "@/lib/ui";
+import { btnPrimary, formatTimestamp, inputClass } from "@/lib/ui";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -103,7 +104,7 @@ export default function ConversationThreadPage() {
           messages.map((m) => {
             const mine = m.sender_user_id === user.id;
             return (
-              <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+              <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
                 <div
                   className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
                     mine
@@ -112,6 +113,15 @@ export default function ConversationThreadPage() {
                   }`}
                 >
                   {m.body}
+                </div>
+                <div className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
+                  <span>{formatTimestamp(m.created_at)}</span>
+                  {mine &&
+                    (m.read_at ? (
+                      <CheckCheck className="h-3.5 w-3.5 text-rose-500" aria-label="Seen" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" aria-label="Sent" />
+                    ))}
                 </div>
               </div>
             );

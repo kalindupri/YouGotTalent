@@ -125,7 +125,11 @@ export default function TalentDetailPage() {
             )}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className={categoryBadgeClass(talent.category)}>{formatCategory(talent.category)}</span>
+            {(talent.categories?.length ? talent.categories : [talent.category]).map((c) => (
+              <span key={c} className={categoryBadgeClass(c)}>
+                {formatCategory(c)}
+              </span>
+            ))}
             {talent.city && <span className="text-sm text-zinc-500">{talent.city}</span>}
           </div>
         </div>

@@ -38,6 +38,13 @@ export async function logout(page: Page) {
   await expect(page.getByRole("navigation").getByRole("link", { name: "Log in" })).toBeVisible();
 }
 
+function categoryLabel(slug: string): string {
+  return slug
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export async function createTalentProfile(
   page: Page,
   opts: { displayName: string; category?: string; city?: string; bio?: string }
@@ -45,7 +52,10 @@ export async function createTalentProfile(
   await page.goto("/dashboard");
   await page.getByLabel("Display name").fill(opts.displayName);
   if (opts.category) {
-    await page.getByLabel("Category").selectOption(opts.category);
+    // Categories are a checkbox group (multi-category support), not a <select> — "acting"
+    // defaults checked, so clear it before checking the requested one for a clean single-value state.
+    await page.getByRole("checkbox", { name: "Acting" }).uncheck();
+    await page.getByRole("checkbox", { name: categoryLabel(opts.category) }).check();
   }
   if (opts.city) {
     await page.getByLabel("City").fill(opts.city);

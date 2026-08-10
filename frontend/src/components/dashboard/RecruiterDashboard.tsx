@@ -425,7 +425,7 @@ export default function RecruiterDashboard() {
           <ul className="mt-4 flex flex-col gap-2">
             {savedSearches.map((s) => {
               const qs = new URLSearchParams();
-              if (s.category) qs.set("category", s.category);
+              if (s.category) qs.set("categories", s.category);
               if (s.city) qs.set("city", s.city);
               if (s.q) qs.set("q", s.q);
               if (s.experience_min !== null) qs.set("experience_min", String(s.experience_min));

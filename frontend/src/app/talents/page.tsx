@@ -37,9 +37,7 @@ function TalentsPageContent() {
     searchParams.has("experience_min") || searchParams.has("experience_max") || searchParams.has("verified_only");
 
   const [talents, setTalents] = useState<TalentProfile[]>([]);
-  const [category, setCategory] = useState<TalentCategory | "">(
-    (searchParams.get("category") as TalentCategory | null) ?? ""
-  );
+  const [categories, setCategories] = useState<TalentCategory[]>(searchParams.getAll("categories") as TalentCategory[]);
   const [city, setCity] = useState(searchParams.get("city") ?? "");
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [showAdvanced, setShowAdvanced] = useState(hasAdvancedParams);
@@ -70,6 +68,10 @@ function TalentsPageContent() {
 
   function toggleInstrument(instrument: string) {
     setInstruments((prev) => (prev.includes(instrument) ? prev.filter((i) => i !== instrument) : [...prev, instrument]));
+  }
+
+  function toggleCategory(c: TalentCategory) {
+    setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   }
 
   function toggleSelected(talentId: string) {
@@ -107,7 +109,7 @@ function TalentsPageContent() {
         try {
           setTalents(
             await api.listTalents({
-              category: category || undefined,
+              categories: categories.length > 0 ? categories : undefined,
               city: city || undefined,
               q: q || undefined,
               experience_min: experienceMin ? Number(experienceMin) : undefined,
@@ -125,7 +127,7 @@ function TalentsPageContent() {
       load();
     }, 250);
     return () => clearTimeout(handle);
-  }, [category, city, q, experienceMin, experienceMax, verifiedOnly, instruments]);
+  }, [categories, city, q, experienceMin, experienceMax, verifiedOnly, instruments]);
 
   async function handleSaveSearch(e: FormEvent) {
     e.preventDefault();
@@ -135,8 +137,8 @@ function TalentsPageContent() {
     try {
       await api.createSavedSearch(
         {
-          name: [category && formatCategory(category), city, q].filter(Boolean).join(" · ") || "My search",
-          category: category || undefined,
+          name: [categories[0] && formatCategory(categories[0]), city, q].filter(Boolean).join(" · ") || "My search",
+          category: categories[0] || undefined,
           city: city || undefined,
           q: q || undefined,
           experience_min: experienceMin ? Number(experienceMin) : undefined,
@@ -169,18 +171,6 @@ function TalentsPageContent() {
           onChange={(e) => setQ(e.target.value)}
           className={`${inputClass} max-w-sm`}
         />
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value as TalentCategory | "")}
-          className={`${inputClass} w-auto`}
-        >
-          <option value="">All categories</option>
-          {TALENT_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {formatCategory(c)}
-            </option>
-          ))}
-        </select>
         <input
           placeholder="Filter by city"
           value={city}
@@ -190,6 +180,22 @@ function TalentsPageContent() {
         <button type="button" onClick={() => setShowAdvanced((v) => !v)} className={btnSmall}>
           {showAdvanced ? "Hide" : "Advanced filters"}
         </button>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+        {TALENT_CATEGORIES.map((c) => (
+          <label
+            key={c}
+            className={`cursor-pointer rounded-full border-2 px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+              categories.includes(c)
+                ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                : "border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+            }`}
+          >
+            <input type="checkbox" checked={categories.includes(c)} onChange={() => toggleCategory(c)} className="hidden" />
+            {formatCategory(c)}
+          </label>
+        ))}
       </div>
 
       {showAdvanced && (
@@ -312,7 +318,11 @@ function TalentsPageContent() {
                   )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className={categoryBadgeClass(t.category)}>{formatCategory(t.category)}</span>
+                  {(t.categories?.length ? t.categories : [t.category]).map((c) => (
+                    <span key={c} className={categoryBadgeClass(c)}>
+                      {formatCategory(c)}
+                    </span>
+                  ))}
                   {t.city && <span className="text-xs text-zinc-500">{t.city}</span>}
                 </div>
                 {t.skills && t.skills.length > 0 && (

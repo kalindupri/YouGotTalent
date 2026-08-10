@@ -22,8 +22,9 @@ test.describe("talent search — filter combinations", () => {
     await logout(page);
 
     await page.goto("/talents");
-    const categorySelect = page.getByRole("combobox").first();
-    await categorySelect.selectOption("photography");
+    // The pill's checkbox input is display:none (removed from the a11y tree entirely) — the
+    // <label> is the real clickable surface, same pattern as the existing instrument filter.
+    await page.locator("label").filter({ hasText: "Photography" }).click();
     await page.getByPlaceholder("Filter by city").fill("Kandy");
 
     await expect(page.getByText("Search Match Kandy")).toBeVisible();

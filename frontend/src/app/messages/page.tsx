@@ -5,16 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ConversationSummary, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { eyebrowClass, sectionClass } from "@/lib/ui";
-
-function formatTimestamp(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  return sameDay
-    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleDateString([], { month: "short", day: "numeric" });
-}
+import { eyebrowClass, formatTimestamp, sectionClass } from "@/lib/ui";
 
 export default function MessagesInboxPage() {
   const { user, token, loading: authLoading } = useAuth();

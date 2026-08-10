@@ -22,13 +22,14 @@ test("browse talents page filters by category", async ({ page }) => {
   await logout(page);
 
   await page.goto("/talents");
-  // The category filter <select> here has no associated <label> (unlike the dashboard forms),
-  // so it's targeted by role instead of getByLabel.
-  const categorySelect = page.getByRole("combobox").first();
-  await categorySelect.selectOption("photography");
+  // The category filter is a checkbox pill group (multi-category support), not a <select>.
+  // The checkbox input is display:none (removed from the a11y tree) — the <label> is the
+  // real clickable pill, same pattern as the existing instrument filter.
+  await page.locator("label").filter({ hasText: "Photography" }).click();
   await expect(page.getByText("Nav Talent Unique")).toBeVisible();
 
-  await categorySelect.selectOption("modeling");
+  await page.locator("label").filter({ hasText: "Photography" }).click();
+  await page.locator("label").filter({ hasText: "Modeling" }).click();
   await expect(page.getByText("Nav Talent Unique")).not.toBeVisible();
 });
 

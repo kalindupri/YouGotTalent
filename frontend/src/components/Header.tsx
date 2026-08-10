@@ -7,6 +7,7 @@ import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { btnSmall } from "@/lib/ui";
+import NotificationBell from "@/components/NotificationBell";
 
 const UNREAD_POLL_INTERVAL_MS = 30_000;
 
@@ -82,6 +83,7 @@ export default function Header() {
               </span>
             )}
           </Link>
+          {token && <NotificationBell token={token} />}
           <Link href="/dashboard" className="text-zinc-300 hover:text-rose-500">
             Dashboard
           </Link>
