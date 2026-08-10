@@ -5,6 +5,7 @@ import {
   createTalentProfile,
   login,
   logout,
+  openDashboardSection,
   postCastingCall,
   registerAndVerify,
   sectionByHeading,
@@ -12,6 +13,7 @@ import {
 import { uniqueEmail } from "../helpers/db";
 
 async function upgradeToPremium(page: import("@playwright/test").Page) {
+  await openDashboardSection(page, "Membership");
   await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
   await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
 }
@@ -24,6 +26,7 @@ test.describe("calendar", () => {
     await registerAndVerify(page, { email, fullName: "Calendar Talent", role: "talent" });
     await createTalentProfile(page, { displayName: "Calendar Talent", category: "acting" });
 
+    await openDashboardSection(page, "Bookings");
     const calendar = sectionByHeading(page, "Work calendar");
     const today = new Date().getDate();
     await calendar.getByRole("button", { name: String(today), exact: true }).click();
@@ -47,6 +50,7 @@ test.describe("media — video quota", () => {
     await registerAndVerify(page, { email, fullName: "Video Quota Talent", role: "talent" });
     await createTalentProfile(page, { displayName: "Video Quota Talent", category: "acting" });
 
+    await openDashboardSection(page, "Portfolio");
     const section = sectionByHeading(page, "Add an audition");
     await section.getByRole("button", { name: "Video", exact: true }).click();
     await section.locator('input[type="file"]').setInputFiles(SAMPLE_VIDEO);
@@ -64,6 +68,7 @@ test.describe("media — video quota", () => {
     await registerAndVerify(page, { email, fullName: "Bad Upload Talent", role: "talent" });
     await createTalentProfile(page, { displayName: "Bad Upload Talent", category: "acting" });
 
+    await openDashboardSection(page, "Portfolio");
     const section = sectionByHeading(page, "Add an audition");
     await section.getByRole("button", { name: "Video", exact: true }).click();
     await section.locator('input[type="file"]').setInputFiles({

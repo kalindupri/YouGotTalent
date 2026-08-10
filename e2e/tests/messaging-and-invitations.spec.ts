@@ -4,6 +4,7 @@ import {
   createTalentProfile,
   login,
   logout,
+  openDashboardSection,
   postCastingCall,
   registerAndVerify,
   sectionByHeading,
@@ -76,6 +77,7 @@ test("recruiter invites a talent to a role and the talent accepts", async ({ pag
   await logout(page);
   await login(page, talentEmail);
   await page.goto("/dashboard");
+  await openDashboardSection(page, "Activity");
   const invitations = sectionByHeading(page, "Invitations");
   await expect(invitations.getByText(castingTitle)).toBeVisible();
   await expect(invitations.getByText("Loved your reel, would you audition?")).toBeVisible();

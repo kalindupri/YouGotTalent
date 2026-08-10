@@ -4,6 +4,7 @@ import {
   createTalentProfile,
   login,
   logout,
+  openDashboardSection,
   postCastingCall,
   registerAndVerify,
   sectionByHeading,
@@ -11,6 +12,7 @@ import {
 import { uniqueEmail } from "../helpers/db";
 
 async function upgradeToPremium(page: import("@playwright/test").Page) {
+  await openDashboardSection(page, "Membership");
   await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
   await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
 }
@@ -21,6 +23,7 @@ test.describe("premium — work library", () => {
     await registerAndVerify(page, { email, fullName: "Library Free", role: "talent" });
     await createTalentProfile(page, { displayName: "Library Free", category: "singing" });
 
+    await openDashboardSection(page, "Portfolio");
     const section = sectionByHeading(page, "Track library");
     await expect(section.getByText(/is a Premium feature/)).toBeVisible();
     await expect(section.getByRole("button", { name: /Add to track library/ })).not.toBeVisible();
@@ -32,6 +35,7 @@ test.describe("premium — work library", () => {
     await createTalentProfile(page, { displayName: "Library Premium", category: "singing" });
     await upgradeToPremium(page);
 
+    await openDashboardSection(page, "Portfolio");
     const section = sectionByHeading(page, "Track library");
     await section.getByRole("button", { name: "Paste a link" }).click();
     await section.getByLabel("Title").fill("Original demo track");
@@ -51,6 +55,7 @@ test.describe("premium — talent CRM (pipeline lists)", () => {
     await registerAndVerify(page, { email, fullName: "CRM Free", role: "recruiter" });
     await createRecruiterProfile(page, { companyName: "CRM Free Studios" });
 
+    await openDashboardSection(page, "Discover talent");
     const section = sectionByHeading(page, "Talent lists");
     await expect(section.getByText(/are a Premium feature/)).toBeVisible();
   });
@@ -71,6 +76,7 @@ test.describe("premium — talent CRM (pipeline lists)", () => {
     await page.getByRole("link", { name: "CRM Target Talent" }).click();
     await page.getByRole("button", { name: "Save talent" }).click();
     await page.goto("/dashboard");
+    await openDashboardSection(page, "Discover talent");
 
     const listsSection = sectionByHeading(page, "Talent lists");
     const listName = `Pipeline ${Date.now()}`;
@@ -112,6 +118,7 @@ test.describe("premium — early access & AI match score", () => {
     await logout(page);
 
     await login(page, recruiterEmail);
+    await openDashboardSection(page, "Discover talent");
     await expect(sectionByHeading(page, "New talent this week").getByText("Fresh Dancer")).toBeVisible();
   });
 

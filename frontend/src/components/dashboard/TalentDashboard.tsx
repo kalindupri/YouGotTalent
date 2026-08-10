@@ -2,7 +2,23 @@
 
 import { FormEvent, createElement, useEffect, useState } from "react";
 import Link from "next/link";
-import { Calendar, Check, ChevronLeft, ChevronRight, Crown, Eye, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import {
+  Calendar,
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  CreditCard,
+  Crown,
+  Eye,
+  Image as ImageIcon,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 import {
   Application,
   ApiError,
@@ -65,6 +81,7 @@ import MediaCard from "@/components/MediaCard";
 import LibraryItemCard from "@/components/LibraryItemCard";
 import HeadshotUploader from "@/components/HeadshotUploader";
 import SubmissionPreview from "@/components/SubmissionPreview";
+import DashboardSidebar, { DashboardNavItem } from "@/components/dashboard/DashboardSidebar";
 
 function parseSkills(raw: string): string[] {
   return raw
@@ -73,8 +90,19 @@ function parseSkills(raw: string): string[] {
     .filter(Boolean);
 }
 
+type TalentSection = "profile" | "portfolio" | "activity" | "bookings" | "membership";
+
+const TALENT_NAV_ITEMS: DashboardNavItem[] = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "portfolio", label: "Portfolio", icon: ImageIcon },
+  { id: "activity", label: "Activity", icon: ClipboardList },
+  { id: "bookings", label: "Bookings", icon: CalendarDays },
+  { id: "membership", label: "Membership", icon: CreditCard },
+];
+
 export default function TalentDashboard() {
   const { token } = useAuth();
+  const [activeSection, setActiveSection] = useState<TalentSection>("profile");
   const [profile, setProfile] = useState<TalentProfile | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -127,181 +155,205 @@ export default function TalentDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <ProfileSummary profile={profile} onUpdated={setProfile} token={token!} />
-      <MembershipCard profile={profile} onUpdated={setProfile} token={token!} />
-      <ProfileViewsCard views={profileViews} isPremium={profile.tier === "premium"} />
-      <NotificationPreferencesCard profile={profile} onUpdated={setProfile} token={token!} />
-      <IntroVideoCard profile={profile} onUpdated={setProfile} token={token!} />
-      <SocialLinksCard profile={profile} onUpdated={setProfile} token={token!} />
-      <AttributesCard profile={profile} onUpdated={setProfile} token={token!} />
-      <InstrumentsCard profile={profile} onUpdated={setProfile} token={token!} />
-      <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
-      <MediaGalleryCard profile={profile} onUpdated={setProfile} token={token!} />
-      <AddMediaForm
-        token={token!}
-        profile={profile}
-        onAdded={(m) => setProfile({ ...profile, media: [...profile.media, m] })}
-      />
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <DashboardSidebar items={TALENT_NAV_ITEMS} activeId={activeSection} onSelect={(id) => setActiveSection(id as TalentSection)} />
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        {activeSection === "profile" && (
+          <>
+            <ProfileSummary profile={profile} onUpdated={setProfile} token={token!} />
+            <IntroVideoCard profile={profile} onUpdated={setProfile} token={token!} />
+            <SocialLinksCard profile={profile} onUpdated={setProfile} token={token!} />
+            <AttributesCard profile={profile} onUpdated={setProfile} token={token!} />
+            <InstrumentsCard profile={profile} onUpdated={setProfile} token={token!} />
+          </>
+        )}
 
-      <LibraryCard profile={profile} token={token!} />
+        {activeSection === "portfolio" && (
+          <>
+            <MediaGalleryCard profile={profile} onUpdated={setProfile} token={token!} />
+            <AddMediaForm
+              token={token!}
+              profile={profile}
+              onAdded={(m) => setProfile({ ...profile, media: [...profile.media, m] })}
+            />
+            <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
+            <LibraryCard profile={profile} token={token!} />
+          </>
+        )}
 
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Invitations</h2>
-        {invitations.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            No invitations yet — talent hunts can invite you directly to a role from your profile.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {invitations.map((inv) => (
-              <li key={inv.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <Link
-                      href={`/casting-calls/${inv.casting_call_id}`}
-                      className="font-semibold text-rose-600 hover:underline"
+        {activeSection === "activity" && (
+          <>
+            <section className={sectionClass}>
+              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">My applications</h2>
+              {applications.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">You haven&apos;t applied to any talent hunts yet.</p>
+              ) : (
+                <ul className="mt-4 flex flex-col gap-2">
+                  {applications.map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800"
                     >
-                      {inv.casting_call.title}
-                    </Link>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <span className={categoryBadgeClass(inv.casting_call.category)}>
-                        {formatCategory(inv.casting_call.category)}
-                      </span>
-                      {inv.casting_call.location && (
-                        <span className="text-xs text-zinc-500">{inv.casting_call.location}</span>
+                      <Link href={`/casting-calls/${a.casting_call_id}`} className="text-rose-600 hover:underline">
+                        View opportunity
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-xs text-zinc-500">
+                          <Eye className="h-3.5 w-3.5" />
+                          {a.viewed_at
+                            ? profile.tier === "premium"
+                              ? `Seen ${formatRelativeTime(a.viewed_at)}`
+                              : "Seen"
+                            : "Not yet seen"}
+                        </span>
+                        <span className={badgeClass(statusTone(a.status))}>{a.status}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className={sectionClass}>
+              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Invitations</h2>
+              {invitations.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  No invitations yet — talent hunts can invite you directly to a role from your profile.
+                </p>
+              ) : (
+                <ul className="mt-4 flex flex-col gap-3">
+                  {invitations.map((inv) => (
+                    <li key={inv.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <Link
+                            href={`/casting-calls/${inv.casting_call_id}`}
+                            className="font-semibold text-rose-600 hover:underline"
+                          >
+                            {inv.casting_call.title}
+                          </Link>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <span className={categoryBadgeClass(inv.casting_call.category)}>
+                              {formatCategory(inv.casting_call.category)}
+                            </span>
+                            {inv.casting_call.location && (
+                              <span className="text-xs text-zinc-500">{inv.casting_call.location}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={badgeClass(invitationStatusTone(inv.status))}>{inv.status}</span>
+                      </div>
+                      {inv.message && <p className="mt-2 text-zinc-600 dark:text-zinc-400">&ldquo;{inv.message}&rdquo;</p>}
+                      {inv.status === "pending" && (
+                        <InvitationResponseButtons
+                          invitation={inv}
+                          token={token!}
+                          onResponded={(updated) =>
+                            setInvitations((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))
+                          }
+                        />
                       )}
-                    </div>
-                  </div>
-                  <span className={badgeClass(invitationStatusTone(inv.status))}>{inv.status}</span>
-                </div>
-                {inv.message && <p className="mt-2 text-zinc-600 dark:text-zinc-400">&ldquo;{inv.message}&rdquo;</p>}
-                {inv.status === "pending" && (
-                  <InvitationResponseButtons
-                    invitation={inv}
-                    token={token!}
-                    onResponded={(updated) =>
-                      setInvitations((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))
-                    }
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className={sectionClass}>
+              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Following</h2>
+              {following.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  You&apos;re not following any talent hunters yet — follow one from a talent hunt&apos;s page to hear
+                  about their new postings.
+                </p>
+              ) : (
+                <ul className="mt-4 flex flex-col gap-2">
+                  {following.map((f) => (
+                    <li
+                      key={f.id}
+                      className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800"
+                    >
+                      <span className="font-semibold text-zinc-900 dark:text-zinc-50">{f.recruiter_company_name}</span>
+                      <button onClick={() => handleUnfollow(f.recruiter_id)} className={btnSmall}>
+                        Unfollow
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
         )}
-      </section>
 
-      <WorkCalendarCard token={token!} />
+        {activeSection === "bookings" && (
+          <>
+            <section className={sectionClass}>
+              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Booking requests</h2>
+              {bookings.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  No booking requests yet — talent hunters can request a time slot from your public profile once
+                  you&apos;ve set your availability above.
+                </p>
+              ) : (
+                <ul className="mt-4 flex flex-col gap-3">
+                  {bookings.map((b) => (
+                    <li key={b.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-zinc-900 dark:text-zinc-50">{b.recruiter_company_name}</p>
+                          {b.casting_call_title && <p className="text-xs text-zinc-500">{b.casting_call_title}</p>}
+                          {b.start_at && b.end_at ? (
+                            <p className="mt-1 text-zinc-600 dark:text-zinc-400">{formatBookingRange(b.start_at, b.end_at)}</p>
+                          ) : (
+                            b.application_id && (
+                              <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                                Contract offer{b.application_role_title ? ` — ${b.application_role_title}` : ""}
+                              </p>
+                            )
+                          )}
+                        </div>
+                        <span className={badgeClass(bookingStatusTone(b.status))}>{b.status}</span>
+                      </div>
+                      {b.message && <p className="mt-2 text-zinc-600 dark:text-zinc-400">&ldquo;{b.message}&rdquo;</p>}
+                      {b.status === "pending" && (
+                        <BookingResponseButtons
+                          booking={b}
+                          token={token!}
+                          onResponded={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+                        />
+                      )}
+                      {b.status === "accepted" && (
+                        <BookingAgreementSection
+                          booking={b}
+                          token={token!}
+                          viewerRole="talent"
+                          otherPartyLabel={b.recruiter_company_name}
+                          onUpdated={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+                        />
+                      )}
+                      {b.status === "accepted" && (
+                        <BookingReviewForm bookingId={b.id} token={token!} revieweeLabel={b.recruiter_company_name} />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
 
-      <AvailabilityCard availability={availability} onChange={setAvailability} token={token!} />
+            <WorkCalendarCard token={token!} />
 
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Booking requests</h2>
-        {bookings.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            No booking requests yet — talent hunters can request a time slot from your public profile once
-            you&apos;ve set your availability above.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {bookings.map((b) => (
-              <li key={b.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-zinc-900 dark:text-zinc-50">{b.recruiter_company_name}</p>
-                    {b.casting_call_title && <p className="text-xs text-zinc-500">{b.casting_call_title}</p>}
-                    {b.start_at && b.end_at ? (
-                      <p className="mt-1 text-zinc-600 dark:text-zinc-400">{formatBookingRange(b.start_at, b.end_at)}</p>
-                    ) : (
-                      b.application_id && (
-                        <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                          Contract offer{b.application_role_title ? ` — ${b.application_role_title}` : ""}
-                        </p>
-                      )
-                    )}
-                  </div>
-                  <span className={badgeClass(bookingStatusTone(b.status))}>{b.status}</span>
-                </div>
-                {b.message && <p className="mt-2 text-zinc-600 dark:text-zinc-400">&ldquo;{b.message}&rdquo;</p>}
-                {b.status === "pending" && (
-                  <BookingResponseButtons
-                    booking={b}
-                    token={token!}
-                    onResponded={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
-                  />
-                )}
-                {b.status === "accepted" && (
-                  <BookingAgreementSection
-                    booking={b}
-                    token={token!}
-                    viewerRole="talent"
-                    otherPartyLabel={b.recruiter_company_name}
-                    onUpdated={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
-                  />
-                )}
-                {b.status === "accepted" && (
-                  <BookingReviewForm bookingId={b.id} token={token!} revieweeLabel={b.recruiter_company_name} />
-                )}
-              </li>
-            ))}
-          </ul>
+            <AvailabilityCard availability={availability} onChange={setAvailability} token={token!} />
+          </>
         )}
-      </section>
 
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Following</h2>
-        {following.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            You&apos;re not following any talent hunters yet — follow one from a talent hunt&apos;s page to hear
-            about their new postings.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-2">
-            {following.map((f) => (
-              <li
-                key={f.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800"
-              >
-                <span className="font-semibold text-zinc-900 dark:text-zinc-50">{f.recruiter_company_name}</span>
-                <button onClick={() => handleUnfollow(f.recruiter_id)} className={btnSmall}>
-                  Unfollow
-                </button>
-              </li>
-            ))}
-          </ul>
+        {activeSection === "membership" && (
+          <>
+            <MembershipCard profile={profile} onUpdated={setProfile} token={token!} />
+            <ProfileViewsCard views={profileViews} isPremium={profile.tier === "premium"} />
+            <NotificationPreferencesCard profile={profile} onUpdated={setProfile} token={token!} />
+          </>
         )}
-      </section>
-
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">My applications</h2>
-        {applications.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">You haven&apos;t applied to any talent hunts yet.</p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-2">
-            {applications.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800"
-              >
-                <Link href={`/casting-calls/${a.casting_call_id}`} className="text-rose-600 hover:underline">
-                  View opportunity
-                </Link>
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1 text-xs text-zinc-500">
-                    <Eye className="h-3.5 w-3.5" />
-                    {a.viewed_at
-                      ? profile.tier === "premium"
-                        ? `Seen ${formatRelativeTime(a.viewed_at)}`
-                        : "Seen"
-                      : "Not yet seen"}
-                  </span>
-                  <span className={badgeClass(statusTone(a.status))}>{a.status}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      </div>
     </div>
   );
 }

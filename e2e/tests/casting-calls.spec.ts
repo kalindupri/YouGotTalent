@@ -3,6 +3,7 @@ import {
   createRecruiterProfile,
   createTalentProfile,
   login,
+  openDashboardSection,
   postCastingCall,
   registerAndVerify,
   sectionByHeading,
@@ -16,6 +17,7 @@ test("recruiter posts a multi-role casting call and it appears on the public lis
 
   // Multi-role posting is a Premium feature — a free-tier recruiter never sees the
   // "+ Add another role" control, only an upgrade prompt.
+  await openDashboardSection(page, "Membership");
   await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
   await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
 
@@ -43,6 +45,7 @@ test("talent applies to a specific role and the recruiter board tags it correctl
   await createRecruiterProfile(page, { companyName: "Apply Studios" });
 
   // Multi-role posting is a Premium feature.
+  await openDashboardSection(page, "Membership");
   await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
   await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
 

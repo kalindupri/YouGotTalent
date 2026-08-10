@@ -2,7 +2,19 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Crown, Eye, ShieldCheck, Sparkles, Star } from "lucide-react";
+import {
+  BarChart3,
+  Building2,
+  CalendarDays,
+  CreditCard,
+  Crown,
+  Eye,
+  Megaphone,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import {
   ApiError,
   Booking,
@@ -43,6 +55,7 @@ import {
 import TalentAvatar from "@/components/TalentAvatar";
 import BookingAgreementSection from "@/components/BookingAgreementSection";
 import BookingReviewForm from "@/components/BookingReviewForm";
+import DashboardSidebar, { DashboardNavItem } from "@/components/dashboard/DashboardSidebar";
 
 function parseSkills(raw: string): string[] {
   return raw
@@ -51,8 +64,20 @@ function parseSkills(raw: string): string[] {
     .filter(Boolean);
 }
 
+type RecruiterSection = "overview" | "talent-hunts" | "discover" | "bookings" | "reviews" | "membership";
+
+const RECRUITER_NAV_ITEMS: DashboardNavItem[] = [
+  { id: "overview", label: "Overview", icon: Building2 },
+  { id: "talent-hunts", label: "Talent hunts", icon: Megaphone },
+  { id: "discover", label: "Discover talent", icon: Search },
+  { id: "bookings", label: "Bookings", icon: CalendarDays },
+  { id: "reviews", label: "Reviews", icon: Star },
+  { id: "membership", label: "Membership", icon: CreditCard },
+];
+
 export default function RecruiterDashboard() {
   const { token } = useAuth();
+  const [activeSection, setActiveSection] = useState<RecruiterSection>("overview");
   const [profile, setProfile] = useState<RecruiterProfile | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [myCalls, setMyCalls] = useState<CastingCall[]>([]);
@@ -150,339 +175,362 @@ export default function RecruiterDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <section className={sectionClass}>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-rose-600 text-lg font-black text-white">
-              {profile.company_name.slice(0, 2).toUpperCase()}
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">{profile.company_name}</h2>
-                <span className={neutralBadgeClass}>{recruiterTypeLabel(profile.recruiter_type)}</span>
-                {profile.is_verified && (
-                  <span className={verifiedBadgeClass}>
-                    <ShieldCheck className="h-3 w-3" /> Verified
-                  </span>
-                )}
-                {profile.tier === "premium" && (
-                  <span className={premiumBadgeClass}>
-                    <Crown className="h-3 w-3" fill="currentColor" strokeWidth={0} /> Premium
-                  </span>
-                )}
-              </div>
-              {profile.industry && <p className="mt-0.5 text-sm text-zinc-500">{profile.industry}</p>}
-            </div>
-          </div>
-          <Link href={`/recruiters/${profile.id}`} className={`${btnSmall} self-start sm:self-auto`}>
-            View public page
-          </Link>
-        </div>
-      </section>
-
-      <MembershipCard profile={profile} onUpdated={setProfile} token={token!} />
-
-      <PostCastingCallForm token={token!} isPremium={profile.tier === "premium"} onPosted={(c) => setMyCalls((prev) => [c, ...prev])} />
-
-      {analytics && (
-        <section className={sectionClass}>
-          <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
-            <BarChart3 className="h-5 w-5" /> Analytics
-          </h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-              <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">{analytics.total_views}</p>
-              <p className="mt-1 text-xs text-zinc-500">Total views</p>
-            </div>
-            <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-              <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">
-                {analytics.total_applications}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">Total applications</p>
-            </div>
-            <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-              <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">
-                {analytics.response_rate}%
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">Response rate</p>
-            </div>
-          </div>
-
-          {analytics.casting_calls.length > 0 && (
-            <ul className="mt-4 flex flex-col gap-2">
-              {analytics.casting_calls.map((c) => (
-                <li key={c.id} className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-50">{c.title}</span>
-                    <span className={badgeClass(statusTone(c.status))}>{c.status}</span>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-                    <span className="flex items-center gap-1">
-                      <Eye className="h-3.5 w-3.5" /> {c.view_count} views
-                    </span>
-                    <span>{c.application_count} applications</span>
-                    <span>{c.pending_count} pending</span>
-                    <span>{c.shortlisted_count} shortlisted</span>
-                    <span>{c.accepted_count} accepted</span>
-                    <span>{c.rejected_count} rejected</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Your talent hunts</h2>
-        {callActionError && <p className="mt-2 text-sm text-red-600">{callActionError}</p>}
-        {myCalls.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">You haven&apos;t posted any talent hunts yet.</p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-2">
-            {myCalls.map((c) => (
-              <li
-                key={c.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
-              >
-                <div>
-                  <p className="font-semibold text-zinc-900 dark:text-zinc-50">{c.title}</p>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <span className={categoryBadgeClass(c.category)}>{formatCategory(c.category)}</span>
-                    <span className={badgeClass(statusTone(c.status))}>{c.status}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Link href={`/dashboard/casting-calls/${c.id}`} className="font-semibold text-rose-600 hover:underline">
-                    Manage
-                  </Link>
-                  <button
-                    type="button"
-                    disabled={callActionId === c.id}
-                    onClick={() => handleToggleCallStatus(c)}
-                    className="font-semibold text-zinc-600 hover:underline disabled:opacity-50 dark:text-zinc-300"
-                  >
-                    {c.status === "open" ? "Close" : "Reopen"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={callActionId === c.id}
-                    onClick={() => handleDeleteCall(c.id)}
-                    className="font-semibold text-zinc-500 hover:text-red-600 hover:underline disabled:opacity-50"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {profile.tier === "premium" && newArrivals.length > 0 && (
-        <section className={sectionClass}>
-          <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
-            <Sparkles className="h-5 w-5" /> New talent this week
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Fresh sign-ups in your posted categories, from the last 48 hours — a premium early look.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {newArrivals.map((t) => (
-              <Link
-                key={t.id}
-                href={`/talents/${t.id}`}
-                className="overflow-hidden rounded-2xl border-2 border-zinc-100 dark:border-zinc-800"
-              >
-                <div className="aspect-square overflow-hidden bg-zinc-100 dark:bg-zinc-900">
-                  <TalentAvatar name={t.display_name} coverUrl={coverPhotoUrl(t.media)} className="h-full w-full text-xl" />
-                </div>
-                <div className="p-2">
-                  <p className="truncate text-xs font-medium text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Saved talent</h2>
-        {savedTalents.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            No saved talent yet — browse{" "}
-            <Link href="/talents" className="text-rose-600 hover:underline">
-              talent profiles
-            </Link>{" "}
-            and save the ones you like.
-          </p>
-        ) : (
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {savedTalents.map((t) => (
-              <div key={t.id} className="overflow-hidden rounded-2xl border-2 border-zinc-100 dark:border-zinc-800">
-                <Link href={`/talents/${t.id}`} className="block">
-                  <div className="aspect-square overflow-hidden bg-zinc-100 dark:bg-zinc-900">
-                    <TalentAvatar name={t.display_name} coverUrl={coverPhotoUrl(t.media)} className="h-full w-full text-xl" />
-                  </div>
-                  <div className="p-2 pb-1">
-                    <p className="truncate text-xs font-medium text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
-                  </div>
-                </Link>
-                {profile.tier === "premium" && talentLists.length > 0 && (
-                  <select
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (e.target.value) handleAddToList(e.target.value, t.id);
-                      e.target.value = "";
-                    }}
-                    className="w-full border-t border-zinc-100 bg-transparent px-2 py-1.5 text-[11px] text-zinc-500 dark:border-zinc-800"
-                  >
-                    <option value="">Add to list…</option>
-                    {talentLists.map((l) => (
-                      <option key={l.id} value={l.id} disabled={l.members.some((m) => m.talent_id === t.id)}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <TalentListsCard
-        profile={profile}
-        lists={talentLists}
-        onCreated={(l) => setTalentLists((prev) => [l, ...prev])}
-        onDeleted={(id) => setTalentLists((prev) => prev.filter((l) => l.id !== id))}
-        onUpdated={(updated) => setTalentLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)))}
-        token={token!}
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <DashboardSidebar
+        items={RECRUITER_NAV_ITEMS}
+        activeId={activeSection}
+        onSelect={(id) => setActiveSection(id as RecruiterSection)}
       />
-
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">My booking requests</h2>
-        {bookings.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            No booking requests yet — request a time slot from a talent&apos;s public profile once they&apos;ve set
-            their availability.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {bookings.map((b) => (
-              <li key={b.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-zinc-900 dark:text-zinc-50">{b.talent_display_name}</p>
-                    {b.casting_call_title && <p className="text-xs text-zinc-500">{b.casting_call_title}</p>}
-                    {b.start_at && b.end_at ? (
-                      <p className="mt-1 text-zinc-600 dark:text-zinc-400">{formatBookingRange(b.start_at, b.end_at)}</p>
-                    ) : (
-                      b.application_id && (
-                        <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                          Contract offer{b.application_role_title ? ` — ${b.application_role_title}` : ""}
-                        </p>
-                      )
-                    )}
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        {activeSection === "overview" && (
+          <>
+            <section className={sectionClass}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-rose-600 text-lg font-black text-white">
+                    {profile.company_name.slice(0, 2).toUpperCase()}
                   </div>
-                  <span className={badgeClass(bookingStatusTone(b.status))}>{b.status}</span>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">{profile.company_name}</h2>
+                      <span className={neutralBadgeClass}>{recruiterTypeLabel(profile.recruiter_type)}</span>
+                      {profile.is_verified && (
+                        <span className={verifiedBadgeClass}>
+                          <ShieldCheck className="h-3 w-3" /> Verified
+                        </span>
+                      )}
+                      {profile.tier === "premium" && (
+                        <span className={premiumBadgeClass}>
+                          <Crown className="h-3 w-3" fill="currentColor" strokeWidth={0} /> Premium
+                        </span>
+                      )}
+                    </div>
+                    {profile.industry && <p className="mt-0.5 text-sm text-zinc-500">{profile.industry}</p>}
+                  </div>
                 </div>
-                {b.message && <p className="mt-2 text-zinc-600 dark:text-zinc-400">&ldquo;{b.message}&rdquo;</p>}
-                {b.status === "pending" && (
-                  <CancelBookingButton
-                    booking={b}
-                    token={token!}
-                    onCancelled={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
-                  />
-                )}
-                {b.status === "accepted" && (
-                  <BookingAgreementSection
-                    booking={b}
-                    token={token!}
-                    viewerRole="recruiter"
-                    otherPartyLabel={b.talent_display_name}
-                    onUpdated={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
-                  />
-                )}
-                {b.status === "accepted" && (
-                  <BookingReviewForm bookingId={b.id} token={token!} revieweeLabel={b.talent_display_name} />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                <Link href={`/recruiters/${profile.id}`} className={`${btnSmall} self-start sm:self-auto`}>
+                  View public page
+                </Link>
+              </div>
+            </section>
 
-      <section className={sectionClass}>
-        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Saved searches</h2>
-        {profile.tier !== "premium" ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            Saved searches are a Premium feature — upgrade above to save filters and get back to
-            matching talent instantly.
-          </p>
-        ) : savedSearches.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            No saved searches yet — use the advanced filters on the{" "}
-            <Link href="/talents" className="text-rose-600 hover:underline">
-              browse talent
-            </Link>{" "}
-            page and save one.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-2">
-            {savedSearches.map((s) => {
-              const qs = new URLSearchParams();
-              if (s.category) qs.set("categories", s.category);
-              if (s.city) qs.set("city", s.city);
-              if (s.q) qs.set("q", s.q);
-              if (s.experience_min !== null) qs.set("experience_min", String(s.experience_min));
-              if (s.experience_max !== null) qs.set("experience_max", String(s.experience_max));
-              if (s.verified_only) qs.set("verified_only", "true");
-              return (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
-                >
-                  <Link href={`/talents?${qs.toString()}`} className="font-semibold text-rose-600 hover:underline">
-                    {s.name}
-                  </Link>
-                  <button onClick={() => handleDeleteSavedSearch(s.id)} className={btnSmall}>
-                    Delete
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+            {analytics && (
+              <section className={sectionClass}>
+                <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <BarChart3 className="h-5 w-5" /> Analytics
+                </h2>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+                    <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">{analytics.total_views}</p>
+                    <p className="mt-1 text-xs text-zinc-500">Total views</p>
+                  </div>
+                  <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+                    <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">
+                      {analytics.total_applications}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">Total applications</p>
+                  </div>
+                  <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+                    <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">
+                      {analytics.response_rate}%
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">Response rate</p>
+                  </div>
+                </div>
 
-      <section className={sectionClass}>
-        <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
-          <Star className="h-5 w-5" /> Reviews received
-        </h2>
-        {reviews.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            No reviews yet — talent can rate you once a booking with them is accepted.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {reviews.map((r) => (
-              <li key={r.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">{r.reviewer_name}</span>
-                  <span className="flex items-center gap-0.5 text-amber-500">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <Star key={n} className="h-3.5 w-3.5" fill={n <= r.rating ? "currentColor" : "none"} />
+                {analytics.casting_calls.length > 0 && (
+                  <ul className="mt-4 flex flex-col gap-2">
+                    {analytics.casting_calls.map((c) => (
+                      <li key={c.id} className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold text-zinc-900 dark:text-zinc-50">{c.title}</span>
+                          <span className={badgeClass(statusTone(c.status))}>{c.status}</span>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                          <span className="flex items-center gap-1">
+                            <Eye className="h-3.5 w-3.5" /> {c.view_count} views
+                          </span>
+                          <span>{c.application_count} applications</span>
+                          <span>{c.pending_count} pending</span>
+                          <span>{c.shortlisted_count} shortlisted</span>
+                          <span>{c.accepted_count} accepted</span>
+                          <span>{c.rejected_count} rejected</span>
+                        </div>
+                      </li>
                     ))}
-                  </span>
-                </div>
-                {r.comment && <p className="mt-1 text-zinc-600 dark:text-zinc-400">&ldquo;{r.comment}&rdquo;</p>}
-              </li>
-            ))}
-          </ul>
+                  </ul>
+                )}
+              </section>
+            )}
+          </>
         )}
-      </section>
+
+        {activeSection === "talent-hunts" && (
+          <>
+            <PostCastingCallForm token={token!} isPremium={profile.tier === "premium"} onPosted={(c) => setMyCalls((prev) => [c, ...prev])} />
+
+            <section className={sectionClass}>
+              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Your talent hunts</h2>
+              {callActionError && <p className="mt-2 text-sm text-red-600">{callActionError}</p>}
+              {myCalls.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">You haven&apos;t posted any talent hunts yet.</p>
+              ) : (
+                <ul className="mt-4 flex flex-col gap-2">
+                  {myCalls.map((c) => (
+                    <li
+                      key={c.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
+                    >
+                      <div>
+                        <p className="font-semibold text-zinc-900 dark:text-zinc-50">{c.title}</p>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span className={categoryBadgeClass(c.category)}>{formatCategory(c.category)}</span>
+                          <span className={badgeClass(statusTone(c.status))}>{c.status}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Link href={`/dashboard/casting-calls/${c.id}`} className="font-semibold text-rose-600 hover:underline">
+                          Manage
+                        </Link>
+                        <button
+                          type="button"
+                          disabled={callActionId === c.id}
+                          onClick={() => handleToggleCallStatus(c)}
+                          className="font-semibold text-zinc-600 hover:underline disabled:opacity-50 dark:text-zinc-300"
+                        >
+                          {c.status === "open" ? "Close" : "Reopen"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={callActionId === c.id}
+                          onClick={() => handleDeleteCall(c.id)}
+                          className="font-semibold text-zinc-500 hover:text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
+        )}
+
+        {activeSection === "discover" && (
+          <>
+            {profile.tier === "premium" && newArrivals.length > 0 && (
+              <section className={sectionClass}>
+                <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <Sparkles className="h-5 w-5" /> New talent this week
+                </h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Fresh sign-ups in your posted categories, from the last 48 hours — a premium early look.
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {newArrivals.map((t) => (
+                    <Link
+                      key={t.id}
+                      href={`/talents/${t.id}`}
+                      className="overflow-hidden rounded-2xl border-2 border-zinc-100 dark:border-zinc-800"
+                    >
+                      <div className="aspect-square overflow-hidden bg-zinc-100 dark:bg-zinc-900">
+                        <TalentAvatar name={t.display_name} coverUrl={coverPhotoUrl(t.media)} className="h-full w-full text-xl" />
+                      </div>
+                      <div className="p-2">
+                        <p className="truncate text-xs font-medium text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className={sectionClass}>
+              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Saved talent</h2>
+              {savedTalents.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  No saved talent yet — browse{" "}
+                  <Link href="/talents" className="text-rose-600 hover:underline">
+                    talent profiles
+                  </Link>{" "}
+                  and save the ones you like.
+                </p>
+              ) : (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {savedTalents.map((t) => (
+                    <div key={t.id} className="overflow-hidden rounded-2xl border-2 border-zinc-100 dark:border-zinc-800">
+                      <Link href={`/talents/${t.id}`} className="block">
+                        <div className="aspect-square overflow-hidden bg-zinc-100 dark:bg-zinc-900">
+                          <TalentAvatar name={t.display_name} coverUrl={coverPhotoUrl(t.media)} className="h-full w-full text-xl" />
+                        </div>
+                        <div className="p-2 pb-1">
+                          <p className="truncate text-xs font-medium text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
+                        </div>
+                      </Link>
+                      {profile.tier === "premium" && talentLists.length > 0 && (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) handleAddToList(e.target.value, t.id);
+                            e.target.value = "";
+                          }}
+                          className="w-full border-t border-zinc-100 bg-transparent px-2 py-1.5 text-[11px] text-zinc-500 dark:border-zinc-800"
+                        >
+                          <option value="">Add to list…</option>
+                          {talentLists.map((l) => (
+                            <option key={l.id} value={l.id} disabled={l.members.some((m) => m.talent_id === t.id)}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <TalentListsCard
+              profile={profile}
+              lists={talentLists}
+              onCreated={(l) => setTalentLists((prev) => [l, ...prev])}
+              onDeleted={(id) => setTalentLists((prev) => prev.filter((l) => l.id !== id))}
+              onUpdated={(updated) => setTalentLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)))}
+              token={token!}
+            />
+
+            <section className={sectionClass}>
+              <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Saved searches</h2>
+              {profile.tier !== "premium" ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  Saved searches are a Premium feature — upgrade above to save filters and get back to
+                  matching talent instantly.
+                </p>
+              ) : savedSearches.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  No saved searches yet — use the advanced filters on the{" "}
+                  <Link href="/talents" className="text-rose-600 hover:underline">
+                    browse talent
+                  </Link>{" "}
+                  page and save one.
+                </p>
+              ) : (
+                <ul className="mt-4 flex flex-col gap-2">
+                  {savedSearches.map((s) => {
+                    const qs = new URLSearchParams();
+                    if (s.category) qs.set("categories", s.category);
+                    if (s.city) qs.set("city", s.city);
+                    if (s.q) qs.set("q", s.q);
+                    if (s.experience_min !== null) qs.set("experience_min", String(s.experience_min));
+                    if (s.experience_max !== null) qs.set("experience_max", String(s.experience_max));
+                    if (s.verified_only) qs.set("verified_only", "true");
+                    return (
+                      <li
+                        key={s.id}
+                        className="flex items-center justify-between rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
+                      >
+                        <Link href={`/talents?${qs.toString()}`} className="font-semibold text-rose-600 hover:underline">
+                          {s.name}
+                        </Link>
+                        <button onClick={() => handleDeleteSavedSearch(s.id)} className={btnSmall}>
+                          Delete
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          </>
+        )}
+
+        {activeSection === "bookings" && (
+          <section className={sectionClass}>
+            <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">My booking requests</h2>
+            {bookings.length === 0 ? (
+              <p className="mt-2 text-sm text-zinc-500">
+                No booking requests yet — request a time slot from a talent&apos;s public profile once they&apos;ve set
+                their availability.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-3">
+                {bookings.map((b) => (
+                  <li key={b.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-zinc-900 dark:text-zinc-50">{b.talent_display_name}</p>
+                        {b.casting_call_title && <p className="text-xs text-zinc-500">{b.casting_call_title}</p>}
+                        {b.start_at && b.end_at ? (
+                          <p className="mt-1 text-zinc-600 dark:text-zinc-400">{formatBookingRange(b.start_at, b.end_at)}</p>
+                        ) : (
+                          b.application_id && (
+                            <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                              Contract offer{b.application_role_title ? ` — ${b.application_role_title}` : ""}
+                            </p>
+                          )
+                        )}
+                      </div>
+                      <span className={badgeClass(bookingStatusTone(b.status))}>{b.status}</span>
+                    </div>
+                    {b.message && <p className="mt-2 text-zinc-600 dark:text-zinc-400">&ldquo;{b.message}&rdquo;</p>}
+                    {b.status === "pending" && (
+                      <CancelBookingButton
+                        booking={b}
+                        token={token!}
+                        onCancelled={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+                      />
+                    )}
+                    {b.status === "accepted" && (
+                      <BookingAgreementSection
+                        booking={b}
+                        token={token!}
+                        viewerRole="recruiter"
+                        otherPartyLabel={b.talent_display_name}
+                        onUpdated={(updated) => setBookings((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+                      />
+                    )}
+                    {b.status === "accepted" && (
+                      <BookingReviewForm bookingId={b.id} token={token!} revieweeLabel={b.talent_display_name} />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {activeSection === "reviews" && (
+          <section className={sectionClass}>
+            <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">
+              <Star className="h-5 w-5" /> Reviews received
+            </h2>
+            {reviews.length === 0 ? (
+              <p className="mt-2 text-sm text-zinc-500">
+                No reviews yet — talent can rate you once a booking with them is accepted.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-3">
+                {reviews.map((r) => (
+                  <li key={r.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-zinc-900 dark:text-zinc-50">{r.reviewer_name}</span>
+                      <span className="flex items-center gap-0.5 text-amber-500">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star key={n} className="h-3.5 w-3.5" fill={n <= r.rating ? "currentColor" : "none"} />
+                        ))}
+                      </span>
+                    </div>
+                    {r.comment && <p className="mt-1 text-zinc-600 dark:text-zinc-400">&ldquo;{r.comment}&rdquo;</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {activeSection === "membership" && <MembershipCard profile={profile} onUpdated={setProfile} token={token!} />}
+      </div>
     </div>
   );
 }

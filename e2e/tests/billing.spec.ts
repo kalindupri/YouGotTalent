@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { createTalentProfile, login, logout, registerAndVerify, sectionByHeading } from "../helpers/actions";
+import { createTalentProfile, login, logout, openDashboardSection, registerAndVerify, sectionByHeading } from "../helpers/actions";
 import { uniqueEmail } from "../helpers/db";
 
 async function psql(sql: string): Promise<string> {
@@ -39,6 +39,7 @@ test.describe("billing — subscription lifecycle (mock gateway)", () => {
     await registerAndVerify(page, { email, fullName: "Billing Trial", role: "talent" });
     await createTalentProfile(page, { displayName: "Billing Trial", category: "acting" });
 
+    await openDashboardSection(page, "Membership");
     const membership = sectionByHeading(page, "Membership");
     await membership.getByRole("button", { name: "Start free trial" }).click();
     await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
@@ -50,6 +51,7 @@ test.describe("billing — subscription lifecycle (mock gateway)", () => {
     await registerAndVerify(page, { email, fullName: "Billing Cancel", role: "talent" });
     await createTalentProfile(page, { displayName: "Billing Cancel", category: "acting" });
 
+    await openDashboardSection(page, "Membership");
     const membership = sectionByHeading(page, "Membership");
     await membership.getByRole("button", { name: "Start free trial" }).click();
     await expect(membership.getByText(/Free trial — ends/)).toBeVisible();
@@ -58,6 +60,7 @@ test.describe("billing — subscription lifecycle (mock gateway)", () => {
     // trial-expiry reconciliation would eventually do rather than waiting out 90 days.
     await forceSubscriptionActive(email);
     await page.reload();
+    await openDashboardSection(page, "Membership");
     await expect(membership.getByText(/Renews/)).toBeVisible();
 
     await membership.getByRole("button", { name: "Cancel subscription" }).click();
@@ -78,10 +81,12 @@ test.describe("billing — subscription lifecycle (mock gateway)", () => {
     await registerAndVerify(page, { email, fullName: "Billing Retention", role: "talent" });
     await createTalentProfile(page, { displayName: "Billing Retention", category: "acting" });
 
+    await openDashboardSection(page, "Membership");
     const membership = sectionByHeading(page, "Membership");
     await membership.getByRole("button", { name: "Start free trial" }).click();
     await forceSubscriptionActive(email);
     await page.reload();
+    await openDashboardSection(page, "Membership");
     await expect(membership.getByText(/Renews/)).toBeVisible();
 
     await membership.getByRole("button", { name: "Cancel subscription" }).click();
@@ -101,10 +106,12 @@ test.describe("billing — subscription lifecycle (mock gateway)", () => {
     await registerAndVerify(page, { email, fullName: "Billing Reactivate", role: "talent" });
     await createTalentProfile(page, { displayName: "Billing Reactivate", category: "acting" });
 
+    await openDashboardSection(page, "Membership");
     const membership = sectionByHeading(page, "Membership");
     await membership.getByRole("button", { name: "Start free trial" }).click();
     await forceSubscriptionActive(email);
     await page.reload();
+    await openDashboardSection(page, "Membership");
     await expect(membership.getByText(/Renews/)).toBeVisible();
 
     await membership.getByRole("button", { name: "Cancel subscription" }).click();
@@ -131,6 +138,7 @@ test.describe("billing — pricing & grandfathering", () => {
     const email = uniqueEmail("billing_grandfather");
     await registerAndVerify(page, { email, fullName: "Grandfather Talent", role: "talent" });
     await createTalentProfile(page, { displayName: "Grandfather Talent", category: "acting" });
+    await openDashboardSection(page, "Membership");
     await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
     await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
 

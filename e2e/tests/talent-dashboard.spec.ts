@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { createTalentProfile, registerAndVerify, sectionByHeading } from "../helpers/actions";
+import { createTalentProfile, openDashboardSection, registerAndVerify, sectionByHeading } from "../helpers/actions";
 import { uniqueEmail } from "../helpers/db";
 
 test.describe("talent dashboard", () => {
@@ -21,6 +21,7 @@ test.describe("talent dashboard", () => {
   });
 
   test("toggle job alert notification preference", async ({ page }) => {
+    await openDashboardSection(page, "Membership");
     const section = sectionByHeading(page, "Notifications");
     const checkbox = section.getByRole("checkbox");
     await expect(checkbox).toBeChecked();
@@ -28,6 +29,7 @@ test.describe("talent dashboard", () => {
     await expect(checkbox).not.toBeChecked();
 
     await page.reload();
+    await openDashboardSection(page, "Membership");
     await expect(sectionByHeading(page, "Notifications").getByRole("checkbox")).not.toBeChecked();
   });
 
@@ -46,6 +48,7 @@ test.describe("talent dashboard", () => {
   });
 
   test("add and delete a credit", async ({ page }) => {
+    await openDashboardSection(page, "Portfolio");
     const section = sectionByHeading(page, "Credits & experience");
     await section.getByRole("button", { name: "+ Add credit" }).click();
     await page.getByLabel("Project title").fill("Teledrama pilot script");
@@ -60,6 +63,7 @@ test.describe("talent dashboard", () => {
   });
 
   test("add media respects the free-tier portfolio limit", async ({ page }) => {
+    await openDashboardSection(page, "Portfolio");
     const section = sectionByHeading(page, "Add an audition");
     for (let i = 0; i < 3; i++) {
       await section.getByLabel("URL").fill(`https://example.com/photo-${i}.jpg`);

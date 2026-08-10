@@ -64,7 +64,10 @@ export async function createTalentProfile(
     await page.getByLabel("Bio").fill(opts.bio);
   }
   await page.getByRole("button", { name: "Create profile" }).click();
-  await expect(page.getByText("Membership")).toBeVisible();
+  // The dashboard's default sidebar tab is "Profile" — after creation the create-form is
+  // replaced by the profile summary, which is the reliable signal here (unlike "Membership",
+  // which now lives behind a different sidebar tab).
+  await expect(page.getByRole("heading", { name: opts.displayName })).toBeVisible();
 }
 
 export async function postCastingCall(
@@ -77,6 +80,7 @@ export async function postCastingCall(
   }
 ) {
   await page.goto("/dashboard");
+  await openDashboardSection(page, "Talent hunts");
   const form = sectionByHeading(page, "Post a talent hunt");
   await form.getByLabel("Title").fill(opts.title);
   if (opts.category) {
@@ -109,6 +113,12 @@ export function sectionByHeading(page: Page, heading: string) {
   return page.locator("section").filter({ has: page.getByRole("heading", { name: heading, exact: true }) });
 }
 
+// The talent/recruiter dashboards use a sidebar that shows one panel of sections at a time —
+// call this before interacting with a section that isn't under the sidebar's default tab.
+export async function openDashboardSection(page: Page, navLabel: string) {
+  await page.getByRole("button", { name: navLabel, exact: true }).click();
+}
+
 export async function createRecruiterProfile(page: Page, opts: { companyName: string; industry?: string }) {
   await page.goto("/dashboard");
   await page.getByLabel("Company / agency name").fill(opts.companyName);
@@ -116,5 +126,8 @@ export async function createRecruiterProfile(page: Page, opts: { companyName: st
     await page.getByLabel("Industry").fill(opts.industry);
   }
   await page.getByRole("button", { name: "Create profile" }).click();
-  await expect(page.getByText("Post a talent hunt")).toBeVisible();
+  // The dashboard's default sidebar tab is "Overview" — after creation the create-form is
+  // replaced by the company header card, which is the reliable signal here ("Post a talent
+  // hunt" now lives behind the "Talent hunts" sidebar tab).
+  await expect(page.getByRole("heading", { name: opts.companyName })).toBeVisible();
 }

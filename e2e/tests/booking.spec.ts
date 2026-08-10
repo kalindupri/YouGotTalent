@@ -1,5 +1,13 @@
 import { test, expect } from "@playwright/test";
-import { createRecruiterProfile, createTalentProfile, login, logout, registerAndVerify, sectionByHeading } from "../helpers/actions";
+import {
+  createRecruiterProfile,
+  createTalentProfile,
+  login,
+  logout,
+  openDashboardSection,
+  registerAndVerify,
+  sectionByHeading,
+} from "../helpers/actions";
 import { uniqueEmail } from "../helpers/db";
 
 function formatDateLocal(d: Date): string {
@@ -24,6 +32,7 @@ test("talent sets availability, recruiter books a slot, talent accepts, and agre
   await registerAndVerify(page, { email: talentEmail, fullName: "Booking Talent", role: "talent" });
   await createTalentProfile(page, { displayName: "Booking Talent", category: "acting" });
 
+  await openDashboardSection(page, "Bookings");
   const availability = sectionByHeading(page, "Availability");
   await availability.getByLabel("Day").selectOption("0");
   await availability.getByLabel("Start time").fill("09:00");
@@ -31,6 +40,7 @@ test("talent sets availability, recruiter books a slot, talent accepts, and agre
   await availability.getByRole("button", { name: "Add window" }).click();
   await expect(availability.locator("li", { hasText: "Monday" })).toBeVisible();
 
+  await openDashboardSection(page, "Profile");
   await page.getByRole("link", { name: "View public page" }).click();
   await expect(page).toHaveURL(/\/talents\//);
   const talentProfileUrl = page.url();
@@ -53,6 +63,7 @@ test("talent sets availability, recruiter books a slot, talent accepts, and agre
 
   await logout(page);
   await login(page, recruiterEmail);
+  await openDashboardSection(page, "Bookings");
   const recruiterBookings = sectionByHeading(page, "My booking requests");
   await expect(recruiterBookings.getByText("Booking Talent")).toBeVisible();
   await expect(recruiterBookings.getByText(/10:00/)).toBeVisible();
@@ -61,6 +72,7 @@ test("talent sets availability, recruiter books a slot, talent accepts, and agre
 
   await logout(page);
   await login(page, talentEmail);
+  await openDashboardSection(page, "Bookings");
   const talentBookings = sectionByHeading(page, "Booking requests");
   await expect(talentBookings.getByText("Booking Studios")).toBeVisible();
   await talentBookings.getByRole("button", { name: "Accept" }).click();
@@ -75,6 +87,7 @@ test("talent sets availability, recruiter books a slot, talent accepts, and agre
 
   await logout(page);
   await login(page, recruiterEmail);
+  await openDashboardSection(page, "Bookings");
   const recruiterBookings2 = sectionByHeading(page, "My booking requests");
   await recruiterBookings2.getByLabel("Type your full name to sign").fill("Booking Studios");
   await recruiterBookings2.getByRole("button", { name: "Sign agreement" }).click();
@@ -86,6 +99,7 @@ test("booking request outside availability is rejected", async ({ page }) => {
   await registerAndVerify(page, { email: talentEmail, fullName: "Outside Talent", role: "talent" });
   await createTalentProfile(page, { displayName: "Outside Talent", category: "acting" });
 
+  await openDashboardSection(page, "Bookings");
   const availability = sectionByHeading(page, "Availability");
   await availability.getByLabel("Day").selectOption("0");
   await availability.getByLabel("Start time").fill("09:00");
@@ -93,6 +107,7 @@ test("booking request outside availability is rejected", async ({ page }) => {
   await availability.getByRole("button", { name: "Add window" }).click();
   await expect(availability.locator("li", { hasText: "Monday" })).toBeVisible();
 
+  await openDashboardSection(page, "Profile");
   await page.getByRole("link", { name: "View public page" }).click();
   await expect(page).toHaveURL(/\/talents\//);
   const talentProfileUrl = page.url();

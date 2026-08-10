@@ -4,6 +4,7 @@ import {
   createTalentProfile,
   login,
   logout,
+  openDashboardSection,
   postCastingCall,
   registerAndVerify,
   sectionByHeading,
@@ -28,6 +29,7 @@ test("talent follows a recruiter from a casting call and sees them in Following"
   await expect(page.getByRole("button", { name: "Following", exact: true })).toBeVisible();
 
   await page.goto("/dashboard");
+  await openDashboardSection(page, "Activity");
   const following = sectionByHeading(page, "Following");
   await expect(following.getByText("Follow Studios")).toBeVisible();
 
@@ -42,6 +44,7 @@ test("recruiter analytics reflect casting call views and applications", async ({
   const title = `Analytics target ${Date.now()}`;
   await postCastingCall(page, { title, description: "x", category: "acting" });
 
+  await openDashboardSection(page, "Overview");
   await expect(sectionByHeading(page, "Analytics").getByText("Total views")).toBeVisible();
   await logout(page);
 
@@ -69,6 +72,7 @@ test("recruiter and talent leave reviews after an accepted booking", async ({ pa
   await registerAndVerify(page, { email: talentEmail, fullName: "Review Talent", role: "talent" });
   await createTalentProfile(page, { displayName: "Review Talent", category: "acting" });
 
+  await openDashboardSection(page, "Bookings");
   const availability = sectionByHeading(page, "Availability");
   await availability.getByLabel("Day").selectOption("0");
   await availability.getByLabel("Start time").fill("09:00");
@@ -76,6 +80,7 @@ test("recruiter and talent leave reviews after an accepted booking", async ({ pa
   await availability.getByRole("button", { name: "Add window" }).click();
   await expect(availability.locator("li", { hasText: "Monday" })).toBeVisible();
 
+  await openDashboardSection(page, "Profile");
   await page.getByRole("link", { name: "View public page" }).click();
   await expect(page).toHaveURL(/\/talents\//);
   const talentProfileUrl = page.url();
@@ -103,6 +108,7 @@ test("recruiter and talent leave reviews after an accepted booking", async ({ pa
 
   await logout(page);
   await login(page, talentEmail);
+  await openDashboardSection(page, "Bookings");
   const talentBookings = sectionByHeading(page, "Booking requests");
   await talentBookings.getByRole("button", { name: "Accept" }).click();
   await expect(talentBookings.getByText("accepted")).toBeVisible();
@@ -113,11 +119,13 @@ test("recruiter and talent leave reviews after an accepted booking", async ({ pa
 
   await logout(page);
   await login(page, recruiterEmail);
+  await openDashboardSection(page, "Bookings");
   const recruiterBookings = sectionByHeading(page, "My booking requests");
   await recruiterBookings.getByRole("button", { name: "4 stars" }).click();
   await recruiterBookings.getByRole("button", { name: "Submit review" }).click();
   await expect(recruiterBookings.getByText("Thanks for your review!")).toBeVisible();
 
+  await openDashboardSection(page, "Reviews");
   const reviewsReceived = sectionByHeading(page, "Reviews received");
   await expect(reviewsReceived.getByText("Review Talent")).toBeVisible();
 

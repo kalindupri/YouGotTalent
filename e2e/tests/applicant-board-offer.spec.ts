@@ -1,5 +1,13 @@
 import { test, expect } from "@playwright/test";
-import { createRecruiterProfile, createTalentProfile, login, logout, postCastingCall, registerAndVerify } from "../helpers/actions";
+import {
+  createRecruiterProfile,
+  createTalentProfile,
+  login,
+  logout,
+  openDashboardSection,
+  postCastingCall,
+  registerAndVerify,
+} from "../helpers/actions";
 import { uniqueEmail } from "../helpers/db";
 
 test("recruiter can message an applicant and send a contract offer from the board; both signing accepts the application", async ({ page }) => {
@@ -24,6 +32,7 @@ test("recruiter can message an applicant and send a contract offer from the boar
   await logout(page);
 
   await login(page, recruiterEmail, recruiterPassword);
+  await openDashboardSection(page, "Talent hunts");
   await page.getByRole("link", { name: "Manage" }).click();
   await expect(page.getByText("Board Talent")).toBeVisible();
 
@@ -48,6 +57,7 @@ test("recruiter can message an applicant and send a contract offer from the boar
 
   // Talent accepts the booking, then views the branded agreement and signs it.
   await login(page, talentEmail, talentPassword);
+  await openDashboardSection(page, "Bookings");
   await expect(page.getByText("Contract offer")).toBeVisible();
   await page.getByRole("button", { name: "Accept" }).click();
   await page.getByRole("button", { name: "View & sign agreement" }).click();
@@ -60,10 +70,12 @@ test("recruiter can message an applicant and send a contract offer from the boar
   // Recruiter signs too — application should now be Accepted.
   await login(page, recruiterEmail, recruiterPassword);
   await page.goto("/dashboard");
+  await openDashboardSection(page, "Bookings");
   await page.getByRole("button", { name: "View & sign agreement" }).click();
   await page.getByLabel("Type your full name to sign").fill("Board Recruiter");
   await page.getByRole("button", { name: "Sign agreement", exact: true }).click();
 
+  await openDashboardSection(page, "Talent hunts");
   await page.getByRole("link", { name: "Manage" }).click();
   await expect(page.getByText("Accepted · 1")).toBeVisible();
 });

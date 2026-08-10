@@ -3,6 +3,7 @@ import {
   createRecruiterProfile,
   createTalentProfile,
   logout,
+  openDashboardSection,
   registerAndVerify,
   sectionByHeading,
 } from "../helpers/actions";
@@ -56,6 +57,7 @@ test("recruiter can save and unsave a talent", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Saved", exact: true })).toBeVisible();
 
   await page.goto("/dashboard");
+  await openDashboardSection(page, "Discover talent");
   await expect(sectionByHeading(page, "Saved talent").getByText("Save Target")).toBeVisible();
 
   await page.goto(talentProfileUrl);
@@ -63,5 +65,6 @@ test("recruiter can save and unsave a talent", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Save talent" })).toBeVisible();
 
   await page.goto("/dashboard");
+  await openDashboardSection(page, "Discover talent");
   await expect(sectionByHeading(page, "Saved talent").getByText("Save Target")).not.toBeVisible();
 });
