@@ -10,6 +10,34 @@ class MediaProcessingError(Exception):
     pass
 
 
+def probe_video_duration(path: str) -> float:
+    """Reads a video's duration in seconds via ffprobe, without decoding/transcoding it —
+    used to reject overlong uploads before spending time compressing them.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                path,
+            ],
+            capture_output=True,
+            timeout=COMPRESS_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise MediaProcessingError("Could not read this video's duration") from exc
+
+    if result.returncode != 0:
+        raise MediaProcessingError(result.stderr.decode(errors="replace")[-2000:])
+
+    try:
+        return float(result.stdout.decode().strip())
+    except ValueError as exc:
+        raise MediaProcessingError("Could not read this video's duration") from exc
+
+
 def compress_video(input_path: str, output_path: str) -> None:
     _run_ffmpeg(
         [

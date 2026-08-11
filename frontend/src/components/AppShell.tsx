@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Header from "./Header";
 import Footer from "./Footer";
+import HelpChatWidget from "./HelpChatWidget";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,6 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Header />
       <div className="flex flex-1 flex-col">{children}</div>
       <Footer />
+      <HelpChatWidget />
     </>
   );
 }

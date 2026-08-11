@@ -15,8 +15,10 @@ import {
   btnSmall,
   categoryBadgeClass,
   formatCategory,
+  getVideoDurationSeconds,
   inputClass,
   labelClass,
+  MAX_VIDEO_DURATION_SECONDS,
   sectionClass,
   statusTone,
 } from "@/lib/ui";
@@ -77,6 +79,28 @@ function CastingCallDetailContent() {
       })
       .catch(() => {});
   }, [token, user, call]);
+
+  async function handleSubmissionFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const picked = input.files?.[0] ?? null;
+    if (!picked) return;
+    setApplyError(null);
+    if (!picked.type.startsWith("audio/")) {
+      try {
+        const duration = await getVideoDurationSeconds(picked);
+        if (duration > MAX_VIDEO_DURATION_SECONDS) {
+          setApplyError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+          setSubmissionFile(null);
+          input.value = "";
+          return;
+        }
+      } catch {
+        // If we can't read the duration client-side, let the upload proceed — the server
+        // enforces the real limit either way.
+      }
+    }
+    setSubmissionFile(picked);
+  }
 
   async function handleApply(e: FormEvent) {
     e.preventDefault();
@@ -301,11 +325,11 @@ function CastingCallDetailContent() {
                     <input
                       type="file"
                       accept="video/*,audio/*"
-                      onChange={(e) => setSubmissionFile(e.target.files?.[0] ?? null)}
+                      onChange={handleSubmissionFileChange}
                       className={inputClass}
                     />
                     <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
-                      We&apos;ll compress it automatically.
+                      We&apos;ll compress it automatically. Video max {MAX_VIDEO_DURATION_SECONDS}s.
                     </span>
                   </label>
                 ) : (

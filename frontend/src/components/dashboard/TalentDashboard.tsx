@@ -13,6 +13,7 @@ import {
   Crown,
   Eye,
   Image as ImageIcon,
+  PlayCircle,
   Plus,
   ShieldCheck,
   Trash2,
@@ -34,6 +35,7 @@ import {
   Media,
   MediaType,
   ProfileViewSummary,
+  Reel,
   TALENT_CATEGORIES,
   TalentCategory,
   TalentProfile,
@@ -63,12 +65,17 @@ import {
   formatCategory,
   formatInstrument,
   formatTimeOfDay,
+  getVideoDurationSeconds,
+  MAX_VIDEO_DURATION_SECONDS,
   INSTRUMENT_GROUPS,
   inputClass,
   invitationStatusTone,
   labelClass,
   libraryLabel,
   premiumBadgeClass,
+  PREMIUM_REEL_LIMIT,
+  reelPlatformLabel,
+  REEL_PLATFORM_ICONS,
   sectionClass,
   skillsQuestion,
   statusTone,
@@ -177,6 +184,7 @@ export default function TalentDashboard() {
               onAdded={(m) => setProfile({ ...profile, media: [...profile.media, m] })}
             />
             <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
+            <ReelsCard profile={profile} onUpdated={setProfile} token={token!} />
             <LibraryCard profile={profile} token={token!} />
           </>
         )}
@@ -1216,7 +1224,7 @@ function NotificationPreferencesCard({
     setSaving(true);
     try {
       const updated = await api.updateMyTalentProfile({ job_alert_emails: !profile.job_alert_emails }, token);
-      onUpdated({ ...updated, media: profile.media, credits: profile.credits });
+      onUpdated({ ...updated, media: profile.media, credits: profile.credits, reels: profile.reels });
     } finally {
       setSaving(false);
     }
@@ -1257,6 +1265,26 @@ function IntroVideoCard({
 
   if (!categoryShowsIntroVideo(profile.category)) return null;
 
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const picked = input.files?.[0] ?? null;
+    if (!picked) return;
+    setError(null);
+    try {
+      const duration = await getVideoDurationSeconds(picked);
+      if (duration > MAX_VIDEO_DURATION_SECONDS) {
+        setError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+        setFile(null);
+        input.value = "";
+        return;
+      }
+    } catch {
+      // If we can't read the duration client-side, let the upload proceed — the server
+      // enforces the real limit either way.
+    }
+    setFile(picked);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -1264,10 +1292,10 @@ function IntroVideoCard({
     try {
       if (mode === "upload" && file) {
         const updated = await api.uploadMyIntroVideo(file, token);
-        onUpdated({ ...updated, media: profile.media, credits: profile.credits });
+        onUpdated({ ...updated, media: profile.media, credits: profile.credits, reels: profile.reels });
       } else {
         const updated = await api.updateMyTalentProfile({ intro_video_url: url.trim() || null }, token);
-        onUpdated({ ...updated, media: profile.media, credits: profile.credits });
+        onUpdated({ ...updated, media: profile.media, credits: profile.credits, reels: profile.reels });
       }
       setEditing(false);
       setFile(null);
@@ -1322,11 +1350,11 @@ function IntroVideoCard({
               <input
                 type="file"
                 accept="video/*"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={handleFileChange}
                 className={inputClass}
               />
               <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
-                We&apos;ll compress it automatically.
+                We&apos;ll compress it automatically. Max {MAX_VIDEO_DURATION_SECONDS}s.
               </span>
             </label>
           ) : (
@@ -1451,7 +1479,7 @@ function AttributesCard({
         Object.entries(values).filter(([, v]) => v.trim() !== "")
       );
       const updated = await api.updateMyTalentProfile({ attributes }, token);
-      onUpdated({ ...updated, media: profile.media, credits: profile.credits });
+      onUpdated({ ...updated, media: profile.media, credits: profile.credits, reels: profile.reels });
       setEditing(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save your details.");
@@ -1835,6 +1863,131 @@ function CreditsCard({
   );
 }
 
+function ReelsCard({
+  profile,
+  onUpdated,
+  token,
+}: {
+  profile: TalentProfile;
+  onUpdated: (p: TalentProfile) => void;
+  token: string;
+}) {
+  const [url, setUrl] = useState("");
+  const [caption, setCaption] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const isPremium = profile.tier === "premium";
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const reel = await api.addMyReel({ url, caption: caption || undefined }, token);
+      onUpdated({ ...profile, reels: [reel, ...profile.reels] });
+      setUrl("");
+      setCaption("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not add this reel.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(reel: Reel) {
+    setDeletingId(reel.id);
+    try {
+      await api.deleteMyReel(reel.id, token);
+      onUpdated({ ...profile, reels: profile.reels.filter((r) => r.id !== reel.id) });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <section className={sectionClass}>
+      <div>
+        <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Reels</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Showcase your TikTok, Instagram Reels, or Facebook Reels — visible on your public profile.
+        </p>
+      </div>
+
+      {!isPremium ? (
+        <p className="mt-4 text-sm text-zinc-500">
+          Reels are a Premium feature. Upgrade to Premium from the Membership tab to showcase your content.
+        </p>
+      ) : (
+        <>
+          <form onSubmit={handleAdd} className="mt-4 flex max-w-md flex-col gap-3 border-b border-zinc-200 pb-5 dark:border-zinc-800">
+            <label className={labelClass}>
+              Reel URL
+              <input
+                required
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://www.tiktok.com/@you/video/…"
+                className={inputClass}
+              />
+            </label>
+            <label className={labelClass}>
+              Caption (optional)
+              <input value={caption} onChange={(e) => setCaption(e.target.value)} className={inputClass} />
+            </label>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              type="submit"
+              disabled={submitting || profile.reels.length >= PREMIUM_REEL_LIMIT}
+              className={`w-fit ${btnPrimary}`}
+            >
+              {submitting ? "Adding…" : "Add reel"}
+            </button>
+            <p className="text-xs text-zinc-400">
+              {profile.reels.length} of {PREMIUM_REEL_LIMIT} used
+            </p>
+          </form>
+
+          {profile.reels.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">No reels added yet.</p>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-2">
+              {profile.reels.map((r) => {
+                const Icon = REEL_PLATFORM_ICONS[r.platform] ?? PlayCircle;
+                return (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 p-3 dark:border-zinc-800"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                          {r.caption || reelPlatformLabel(r.platform)}
+                        </p>
+                        <p className="truncate text-xs text-zinc-500">{r.url}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(r)}
+                      disabled={deletingId === r.id}
+                      aria-label="Delete reel"
+                      className="shrink-0 rounded-full p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 function MediaGalleryCard({
   profile,
   onUpdated,
@@ -1963,6 +2116,28 @@ function AddMediaForm({
   const videoLimit = profile.tier === "premium" ? PREMIUM_TIER_VIDEO_LIMIT : FREE_TIER_VIDEO_LIMIT;
   const videoLimitReached = mediaType === "video" && videoCount >= videoLimit;
 
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const picked = input.files?.[0] ?? null;
+    if (!picked) return;
+    setError(null);
+    if (mediaType === "video") {
+      try {
+        const duration = await getVideoDurationSeconds(picked);
+        if (duration > MAX_VIDEO_DURATION_SECONDS) {
+          setError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+          setFile(null);
+          input.value = "";
+          return;
+        }
+      } catch {
+        // If we can't read the duration client-side, let the upload proceed — the server
+        // enforces the real limit either way.
+      }
+    }
+    setFile(picked);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -2022,6 +2197,7 @@ function AddMediaForm({
           <p className="text-xs text-zinc-500">
             {videoCount}/{videoLimit} audition video{videoLimit === 1 ? "" : "s"} used
             {profile.tier !== "premium" && " — upgrade to Premium for more"}
+            {" · "}max {MAX_VIDEO_DURATION_SECONDS}s
           </p>
         )}
 
@@ -2032,7 +2208,7 @@ function AddMediaForm({
               required
               type="file"
               accept={mediaType === "video" ? "video/*" : "audio/*"}
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={handleFileChange}
               className={inputClass}
             />
           </label>
@@ -2088,6 +2264,28 @@ function LibraryCard({ profile, token }: { profile: TalentProfile; token: string
     if (!isPremium) return;
     api.listMyLibrary(token).then(setItems).catch(() => {}).finally(() => setLoading(false));
   }, [token, isPremium]);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const picked = input.files?.[0] ?? null;
+    if (!picked) return;
+    setError(null);
+    if (mediaType === "video") {
+      try {
+        const duration = await getVideoDurationSeconds(picked);
+        if (duration > MAX_VIDEO_DURATION_SECONDS) {
+          setError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+          setFile(null);
+          input.value = "";
+          return;
+        }
+      } catch {
+        // If we can't read the duration client-side, let the upload proceed — the server
+        // enforces the real limit either way.
+      }
+    }
+    setFile(picked);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -2194,12 +2392,12 @@ function LibraryCard({ profile, token }: { profile: TalentProfile; token: string
 
         {mode === "upload" ? (
           <label className={labelClass}>
-            File
+            File{mediaType === "video" ? ` (max ${MAX_VIDEO_DURATION_SECONDS}s)` : ""}
             <input
               required
               type="file"
               accept={mediaType === "photo" ? "image/*" : mediaType === "video" ? "video/*" : "audio/*"}
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={handleFileChange}
               className={inputClass}
             />
           </label>

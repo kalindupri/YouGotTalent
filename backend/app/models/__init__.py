@@ -10,6 +10,7 @@ from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.saved_search import SavedSearch
 from app.models.credit import Credit
+from app.models.reel import Reel
 from app.models.invitation import Invitation
 from app.models.availability_window import AvailabilityWindow
 from app.models.booking import Booking
@@ -40,6 +41,7 @@ __all__ = [
     "Message",
     "SavedSearch",
     "Credit",
+    "Reel",
     "Invitation",
     "AvailabilityWindow",
     "Booking",

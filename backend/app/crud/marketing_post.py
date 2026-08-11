@@ -136,6 +136,7 @@ _CATEGORY_KEYWORDS: dict[TalentCategory, list[str]] = {
     TalentCategory.DIRECTION: ["director", "directors", "direction"],
     TalentCategory.MODELING: ["model", "models", "modeling", "modelling"],
     TalentCategory.DESIGN: ["designer", "designers"],
+    TalentCategory.CONTENT_CREATOR: ["content creator", "content creators", "influencer", "influencers", "UGC"],
 }
 
 _TOPIC_KEYWORDS: list[tuple[list[str], Callable[[Session], tuple[str, str] | None]]] = [

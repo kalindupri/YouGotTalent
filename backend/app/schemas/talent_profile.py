@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.models.media import MediaType
 from app.models.talent_profile import TalentCategory
 from app.schemas.credit import CreditRead
+from app.schemas.reel import ReelRead
 
 
 class TalentProfileCreate(BaseModel):
@@ -110,3 +111,4 @@ class TalentProfileRead(BaseModel):
     created_at: datetime
     media: list[MediaRead] = []
     credits: list[CreditRead] = []
+    reels: list[ReelRead] = []

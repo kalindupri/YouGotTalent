@@ -20,6 +20,7 @@ import {
   PenTool,
   PlayCircle,
   Shirt,
+  Smartphone,
   Sparkles,
   ThumbsUp,
   Tv,
@@ -173,6 +174,26 @@ export function defaultContractTemplate({
   );
 }
 
+// Mirrors backend/app/core/config.py's MAX_VIDEO_DURATION_SECONDS — the server is the real
+// gate, this just lets us reject an overlong file before spending time uploading it.
+export const MAX_VIDEO_DURATION_SECONDS = 30;
+
+export function getVideoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(video.src);
+      resolve(video.duration);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(video.src);
+      reject(new Error("Could not read this video's duration."));
+    };
+    video.src = URL.createObjectURL(file);
+  });
+}
+
 export function formatTimeOfDay(time: string): string {
   const [h, m] = time.split(":");
   const hour = parseInt(h, 10);
@@ -201,6 +222,7 @@ const CATEGORY_COLORS: Record<string, CategoryColor> = {
   direction: { solid: "bg-indigo-500", soft: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300", gradient: "from-indigo-400 to-violet-600" },
   modeling: { solid: "bg-purple-500", soft: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300", gradient: "from-purple-400 to-fuchsia-600" },
   design: { solid: "bg-emerald-500", soft: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300", gradient: "from-emerald-400 to-teal-500" },
+  content_creator: { solid: "bg-sky-500", soft: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300", gradient: "from-sky-400 to-cyan-500" },
   other: { solid: "bg-slate-500", soft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300", gradient: "from-slate-400 to-slate-600" },
 };
 
@@ -242,6 +264,7 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   direction: Video,
   modeling: Shirt,
   design: Paintbrush,
+  content_creator: Smartphone,
   other: Sparkles,
 };
 
@@ -270,6 +293,7 @@ const LIBRARY_LABELS: Record<string, string> = {
   painting: "Portfolio gallery",
   design: "Portfolio gallery",
   script_writing: "Writing samples",
+  content_creator: "Content library",
 };
 
 export function libraryLabel(category: string): string {
@@ -294,6 +318,25 @@ export const SOCIAL_LINK_FIELDS: { key: SocialLinkKey; label: string; icon: Luci
   { key: "website_url", label: "Website", icon: Globe },
 ];
 
+// Mirrors backend/app/core/config.py's PREMIUM_REEL_LIMIT.
+export const PREMIUM_REEL_LIMIT = 10;
+
+export const REEL_PLATFORM_ICONS: Record<string, LucideIcon> = {
+  tiktok: Music2,
+  instagram: Aperture,
+  facebook: ThumbsUp,
+};
+
+const REEL_PLATFORM_LABELS: Record<string, string> = {
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  facebook: "Facebook",
+};
+
+export function reelPlatformLabel(platform: string): string {
+  return REEL_PLATFORM_LABELS[platform] ?? platform;
+}
+
 interface SkillsQuestion {
   label: string;
   placeholder: string;
@@ -313,6 +356,7 @@ const SKILLS_QUESTIONS: Record<string, SkillsQuestion> = {
   direction: { label: "Genres you direct", placeholder: "e.g. drama, documentary, advertising" },
   modeling: { label: "Modeling types", placeholder: "e.g. runway, print, commercial" },
   design: { label: "Design specialties", placeholder: "e.g. graphic design, fashion design, set design" },
+  content_creator: { label: "Content niches you create for", placeholder: "e.g. beauty, tech reviews, comedy skits, unboxing" },
   other: { label: "Special skills", placeholder: "Describe your special skills" },
 };
 
@@ -409,6 +453,10 @@ export const CATEGORY_ATTRIBUTES: Record<string, AttributeField[]> = {
   ],
   direction: [{ key: "primary_genre", label: "Primary genre", placeholder: "e.g. drama, documentary" }],
   design: [{ key: "software_tools", label: "Software / tools", placeholder: "e.g. Figma, Adobe Illustrator" }],
+  content_creator: [
+    { key: "primary_platform", label: "Primary platform", placeholder: "e.g. TikTok, Instagram, YouTube" },
+    { key: "audience_size", label: "Audience size", placeholder: "e.g. 50K–100K followers" },
+  ],
   other: [],
 };
 

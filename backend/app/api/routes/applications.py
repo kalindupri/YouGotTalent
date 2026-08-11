@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_recruiter_profile, get_current_talent_profile
 from app.core.config import settings
 from app.core.email import send_email
-from app.core.media_processing import MediaProcessingError, compress_audio, compress_video
+from app.core.media_processing import MediaProcessingError, compress_audio, compress_video, probe_video_duration
 from app.core.storage import upload_media_file
 from app.crud.application import (
     create_application,
@@ -120,6 +120,12 @@ def apply_to_casting_call_with_upload(
         compressed_path = os.path.join(tmpdir, f"compressed{out_suffix}")
         try:
             if media_type == "video":
+                duration = probe_video_duration(raw_path)
+                if duration > settings.MAX_VIDEO_DURATION_SECONDS:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
+                    )
                 compress_video(raw_path, compressed_path)
             else:
                 compress_audio(raw_path, compressed_path)

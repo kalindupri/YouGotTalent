@@ -172,3 +172,15 @@ def test_replacing_intro_video_does_not_error(client, talent_headers, talent_pro
 def test_upload_intro_video_rejects_corrupt_file(client, talent_headers, talent_profile):
     resp = upload_intro_video(client, talent_headers, b"not a real video file")
     assert resp.status_code == 400
+
+
+def test_upload_video_rejects_over_30_seconds(client, talent_headers, talent_profile, long_sample_video_bytes):
+    resp = upload_video(client, talent_headers, long_sample_video_bytes)
+    assert resp.status_code == 400
+    assert "30 seconds" in resp.json()["detail"]
+
+
+def test_upload_intro_video_rejects_over_30_seconds(client, talent_headers, talent_profile, long_sample_video_bytes):
+    resp = upload_intro_video(client, talent_headers, long_sample_video_bytes)
+    assert resp.status_code == 400
+    assert "30 seconds" in resp.json()["detail"]

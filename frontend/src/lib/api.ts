@@ -17,6 +17,7 @@ export type TalentCategory =
   | "direction"
   | "modeling"
   | "design"
+  | "content_creator"
   | "other";
 export type ApplicationStatus = "pending" | "shortlisted" | "rejected" | "accepted";
 export type CastingCallStatus = "open" | "closed";
@@ -36,6 +37,7 @@ export const TALENT_CATEGORIES: TalentCategory[] = [
   "direction",
   "modeling",
   "design",
+  "content_creator",
   "other",
 ];
 
@@ -106,6 +108,22 @@ export interface MediaUpdateInput {
   title?: string;
 }
 
+export type ReelPlatform = "tiktok" | "instagram" | "facebook";
+
+export interface Reel {
+  id: string;
+  talent_profile_id: string;
+  platform: ReelPlatform;
+  url: string;
+  caption: string | null;
+  created_at: string;
+}
+
+export interface ReelInput {
+  url: string;
+  caption?: string;
+}
+
 export interface TalentProfile {
   id: string;
   user_id: string;
@@ -133,6 +151,7 @@ export interface TalentProfile {
   created_at: string;
   media: Media[];
   credits: Credit[];
+  reels: Reel[];
 }
 
 export interface TalentProfileInput {
@@ -956,6 +975,10 @@ export const api = {
     request<Credit>(`/talents/me/credits/${creditId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
   deleteMyCredit: (creditId: string, token: string) =>
     request<void>(`/talents/me/credits/${creditId}`, { method: "DELETE" }, token),
+  addMyReel: (data: ReelInput, token: string) =>
+    request<Reel>("/talents/me/reels", { method: "POST", body: JSON.stringify(data) }, token),
+  deleteMyReel: (reelId: string, token: string) =>
+    request<void>(`/talents/me/reels/${reelId}`, { method: "DELETE" }, token),
 
   createMyRecruiterProfile: (data: { company_name: string; recruiter_type?: RecruiterType; industry?: string }, token: string) =>
     request<RecruiterProfile>("/recruiters/me", { method: "POST", body: JSON.stringify(data) }, token),

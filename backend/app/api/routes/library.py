@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_talent_profile
 from app.core.config import settings
-from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video
+from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud.library_item import create_library_item, delete_library_item, get_library_item, list_library_items
 from app.crud.talent_profile import get_talent_profile
@@ -80,6 +80,12 @@ def upload_my_library_item(
         compressed_path = os.path.join(tmpdir, f"compressed{out_suffix}")
         try:
             if media_type == "video":
+                duration = probe_video_duration(raw_path)
+                if duration > settings.MAX_VIDEO_DURATION_SECONDS:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
+                    )
                 compress_video(raw_path, compressed_path)
             elif media_type == "audio":
                 compress_audio(raw_path, compressed_path)

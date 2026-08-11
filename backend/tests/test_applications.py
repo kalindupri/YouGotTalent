@@ -227,6 +227,16 @@ def test_apply_with_audio_upload(client, talent_headers, casting_call, sample_au
     assert resp.json()["submission_url"]
 
 
+def test_apply_with_upload_rejects_video_over_30_seconds(client, talent_headers, casting_call, long_sample_video_bytes):
+    create_talent_profile(client, talent_headers)
+    role_id = casting_call["roles"][0]["id"]
+    resp = apply_with_upload(
+        client, talent_headers, casting_call, role_id, long_sample_video_bytes, "take.mp4", "video/mp4", "video",
+    )
+    assert resp.status_code == 400
+    assert "30 seconds" in resp.json()["detail"]
+
+
 def test_apply_with_upload_rejects_unsupported_media_type(client, talent_headers, casting_call, sample_video_bytes):
     create_talent_profile(client, talent_headers)
     role_id = casting_call["roles"][0]["id"]

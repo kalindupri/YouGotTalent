@@ -210,6 +210,27 @@ def sample_video_bytes() -> bytes:
 
 
 @pytest.fixture(scope="session")
+def long_sample_video_bytes() -> bytes:
+    """A 35-second synthetic video — one second past MAX_VIDEO_DURATION_SECONDS — for testing
+    the duration-limit rejection on manual video uploads.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "long_sample.mp4"
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", "testsrc=duration=35:size=320x240:rate=10",
+                "-f", "lavfi", "-i", "sine=frequency=1000:duration=35",
+                "-shortest", "-pix_fmt", "yuv420p",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        return path.read_bytes()
+
+
+@pytest.fixture(scope="session")
 def sample_audio_bytes() -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.mp3"

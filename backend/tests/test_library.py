@@ -19,6 +19,15 @@ def upload_library_audio(client, headers, audio_bytes, *, title="My track"):
     )
 
 
+def upload_library_video(client, headers, video_bytes, *, title="My reel"):
+    return client.post(
+        "/api/v1/talents/me/library/upload",
+        data={"media_type": "video", "title": title},
+        files={"file": ("sample.mp4", video_bytes, "video/mp4")},
+        headers=headers,
+    )
+
+
 def create_url_item(client, headers, *, title="External track", url="https://soundcloud.com/example/track"):
     return client.post(
         "/api/v1/talents/me/library",
@@ -71,6 +80,14 @@ def test_library_upload_rejects_document_type(client, talent_headers, talent_pro
         headers=talent_headers,
     )
     assert resp.status_code == 400
+
+
+def test_library_upload_rejects_video_over_30_seconds(client, talent_headers, talent_profile, long_sample_video_bytes):
+    assert client.post("/api/v1/talents/me/upgrade", headers=talent_headers).status_code == 200
+
+    resp = upload_library_video(client, talent_headers, long_sample_video_bytes)
+    assert resp.status_code == 400
+    assert "30 seconds" in resp.json()["detail"]
 
 
 def test_talent_lists_own_library_items_newest_first(client, talent_headers, talent_profile):

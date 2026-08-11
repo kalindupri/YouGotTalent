@@ -24,6 +24,7 @@ class TalentCategory(str, enum.Enum):
     DIRECTION = "direction"
     MODELING = "modeling"
     DESIGN = "design"
+    CONTENT_CREATOR = "content_creator"
     OTHER = "other"
 
 
@@ -87,4 +88,7 @@ class TalentProfile(Base):
     applications: Mapped[list["Application"]] = relationship("Application", back_populates="talent", cascade="all, delete-orphan")
     credits: Mapped[list["Credit"]] = relationship(
         "Credit", back_populates="talent_profile", cascade="all, delete-orphan", order_by="Credit.created_at.desc()"
+    )
+    reels: Mapped[list["Reel"]] = relationship(
+        "Reel", back_populates="talent_profile", cascade="all, delete-orphan", order_by="Reel.created_at.desc()"
     )

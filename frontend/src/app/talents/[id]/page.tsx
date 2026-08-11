@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Bookmark, Check, Crown, Share2, ShieldCheck, Star } from "lucide-react";
-import { ApiError, Credit, LibraryItem, TalentProfile, TalentReviewSummary, api } from "@/lib/api";
+import { ApiError, Credit, LibraryItem, Reel, TalentProfile, TalentReviewSummary, api } from "@/lib/api";
 import {
   CREDIT_PROJECT_TYPES,
   SOCIAL_LINK_FIELDS,
@@ -17,6 +17,8 @@ import {
   formatCategory,
   libraryLabel,
   premiumBadgeClass,
+  reelPlatformLabel,
+  REEL_PLATFORM_ICONS,
   verifiedBadgeClass,
 } from "@/lib/ui";
 import { useAuth } from "@/lib/auth-context";
@@ -226,6 +228,17 @@ export default function TalentDetailPage() {
         </div>
       )}
 
+      {talent.reels.length > 0 && (
+        <div className="mt-10">
+          <h2 className="font-heading text-2xl font-bold text-zinc-900 dark:text-zinc-50">Reels</h2>
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {talent.reels.map((r) => (
+              <ReelCard key={r.id} reel={r} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {reviewSummary && reviewSummary.review_count > 0 && (
         <div className="mt-10 pb-10">
           <h2 className="flex items-center gap-2 font-heading text-2xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -328,6 +341,26 @@ function CreditsSection({ credits }: { credits: Credit[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function ReelCard({ reel }: { reel: Reel }) {
+  const Icon = REEL_PLATFORM_ICONS[reel.platform];
+  return (
+    <a
+      href={reel.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 p-4 text-sm transition-colors hover:border-rose-300 dark:border-zinc-800 dark:hover:border-rose-800"
+    >
+      <div className="min-w-0">
+        {reel.caption && <p className="truncate font-semibold text-zinc-900 dark:text-zinc-50">{reel.caption}</p>}
+        <p className="truncate text-xs text-zinc-500">{reel.url}</p>
+      </div>
+      <span className={`shrink-0 ${btnSmall}`}>
+        {Icon && <Icon className="h-3.5 w-3.5" />} Watch on {reelPlatformLabel(reel.platform)} ↗
+      </span>
+    </a>
   );
 }
 

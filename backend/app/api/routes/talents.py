@@ -13,10 +13,11 @@ from app.api.deps import (
     require_talent,
 )
 from app.core.config import settings
-from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video
+from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud import subscription as subscription_crud
 from app.crud.credit import create_credit, delete_credit, get_credit, update_credit
+from app.crud.reel import count_reels, create_reel, delete_reel, get_reel
 from app.crud.profile_view import count_profile_views, list_distinct_viewers, record_profile_view
 from app.crud.review import get_talent_review_summary
 from app.crud.saved_talent import get_saved_talent, save_talent, unsave_talent
@@ -42,6 +43,7 @@ from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentCategory, TalentProfile
 from app.models.user import User
 from app.schemas.credit import CreditCreate, CreditRead, CreditUpdate
+from app.schemas.reel import ReelCreate, ReelRead
 from app.schemas.profile_view import ProfileViewSummary
 from app.schemas.review import TalentReviewSummary
 from app.schemas.talent_profile import (
@@ -200,6 +202,12 @@ def upload_my_media(
         compressed_path = os.path.join(tmpdir, f"compressed{out_suffix}")
         try:
             if media_type == "video":
+                duration = probe_video_duration(raw_path)
+                if duration > settings.MAX_VIDEO_DURATION_SECONDS:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
+                    )
                 compress_video(raw_path, compressed_path)
             else:
                 compress_audio(raw_path, compressed_path)
@@ -319,6 +327,12 @@ def upload_my_intro_video(
 
         compressed_path = os.path.join(tmpdir, "compressed.mp4")
         try:
+            duration = probe_video_duration(raw_path)
+            if duration > settings.MAX_VIDEO_DURATION_SECONDS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
+                )
             compress_video(raw_path, compressed_path)
         except MediaProcessingError:
             raise HTTPException(
@@ -391,6 +405,40 @@ def delete_my_credit(
     if credit is None or credit.talent_profile_id != profile.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credit not found")
     delete_credit(db, credit)
+
+
+@router.post("/me/reels", response_model=ReelRead, status_code=status.HTTP_201_CREATED)
+def add_my_reel(
+    reel_in: ReelCreate,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    if profile.tier != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Reels are a Premium feature. Upgrade to showcase your TikTok, Instagram, or Facebook Reels.",
+        )
+    if count_reels(db, profile.id) >= settings.PREMIUM_REEL_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You've reached the limit of {settings.PREMIUM_REEL_LIMIT} reels.",
+        )
+    try:
+        return create_reel(db, profile.id, reel_in)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.delete("/me/reels/{reel_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_reel(
+    reel_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    reel = get_reel(db, reel_id)
+    if reel is None or reel.talent_profile_id != profile.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reel not found")
+    delete_reel(db, reel)
 
 
 @router.post("/{talent_id}/save", status_code=status.HTTP_204_NO_CONTENT)
