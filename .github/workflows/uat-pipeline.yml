@@ -57,6 +57,8 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
+      - name: Create .env for docker compose
+        run: cp .env.example .env
       - name: Start the full stack
         run: docker compose up -d --build
       - name: Wait for backend to be reachable
