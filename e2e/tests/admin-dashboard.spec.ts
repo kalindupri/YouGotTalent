@@ -154,6 +154,8 @@ test("financial overview reflects a talent upgrading to premium", async ({ page 
   const talentEmail = uniqueEmail("admin_fin_talent");
   await registerAndVerify(page, { email: talentEmail, fullName: "Financial Talent", role: "talent" });
   await createTalentProfile(page, { displayName: "Financial Talent", category: "acting" });
+  // "Start free trial" lives under the Membership tab, not the default Profile tab.
+  await openDashboardSection(page, "Membership");
   // Button text is "Start free trial" (mock gateway activates Premium instantly, no payment) —
   // not "Upgrade to Premium", which is the plan tier's label elsewhere on the page.
   await page.getByRole("button", { name: "Start free trial" }).click();

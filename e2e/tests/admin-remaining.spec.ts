@@ -4,6 +4,7 @@ import {
   createTalentProfile,
   login,
   logout,
+  openDashboardSection,
   registerAndVerify,
   sectionByHeading,
 } from "../helpers/actions";
@@ -63,6 +64,8 @@ test("admin subscriptions panel filters, shows payment history, and runs the dun
   const talentEmail = uniqueEmail("adminsub_talent");
   await registerAndVerify(page, { email: talentEmail, fullName: "AdminSub Talent", role: "talent" });
   await createTalentProfile(page, { displayName: "AdminSub Talent", category: "acting" });
+  // "Start free trial" lives under the Membership tab, not the default Profile tab.
+  await openDashboardSection(page, "Membership");
   await sectionByHeading(page, "Membership").getByRole("button", { name: "Start free trial" }).click();
   await expect(page.getByText("Premium", { exact: true }).first()).toBeVisible();
   await logout(page);
