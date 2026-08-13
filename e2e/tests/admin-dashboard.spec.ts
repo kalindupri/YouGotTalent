@@ -4,6 +4,7 @@ import {
   createTalentProfile,
   login,
   logout,
+  openDashboardSection,
   postCastingCall,
   registerAndVerify,
   sectionByHeading,
@@ -27,7 +28,11 @@ test("admin approves a talent's verification request", async ({ page }) => {
   const talentEmail = uniqueEmail("admin_verify_talent");
   await registerAndVerify(page, { email: talentEmail, fullName: "Verify Candidate", role: "talent" });
   await createTalentProfile(page, { displayName: "Verify Candidate", category: "acting" });
+  // "Request verification" lives under the Membership tab, not the default Profile tab.
+  await openDashboardSection(page, "Membership");
   await page.getByRole("button", { name: "Request verification" }).click();
+  // "View public page" is back on the Profile tab (ProfileSummary), not Membership.
+  await openDashboardSection(page, "Profile");
   await page.getByRole("link", { name: "View public page" }).click();
   await expect(page).toHaveURL(/\/talents\//);
   const talentProfileUrl = page.url();

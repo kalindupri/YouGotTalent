@@ -17,7 +17,9 @@ test.describe("talent dashboard", () => {
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(page.getByText("Playback vocalist from Kandy.")).toBeVisible();
-    await expect(page.getByText("Kandy")).toBeVisible();
+    // exact:true -- the bio paragraph above also contains "Kandy" as a substring, which an
+    // unscoped match would ambiguously hit alongside the dedicated city field.
+    await expect(page.getByText("Kandy", { exact: true })).toBeVisible();
   });
 
   test("toggle job alert notification preference", async ({ page }) => {
