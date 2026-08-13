@@ -12,6 +12,26 @@ export interface FaqEntry {
 export const FAQ_ENTRIES: FaqEntry[] = [
   // Getting started
   {
+    id: "about-platform",
+    question: "What is YouGotTalent?",
+    keywords: [
+      "what is this",
+      "what kind of platform",
+      "what is yougottalent",
+      "about this site",
+      "about this platform",
+      "what does this app do",
+      "what is this site",
+      "what is this app",
+      "what is this website",
+      "purpose of this site",
+      "what does this website do",
+    ],
+    answer:
+      "YouGotTalent is Sri Lanka's creative-talent marketplace. Talent (actors, singers, dancers, musicians, and more) build a profile with audition media, and talent hunts (recruiters, studios, agencies) post casting calls and search for talent to hire.",
+    category: "Getting started",
+  },
+  {
     id: "register",
     question: "How do I create an account?",
     keywords: ["register", "sign up", "create account", "join", "signup", "make an account", "new account"],
