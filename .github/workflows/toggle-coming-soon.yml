@@ -1,0 +1,45 @@
+# Manually flips the production coming-soon page on/off. "on" hides the real site behind a
+# coming-soon placeholder; "off" makes the real site live at yougottalent.lk. Takes effect
+# within about a minute (new Container App revision), no rebuild needed -- see
+# frontend/src/middleware.ts.
+name: Toggle Coming Soon Page
+
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: "Turn the coming-soon page on or off"
+        required: true
+        type: choice
+        options:
+          - "on"
+          - "off"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RESOURCE_GROUP: rg-ygt-prod
+  FRONTEND_APP_NAME: ygt-frontend-prod
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set COMING_SOON_MODE
+        run: |
+          if [ "${{ inputs.state }}" = "on" ]; then
+            VALUE=true
+          else
+            VALUE=false
+          fi
+          az containerapp update --name ${{ env.FRONTEND_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} \
+            --set-env-vars COMING_SOON_MODE=$VALUE
+          echo "### Coming-soon page is now **${{ inputs.state }}**" >> "$GITHUB_STEP_SUMMARY"
