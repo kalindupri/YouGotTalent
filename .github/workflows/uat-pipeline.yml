@@ -13,6 +13,7 @@ permissions:
   contents: write
   packages: write
   id-token: write
+  actions: write  # needed by merge-to-main's "Trigger production deploy" API dispatch call
 
 env:
   RESOURCE_GROUP: rg-ygt-dev
