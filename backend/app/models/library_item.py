@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.content_visibility import ContentVisibility
 
 
 class LibraryItem(Base):
@@ -26,6 +27,7 @@ class LibraryItem(Base):
     # shouldn't be coupled to that table's lifecycle.
     media_type: Mapped[str] = mapped_column(String(20), nullable=False)
     url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    visibility: Mapped[ContentVisibility] = mapped_column(String(20), nullable=False, server_default="public")
 
     # Python-side default (not server_default=func.now()) since Postgres's now() is frozen for
     # the whole transaction — under the test harness's SAVEPOINT-per-commit isolation, multiple

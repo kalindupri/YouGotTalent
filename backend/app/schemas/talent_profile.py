@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.models.content_visibility import ContentVisibility
 from app.models.media import MediaType
 from app.models.talent_profile import TalentCategory
 from app.schemas.credit import CreditRead
@@ -69,6 +70,7 @@ class MediaRead(BaseModel):
     media_type: MediaType
     title: str | None
     is_cover: bool
+    visibility: ContentVisibility
 
 
 class MediaCreate(BaseModel):
@@ -76,6 +78,7 @@ class MediaCreate(BaseModel):
     media_type: MediaType
     title: str | None = None
     is_cover: bool = False
+    visibility: ContentVisibility = ContentVisibility.PUBLIC
 
 
 class MediaUpdate(BaseModel):

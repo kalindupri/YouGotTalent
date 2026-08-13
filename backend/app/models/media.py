@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.content_visibility import ContentVisibility
 
 
 class MediaType(str, enum.Enum):
@@ -26,6 +27,7 @@ class Media(Base):
     media_type: Mapped[MediaType] = mapped_column(String(20), nullable=False)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_cover: Mapped[bool] = mapped_column(default=False, nullable=False)
+    visibility: Mapped[ContentVisibility] = mapped_column(String(20), nullable=False, server_default="public")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

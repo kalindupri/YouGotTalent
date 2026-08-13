@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.content_visibility import ContentVisibility
 
 REEL_PLATFORMS = ["tiktok", "instagram", "facebook"]
 
@@ -23,6 +24,7 @@ class Reel(Base):
     platform: Mapped[str] = mapped_column(String(20), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     caption: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    visibility: Mapped[ContentVisibility] = mapped_column(String(20), nullable=False, server_default="public")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

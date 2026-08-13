@@ -34,7 +34,13 @@ def get_reel(db: Session, reel_id: uuid.UUID) -> Reel | None:
 
 def create_reel(db: Session, talent_profile_id: uuid.UUID, reel_in: ReelCreate) -> Reel:
     platform = detect_reel_platform(reel_in.url)
-    reel = Reel(talent_profile_id=talent_profile_id, platform=platform, url=reel_in.url, caption=reel_in.caption)
+    reel = Reel(
+        talent_profile_id=talent_profile_id,
+        platform=platform,
+        url=reel_in.url,
+        caption=reel_in.caption,
+        visibility=reel_in.visibility,
+    )
     db.add(reel)
     db.commit()
     db.refresh(reel)

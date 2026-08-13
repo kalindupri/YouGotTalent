@@ -14,7 +14,7 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "register",
     question: "How do I create an account?",
-    keywords: ["register", "sign up", "create account", "join", "account", "signup"],
+    keywords: ["register", "sign up", "create account", "join", "signup", "make an account", "new account"],
     answer:
       "Click Register in the top navigation, choose whether you're a Talent or a Talent Hunt (recruiter), fill in your name, email, and password, and agree to the terms. We'll email you a verification code to confirm your address before you can log in.",
     category: "Getting started",
@@ -30,7 +30,7 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "talent-vs-recruiter",
     question: "What's the difference between a Talent and a Talent Hunt account?",
-    keywords: ["talent vs recruiter", "difference", "role", "account type", "talent hunt account", "recruiter account"],
+    keywords: ["talent vs recruiter", "difference between", "account type", "talent hunt account", "recruiter account", "what is a talent hunt"],
     answer:
       "A Talent account is for performers, artists, and creatives who want to build a profile and apply to opportunities. A Talent Hunt (recruiter) account is for companies, agencies, or individuals posting casting calls and searching for talent. You choose one when you register.",
     category: "Getting started",
@@ -136,7 +136,7 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "booking-request",
     question: "How do bookings work?",
-    keywords: ["booking request", "how booking works", "accept booking", "decline booking"],
+    keywords: ["booking request", "how booking works", "accept booking", "decline booking", "book a talent", "book someone", "hire someone for a session"],
     answer:
       "A talent hunt can request a time slot within your declared availability. You'll see the request in Dashboard → Bookings, where you can Accept or Decline it.",
     category: "Bookings",
@@ -180,7 +180,7 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "messaging",
     question: "How does messaging work?",
-    keywords: ["messaging", "message a recruiter", "chat", "read receipt", "seen"],
+    keywords: ["messaging", "message a recruiter", "chat", "read receipt", "seen", "saw my message", "did they see my message"],
     answer:
       "Messages between you and a talent hunt live under Messages in the top nav. Each message shows a timestamp, and you'll see \"Seen\" once the other person has opened the conversation.",
     category: "Messaging",
@@ -197,7 +197,7 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "talent-premium",
     question: "What do I get with Premium?",
-    keywords: ["premium", "upgrade", "talent premium benefits", "subscription benefits", "premium features"],
+    keywords: ["premium", "upgrade", "talent premium benefits", "subscription benefits", "premium features", "upgrade my account", "upgrade to premium", "go premium"],
     answer:
       "Talent Premium unlocks unlimited portfolio items, up to 5 audition videos, boosted placement in search, a dedicated work library/reel, who-viewed-your-profile visibility, and exact read-receipt times on messages.",
     category: "Billing",
@@ -207,7 +207,7 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "post-casting-call",
     question: "How do I post a talent hunt?",
-    keywords: ["post talent hunt", "post job", "create casting call", "new posting", "post a role"],
+    keywords: ["post talent hunt", "post job", "create casting call", "new posting", "post a role", "post a casting call", "create a casting call"],
     answer:
       "From Dashboard → Talent hunts, fill in the \"Post a talent hunt\" form: title, category, description, and at least one role. Premium recruiters can add multiple roles to a single posting.",
     category: "Recruiter",
@@ -215,7 +215,7 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "applicant-board",
     question: "How do I review applicants?",
-    keywords: ["review applicants", "applicant board", "manage applications", "shortlist"],
+    keywords: ["review applicants", "applicant board", "manage applications", "shortlist", "who applied", "see who applied", "view applicants"],
     answer:
       "Click Manage on any of your talent hunts to open the applicant board — search by name, sort by date or match score, and move applicants between Pending, Shortlisted, Accepted, and Rejected columns.",
     category: "Recruiter",
@@ -327,8 +327,24 @@ export const FAQ_ENTRIES: FaqEntry[] = [
   {
     id: "contact-support",
     question: "How do I contact support?",
-    keywords: ["contact support", "help", "support", "talk to someone", "contact us"],
-    answer: "Use the \"Report a problem\" link in the footer, or the Report button on the relevant page, to reach our team directly.",
+    keywords: ["contact support", "help", "support", "talk to someone", "contact us", "delete my account", "close my account", "deactivate account"],
+    answer: "Use the \"Report a problem\" link in the footer, or the Report button on the relevant page, to reach our team directly — including for account deletion requests, which our team handles manually.",
     category: "General",
+  },
+  {
+    id: "get-verified",
+    question: "How do I get a verified badge on my profile?",
+    keywords: ["get verified", "verification badge", "verify my profile", "blue check", "request verification", "how to get verified"],
+    answer:
+      "From Dashboard → Profile, click \"Request verification.\" Our team reviews requests manually (it isn't instant) — once approved, a verified badge appears on your public profile.",
+    category: "Talent profile",
+  },
+  {
+    id: "boost-visibility",
+    question: "How do I get more views or show up higher in search?",
+    keywords: ["more visibility", "get discovered", "boost my profile", "featured placement", "show up in search", "more views", "get noticed"],
+    answer:
+      "Premium talent get boosted placement in search results and a rotating spot in Featured Talent, on top of the profile-views insights that show who's been checking you out. A complete, verified profile with recent portfolio items also ranks higher organically.",
+    category: "Talent profile",
   },
 ];

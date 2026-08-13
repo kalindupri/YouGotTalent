@@ -3,12 +3,15 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.content_visibility import ContentVisibility
+
 
 class LibraryItemCreate(BaseModel):
     title: str
     description: str | None = None
     media_type: str
     url: str
+    visibility: ContentVisibility = ContentVisibility.PUBLIC
 
 
 class LibraryItemRead(BaseModel):
@@ -20,4 +23,5 @@ class LibraryItemRead(BaseModel):
     description: str | None
     media_type: str
     url: str
+    visibility: ContentVisibility
     created_at: datetime

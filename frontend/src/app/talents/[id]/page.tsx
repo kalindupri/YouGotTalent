@@ -30,6 +30,7 @@ import MediaCard from "@/components/MediaCard";
 import LibraryItemCard from "@/components/LibraryItemCard";
 import SubmissionPreview from "@/components/SubmissionPreview";
 import ReportButton from "@/components/ReportButton";
+import TikTokEmbed from "@/components/TikTokEmbed";
 
 export default function TalentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -46,12 +47,12 @@ export default function TalentDetailPage() {
 
   useEffect(() => {
     api
-      .getTalent(params.id)
+      .getTalent(params.id, token)
       .then(setTalent)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load this profile."));
     api.getTalentReviews(params.id).then(setReviewSummary).catch(() => {});
-    api.listTalentLibrary(params.id).then(setLibrary).catch(() => {});
-  }, [params.id]);
+    api.listTalentLibrary(params.id, token).then(setLibrary).catch(() => {});
+  }, [params.id, token]);
 
   useEffect(() => {
     if (!token || user?.role !== "recruiter") return;
@@ -346,6 +347,16 @@ function CreditsSection({ credits }: { credits: Credit[] }) {
 
 function ReelCard({ reel }: { reel: Reel }) {
   const Icon = REEL_PLATFORM_ICONS[reel.platform];
+
+  if (reel.platform === "tiktok") {
+    return (
+      <div>
+        <TikTokEmbed url={reel.url} />
+        {reel.caption && <p className="mt-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">{reel.caption}</p>}
+      </div>
+    );
+  }
+
   return (
     <a
       href={reel.url}

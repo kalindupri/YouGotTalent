@@ -46,6 +46,24 @@ test("premium talent adds a reel and it appears on their public profile", async 
   await expect(page.getByRole("link", { name: /Watch on TikTok/ })).toBeVisible();
 });
 
+test("a real TikTok reel plays in-app on the public profile instead of just linking out", async ({ page }) => {
+  const email = uniqueEmail("reels_embed");
+  await registerAndVerify(page, { email, fullName: "Reels Embed Talent", role: "talent" });
+  await createTalentProfile(page, { displayName: "Reels Embed Talent", category: "acting" });
+  await upgradeToPremium(page);
+
+  await openDashboardSection(page, "Portfolio");
+  const section = sectionByHeading(page, "Reels");
+  await section.getByLabel("Reel URL").fill("https://www.tiktok.com/@kalindu.yapa/video/7637017808911568129");
+  await section.getByRole("button", { name: "Add reel" }).click();
+  await expect(section.getByText("TikTok", { exact: false }).first()).toBeVisible();
+
+  await logout(page);
+  await page.goto("/talents");
+  await page.getByRole("link", { name: /Reels Embed Talent/ }).first().click();
+  await expect(page.locator(".tiktok-embed")).toBeVisible({ timeout: 15000 });
+});
+
 test("premium talent gets an error for an unrecognized reel URL", async ({ page }) => {
   const email = uniqueEmail("reels_invalid");
   await registerAndVerify(page, { email, fullName: "Reels Invalid", role: "talent" });

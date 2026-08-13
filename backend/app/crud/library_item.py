@@ -13,6 +13,7 @@ def create_library_item(db: Session, talent_id: uuid.UUID, item_in: LibraryItemC
         description=item_in.description,
         media_type=item_in.media_type,
         url=item_in.url,
+        visibility=item_in.visibility,
     )
     db.add(item)
     db.commit()

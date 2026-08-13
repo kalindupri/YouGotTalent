@@ -27,6 +27,7 @@ import {
   Booking,
   CalendarEntry,
   CalendarEvent,
+  ContentVisibility,
   Credit,
   CreditProjectType,
   Follow,
@@ -77,6 +78,7 @@ import {
   reelPlatformLabel,
   REEL_PLATFORM_ICONS,
   sectionClass,
+  VISIBILITY_OPTIONS,
   skillsQuestion,
   statusTone,
   verifiedBadgeClass,
@@ -1874,6 +1876,7 @@ function ReelsCard({
 }) {
   const [url, setUrl] = useState("");
   const [caption, setCaption] = useState("");
+  const [visibility, setVisibility] = useState<ContentVisibility>("public");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1884,7 +1887,7 @@ function ReelsCard({
     setError(null);
     setSubmitting(true);
     try {
-      const reel = await api.addMyReel({ url, caption: caption || undefined }, token);
+      const reel = await api.addMyReel({ url, caption: caption || undefined, visibility }, token);
       onUpdated({ ...profile, reels: [reel, ...profile.reels] });
       setUrl("");
       setCaption("");
@@ -1935,6 +1938,16 @@ function ReelsCard({
             <label className={labelClass}>
               Caption (optional)
               <input value={caption} onChange={(e) => setCaption(e.target.value)} className={inputClass} />
+            </label>
+            <label className={labelClass}>
+              Who can see this
+              <select value={visibility} onChange={(e) => setVisibility(e.target.value as ContentVisibility)} className={inputClass}>
+                {VISIBILITY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
@@ -2102,12 +2115,13 @@ function AddMediaForm({
 }: {
   token: string;
   profile: TalentProfile;
-  onAdded: (m: { id: string; url: string; media_type: MediaType; title: string | null; is_cover: boolean }) => void;
+  onAdded: (m: Media) => void;
 }) {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("photo");
+  const [visibility, setVisibility] = useState<ContentVisibility>("public");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -2144,8 +2158,11 @@ function AddMediaForm({
     setSubmitting(true);
     try {
       const media = isUpload
-        ? await api.uploadMyMedia({ file: file!, media_type: mediaType as "video" | "audio", title: title || undefined }, token)
-        : await api.addMyMedia({ url, media_type: mediaType, title: title || undefined }, token);
+        ? await api.uploadMyMedia(
+            { file: file!, media_type: mediaType as "video" | "audio", title: title || undefined, visibility },
+            token
+          )
+        : await api.addMyMedia({ url, media_type: mediaType, title: title || undefined, visibility }, token);
       onAdded(media);
       setUrl("");
       setFile(null);
@@ -2226,6 +2243,17 @@ function AddMediaForm({
           </label>
         )}
 
+        <label className={labelClass}>
+          Who can see this
+          <select value={visibility} onChange={(e) => setVisibility(e.target.value as ContentVisibility)} className={inputClass}>
+            {VISIBILITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"
@@ -2254,6 +2282,7 @@ function LibraryCard({ profile, token }: { profile: TalentProfile; token: string
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [visibility, setVisibility] = useState<ContentVisibility>("public");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -2294,8 +2323,14 @@ function LibraryCard({ profile, token }: { profile: TalentProfile; token: string
     try {
       const item =
         mode === "upload"
-          ? await api.uploadMyLibraryItem({ file: file!, media_type: mediaType, title, description: description || undefined }, token)
-          : await api.addMyLibraryItem({ title, description: description || undefined, media_type: mediaType, url }, token);
+          ? await api.uploadMyLibraryItem(
+              { file: file!, media_type: mediaType, title, description: description || undefined, visibility },
+              token
+            )
+          : await api.addMyLibraryItem(
+              { title, description: description || undefined, media_type: mediaType, url, visibility },
+              token
+            );
       setItems((prev) => [item, ...prev]);
       setTitle("");
       setDescription("");
@@ -2418,6 +2453,17 @@ function LibraryCard({ profile, token }: { profile: TalentProfile; token: string
         <label className={labelClass}>
           Notes (optional)
           <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} />
+        </label>
+
+        <label className={labelClass}>
+          Who can see this
+          <select value={visibility} onChange={(e) => setVisibility(e.target.value as ContentVisibility)} className={inputClass}>
+            {VISIBILITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </label>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

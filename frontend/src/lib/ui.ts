@@ -1,6 +1,7 @@
 import {
   AtSign,
   Aperture,
+  Briefcase,
   Camera,
   Clapperboard,
   Drama,
@@ -29,7 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { CreditProjectType, Media } from "./api";
+import type { ContentVisibility, CreditProjectType, Media } from "./api";
 
 export function coverPhotoUrl(media: Media[]): string | undefined {
   const photos = media.filter((m) => m.media_type === "photo");
@@ -335,6 +336,22 @@ const REEL_PLATFORM_LABELS: Record<string, string> = {
 
 export function reelPlatformLabel(platform: string): string {
   return REEL_PLATFORM_LABELS[platform] ?? platform;
+}
+
+export const VISIBILITY_OPTIONS: { value: ContentVisibility; label: string; icon: LucideIcon }[] = [
+  { value: "public", label: "Public — anyone", icon: Globe },
+  { value: "members", label: "Members — logged-in talent & recruiters", icon: Users },
+  { value: "recruiters", label: "Recruiters only", icon: Briefcase },
+];
+
+const VISIBILITY_LABELS: Record<ContentVisibility, string> = {
+  public: "Public",
+  members: "Members only",
+  recruiters: "Recruiters only",
+};
+
+export function visibilityLabel(visibility: ContentVisibility): string {
+  return VISIBILITY_LABELS[visibility] ?? visibility;
 }
 
 interface SkillsQuestion {

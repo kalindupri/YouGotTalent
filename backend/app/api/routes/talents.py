@@ -10,9 +10,11 @@ from app.api.deps import (
     get_current_recruiter_profile,
     get_current_talent_profile,
     get_optional_recruiter_profile,
+    get_optional_viewer_role,
     require_talent,
 )
 from app.core.config import settings
+from app.core.content_visibility import is_visible_to
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud import subscription as subscription_crud
@@ -41,7 +43,7 @@ from app.db.session import get_db
 from app.models.media import MediaType
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentCategory, TalentProfile
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.credit import CreditCreate, CreditRead, CreditUpdate
 from app.schemas.reel import ReelCreate, ReelRead
 from app.schemas.profile_view import ProfileViewSummary
@@ -103,13 +105,17 @@ def get_talent(
     talent_id: uuid.UUID,
     db: Session = Depends(get_db),
     viewer: RecruiterProfile | None = Depends(get_optional_recruiter_profile),
+    viewer_role: UserRole | None = Depends(get_optional_viewer_role),
 ):
     profile = get_talent_profile(db, talent_id)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
     if viewer is not None:
         record_profile_view(db, profile.id, viewer.id)
-    return profile
+    data = TalentProfileRead.model_validate(profile)
+    data.media = [m for m in data.media if is_visible_to(m.visibility, viewer_role)]
+    data.reels = [r for r in data.reels if is_visible_to(r.visibility, viewer_role)]
+    return data
 
 
 @router.get("/{talent_id}/reviews", response_model=TalentReviewSummary)
@@ -158,6 +164,7 @@ def add_my_media(
 def upload_my_media(
     media_type: str = Form(...),
     title: str | None = Form(None),
+    visibility: str = Form("public"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     profile: TalentProfile = Depends(get_current_talent_profile),
@@ -220,7 +227,7 @@ def upload_my_media(
         compressed_bytes = Path(compressed_path).read_bytes()
 
     url = upload_media_file(compressed_bytes, out_suffix, content_type)
-    media_in = MediaCreate(url=url, media_type=MediaType(media_type), title=title or None)
+    media_in = MediaCreate(url=url, media_type=MediaType(media_type), title=title or None, visibility=visibility)
     return add_media(db, profile.id, media_in)
 
 

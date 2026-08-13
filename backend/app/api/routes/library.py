@@ -6,14 +6,16 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_talent_profile
+from app.api.deps import get_current_talent_profile, get_optional_viewer_role
 from app.core.config import settings
+from app.core.content_visibility import is_visible_to
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud.library_item import create_library_item, delete_library_item, get_library_item, list_library_items
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.talent_profile import TalentProfile
+from app.models.user import UserRole
 from app.schemas.library_item import LibraryItemCreate, LibraryItemRead
 
 router = APIRouter(tags=["library"])
@@ -51,6 +53,7 @@ def upload_my_library_item(
     media_type: str = Form(...),
     title: str = Form(...),
     description: str | None = Form(None),
+    visibility: str = Form("public"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     profile: TalentProfile = Depends(get_current_talent_profile),
@@ -100,7 +103,7 @@ def upload_my_library_item(
         compressed_bytes = Path(compressed_path).read_bytes()
 
     url = upload_media_file(compressed_bytes, out_suffix, content_type)
-    item_in = LibraryItemCreate(title=title, description=description, media_type=media_type, url=url)
+    item_in = LibraryItemCreate(title=title, description=description, media_type=media_type, url=url, visibility=visibility)
     return create_library_item(db, profile.id, item_in)
 
 
@@ -118,8 +121,13 @@ def remove_my_library_item(
 
 
 @router.get("/talents/{talent_id}/library", response_model=list[LibraryItemRead])
-def read_talent_library(talent_id: uuid.UUID, db: Session = Depends(get_db)):
+def read_talent_library(
+    talent_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    viewer_role: UserRole | None = Depends(get_optional_viewer_role),
+):
     talent = get_talent_profile(db, talent_id)
     if talent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
-    return list_library_items(db, talent_id)
+    items = list_library_items(db, talent_id)
+    return [item for item in items if is_visible_to(item.visibility, viewer_role)]

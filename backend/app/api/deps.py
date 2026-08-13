@@ -80,3 +80,19 @@ def get_optional_recruiter_profile(
     if user is None or not user.is_active or user.role != UserRole.RECRUITER:
         return None
     return db.query(RecruiterProfile).filter(RecruiterProfile.user_id == user.id).first()
+
+
+# For content-visibility gating on public routes — needs the viewer's role (any role, or
+# guest), unlike get_optional_recruiter_profile above which only cares about recruiters.
+def get_optional_viewer_role(
+    db: Session = Depends(get_db), token: str | None = Depends(optional_oauth2_scheme)
+) -> UserRole | None:
+    if not token:
+        return None
+    subject = decode_access_token(token)
+    if subject is None:
+        return None
+    user = db.query(User).filter(User.id == uuid.UUID(subject)).first()
+    if user is None or not user.is_active:
+        return None
+    return user.role

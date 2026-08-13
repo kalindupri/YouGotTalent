@@ -9,18 +9,30 @@ const STOPWORDS = new Set([
   "me", "him", "them", "us", "am", "not", "no", "yes", "up", "out", "get", "got",
 ]);
 
+// Deliberately crude — this is a hand-rolled suffix stripper, not a real stemmer. Good enough
+// to fold "videos"->"video", "applied"->"appli"/"applicants"->"applic" close enough to overlap,
+// "saved"->"save", without pulling in an NLP dependency (the whole point is "no LLM/ML").
+function stem(word: string): string {
+  if (word.length > 5 && word.endsWith("ing")) return word.slice(0, -3);
+  if (word.length > 5 && word.endsWith("ies")) return word.slice(0, -3) + "y";
+  if (word.length > 4 && word.endsWith("ed")) return word.slice(0, -2);
+  if (word.length > 4 && word.endsWith("es")) return word.slice(0, -2);
+  if (word.length > 4 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  return word;
+}
+
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
-    .filter((tok) => tok.length > 0 && !STOPWORDS.has(tok));
+    .filter((tok) => tok.length > 0 && !STOPWORDS.has(tok))
+    .map(stem);
 }
 
 const MATCH_THRESHOLD = 2;
 
 export function matchFaq(query: string, entries: FaqEntry[] = FAQ_ENTRIES): FaqEntry | null {
-  const queryLower = query.toLowerCase();
   const queryTokens = new Set(tokenize(query));
   if (queryTokens.size === 0) return null;
 
@@ -30,14 +42,23 @@ export function matchFaq(query: string, entries: FaqEntry[] = FAQ_ENTRIES): FaqE
   for (const entry of entries) {
     let score = 0;
 
+    // Bag-of-words phrase match (order-independent, stemmed) rather than a literal substring —
+    // real sentences almost always insert filler words ("upload A video"), which broke exact
+    // substring matching for nearly every multi-word keyword in practice.
     for (const keyword of entry.keywords) {
-      if (queryLower.includes(keyword.toLowerCase())) {
-        // A multi-word phrase matched verbatim is a much stronger signal than one shared token.
-        score += keyword.includes(" ") ? 4 : 2;
+      const kwTokens = tokenize(keyword);
+      if (kwTokens.length === 0) continue;
+      if (kwTokens.every((t) => queryTokens.has(t))) {
+        // A generic single-word "keyword" (e.g. "account") is a weak signal on its own — it
+        // must combine with question-token overlap to cross the threshold, so it can't alone
+        // hijack an unrelated query the way it used to.
+        score += kwTokens.length > 1 ? 4 : 1.5;
       }
     }
 
-    const questionTokens = tokenize(entry.question);
+    // De-duplicated on purpose: a question that happens to repeat a word (e.g. "a Talent and a
+    // Talent Hunt account") must not score higher just for saying that word twice.
+    const questionTokens = new Set(tokenize(entry.question));
     for (const tok of questionTokens) {
       if (queryTokens.has(tok)) score += 1;
     }

@@ -3,10 +3,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.content_visibility import ContentVisibility
+
 
 class ReelCreate(BaseModel):
     url: str
     caption: str | None = None
+    visibility: ContentVisibility = ContentVisibility.PUBLIC
 
 
 class ReelRead(BaseModel):
@@ -17,4 +20,5 @@ class ReelRead(BaseModel):
     platform: str
     url: str
     caption: str | None
+    visibility: ContentVisibility
     created_at: datetime

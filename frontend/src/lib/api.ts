@@ -22,6 +22,7 @@ export type TalentCategory =
 export type ApplicationStatus = "pending" | "shortlisted" | "rejected" | "accepted";
 export type CastingCallStatus = "open" | "closed";
 export type MediaType = "photo" | "video" | "audio" | "document";
+export type ContentVisibility = "public" | "members" | "recruiters";
 
 export const TALENT_CATEGORIES: TalentCategory[] = [
   "acting",
@@ -58,6 +59,7 @@ export interface Media {
   media_type: MediaType;
   title: string | null;
   is_cover: boolean;
+  visibility: ContentVisibility;
 }
 
 export type CreditProjectType =
@@ -116,12 +118,14 @@ export interface Reel {
   platform: ReelPlatform;
   url: string;
   caption: string | null;
+  visibility: ContentVisibility;
   created_at: string;
 }
 
 export interface ReelInput {
   url: string;
   caption?: string;
+  visibility?: ContentVisibility;
 }
 
 export interface TalentProfile {
@@ -340,6 +344,7 @@ export interface LibraryItem {
   description: string | null;
   media_type: string;
   url: string;
+  visibility: ContentVisibility;
   created_at: string;
 }
 
@@ -848,7 +853,7 @@ export const api = {
     return request<TalentProfile[]>(`/talents${suffix}`);
   },
   listFeaturedTalent: () => request<TalentProfile[]>("/talents/featured"),
-  getTalent: (id: string) => request<TalentProfile>(`/talents/${id}`),
+  getTalent: (id: string, token?: string | null) => request<TalentProfile>(`/talents/${id}`, {}, token),
   getMyTalentProfile: (token: string) => request<TalentProfile>("/talents/me", {}, token),
   createMyTalentProfile: (data: TalentProfileInput, token: string) =>
     request<TalentProfile>("/talents/me", { method: "POST", body: JSON.stringify(data) }, token),
@@ -875,15 +880,18 @@ export const api = {
     }
     return res.json();
   },
-  addMyMedia: (data: { url: string; media_type: MediaType; title?: string; is_cover?: boolean }, token: string) =>
-    request<Media>("/talents/me/media", { method: "POST", body: JSON.stringify(data) }, token),
+  addMyMedia: (
+    data: { url: string; media_type: MediaType; title?: string; is_cover?: boolean; visibility?: ContentVisibility },
+    token: string
+  ) => request<Media>("/talents/me/media", { method: "POST", body: JSON.stringify(data) }, token),
   uploadMyMedia: async (
-    data: { file: File; media_type: "video" | "audio"; title?: string },
+    data: { file: File; media_type: "video" | "audio"; title?: string; visibility?: ContentVisibility },
     token: string
   ): Promise<Media> => {
     const form = new FormData();
     form.set("media_type", data.media_type);
     if (data.title) form.set("title", data.title);
+    if (data.visibility) form.set("visibility", data.visibility);
     form.set("file", data.file);
 
     const res = await fetch(`${API_URL}/talents/me/media/upload`, {
@@ -904,17 +912,20 @@ export const api = {
     return res.json();
   },
   listMyLibrary: (token: string) => request<LibraryItem[]>("/talents/me/library", {}, token),
-  listTalentLibrary: (talentId: string) => request<LibraryItem[]>(`/talents/${talentId}/library`),
-  addMyLibraryItem: (data: { title: string; description?: string; media_type: string; url: string }, token: string) =>
-    request<LibraryItem>("/talents/me/library", { method: "POST", body: JSON.stringify(data) }, token),
+  listTalentLibrary: (talentId: string, token?: string | null) => request<LibraryItem[]>(`/talents/${talentId}/library`, {}, token),
+  addMyLibraryItem: (
+    data: { title: string; description?: string; media_type: string; url: string; visibility?: ContentVisibility },
+    token: string
+  ) => request<LibraryItem>("/talents/me/library", { method: "POST", body: JSON.stringify(data) }, token),
   uploadMyLibraryItem: async (
-    data: { file: File; media_type: "photo" | "video" | "audio"; title: string; description?: string },
+    data: { file: File; media_type: "photo" | "video" | "audio"; title: string; description?: string; visibility?: ContentVisibility },
     token: string
   ): Promise<LibraryItem> => {
     const form = new FormData();
     form.set("media_type", data.media_type);
     form.set("title", data.title);
     if (data.description) form.set("description", data.description);
+    if (data.visibility) form.set("visibility", data.visibility);
     form.set("file", data.file);
 
     const res = await fetch(`${API_URL}/talents/me/library/upload`, {
