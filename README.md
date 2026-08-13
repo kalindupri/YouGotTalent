@@ -84,6 +84,11 @@ npm run dev
 - Photos, videos, and audio auditions collected from talent profiles are personal data under the Personal Data Protection Act No. 9 of 2022 — before going to production, add: a documented retention/deletion policy, a data breach notification process, and (if processing at scale) a Data Protection Officer and DPIA. See the Data Protection Authority: https://www.dpa.gov.lk/
 - Minors submitting auditions will need guardian-consent flows — not yet implemented.
 
+## Live environments
+
+- **Production:** https://yougottalent.lk
+- **UAT:** https://test.yougottalent.lk
+
 ## Project status
 
 Built: auth, talent profiles + skill tags + multi-type media (photo/video/audio/document), organizer profiles, talent hunts (casting calls), applications with status tracking, saved-talent shortlist, skill/keyword search, and a full Tailwind UI for every flow (browse, profile pages, dashboards).
