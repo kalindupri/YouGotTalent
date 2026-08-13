@@ -27,6 +27,7 @@ from app.models.calendar_entry import CalendarEntry
 from app.models.library_item import LibraryItem
 from app.models.marketing_post import MarketingPost
 from app.models.notification import Notification
+from app.models.support_chat import SupportConversation, SupportMessage
 
 __all__ = [
     "User",
@@ -62,4 +63,6 @@ __all__ = [
     "LibraryItem",
     "MarketingPost",
     "Notification",
+    "SupportConversation",
+    "SupportMessage",
 ]

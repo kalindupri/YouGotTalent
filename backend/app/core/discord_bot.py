@@ -179,6 +179,61 @@ def post_to_channel(channel_id: str, content: str) -> None:
         logger.exception("Failed to post message to Discord channel %s", channel_id)
 
 
+def create_thread(channel_id: str, name: str, initial_message: str) -> tuple[str, str]:
+    """Creates a new public thread under channel_id (no starter message required — type 11 is
+    GUILD_PUBLIC_THREAD) and posts initial_message into it. Returns (thread_id, message_id); the
+    thread id works interchangeably with a channel id for every other function in this module,
+    since Discord's message endpoints treat threads as channels. Raises on failure — the caller
+    (starting a live-chat handoff) needs to know immediately if this didn't work, not silently
+    drop the customer's request.
+    """
+    resp = httpx.post(
+        f"{DISCORD_API}/channels/{channel_id}/threads",
+        headers=_headers(),
+        json={"name": name[:100], "type": 11, "auto_archive_duration": 1440},
+        timeout=10.0,
+    )
+    resp.raise_for_status()
+    thread_id = resp.json()["id"]
+
+    msg_resp = httpx.post(
+        f"{DISCORD_API}/channels/{thread_id}/messages",
+        headers=_headers(),
+        json={"content": initial_message},
+        timeout=10.0,
+    )
+    msg_resp.raise_for_status()
+    return thread_id, msg_resp.json()["id"]
+
+
+def get_new_human_messages(channel_id: str, after_message_id: str | None) -> list[dict]:
+    """Like get_human_replies_after, but returns {"id", "content"} pairs instead of just text —
+    the id is needed so the caller can track how far it's already synced and only ask for what's
+    new on the next poll. If after_message_id is None (a brand-new thread), fetches the most
+    recent messages instead of erroring on a missing anchor.
+    """
+    bot_user_id = _bot_user_id()
+    params: dict = {"limit": 50}
+    if after_message_id:
+        params["after"] = after_message_id
+    resp = httpx.get(
+        f"{DISCORD_API}/channels/{channel_id}/messages",
+        headers=_headers(),
+        params=params,
+        timeout=10.0,
+    )
+    resp.raise_for_status()
+    human_messages = [
+        m for m in resp.json() if m["author"]["id"] != bot_user_id and not m["author"].get("bot")
+    ]
+    human_messages.sort(key=lambda m: int(m["id"]))
+    return [
+        {"id": m["id"], "content": m.get("content", "").strip()}
+        for m in human_messages
+        if m.get("content", "").strip()
+    ]
+
+
 def notify_channel(content: str) -> None:
     """Best-effort status note to the marketing channel (e.g. 'posted to Facebook', 'draft
     generation failed') — failures here are logged, not raised, since this is a courtesy

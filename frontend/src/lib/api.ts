@@ -642,6 +642,19 @@ export interface ThreadCreateInput {
   title_id?: string;
 }
 
+export interface SupportMessage {
+  id: string;
+  sender: "customer" | "agent";
+  content: string;
+  created_at: string;
+}
+
+export interface SupportConversation {
+  id: string;
+  status: "open" | "closed";
+  messages: SupportMessage[];
+}
+
 export interface DiscussionThread {
   id: string;
   category: DiscussionCategory;
@@ -1358,4 +1371,11 @@ export const api = {
   adminDeleteTitleReview: (id: string, token: string) => request<void>(`/admin/community/reviews/${id}`, { method: "DELETE" }, token),
   adminDeleteThread: (id: string, token: string) => request<void>(`/admin/community/threads/${id}`, { method: "DELETE" }, token),
   adminDeleteReply: (id: string, token: string) => request<void>(`/admin/community/replies/${id}`, { method: "DELETE" }, token),
+
+  isSupportChatAvailable: () => request<{ available: boolean }>("/support/available"),
+  startSupportChat: (question: string, token?: string | null) =>
+    request<SupportConversation>("/support/start", { method: "POST", body: JSON.stringify({ question }) }, token),
+  pollSupportChat: (conversationId: string) => request<SupportConversation>(`/support/${conversationId}`),
+  sendSupportMessage: (conversationId: string, content: string) =>
+    request<SupportConversation>(`/support/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
 };

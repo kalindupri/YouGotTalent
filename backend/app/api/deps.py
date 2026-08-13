@@ -82,6 +82,22 @@ def get_optional_recruiter_profile(
     return db.query(RecruiterProfile).filter(RecruiterProfile.user_id == user.id).first()
 
 
+# For routes usable by both guests and logged-in users of any role (e.g. starting a live-chat
+# handoff) — the caller only needs to know who's asking, not enforce a role.
+def get_optional_current_user(
+    db: Session = Depends(get_db), token: str | None = Depends(optional_oauth2_scheme)
+) -> User | None:
+    if not token:
+        return None
+    subject = decode_access_token(token)
+    if subject is None:
+        return None
+    user = db.query(User).filter(User.id == uuid.UUID(subject)).first()
+    if user is None or not user.is_active:
+        return None
+    return user
+
+
 # For content-visibility gating on public routes — needs the viewer's role (any role, or
 # guest), unlike get_optional_recruiter_profile above which only cares about recruiters.
 def get_optional_viewer_role(

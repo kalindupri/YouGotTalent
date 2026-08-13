@@ -148,5 +148,10 @@ class Settings(BaseSettings):
     # channel from user-filed content reports, which still use that webhook.
     DISCORD_ERROR_CHANNEL_ID: str | None = None
 
+    # Live-agent handoff from the help chat bot (see app/api/routes/support_chat.py). A new
+    # Discord thread is created under this channel per conversation, using the same bot as
+    # marketing/error alerts above. If unset, the "chat with a person" option is hidden.
+    DISCORD_SUPPORT_CHANNEL_ID: str | None = None
+
 
 settings = Settings()

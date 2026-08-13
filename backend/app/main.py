@@ -22,6 +22,7 @@ from app.api.routes import (
     recruiters,
     reels,
     reports,
+    support_chat,
     talents,
     titles,
 )
@@ -66,6 +67,7 @@ app.include_router(discussions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(marketing.router, prefix=settings.API_V1_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reels.router, prefix=settings.API_V1_PREFIX)
+app.include_router(support_chat.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")
