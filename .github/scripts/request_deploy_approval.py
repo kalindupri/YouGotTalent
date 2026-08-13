@@ -20,7 +20,15 @@ POLL_INTERVAL_SECONDS = 60
 
 
 def _headers(token: str) -> dict:
-    return {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    # Cloudflare (fronting discord.com) blocks requests with urllib's default
+    # "Python-urllib/3.x" User-Agent from cloud/CI IP ranges with a 1010 error before they
+    # ever reach Discord's API -- a descriptive User-Agent (Discord's own recommended format
+    # for bots) avoids that.
+    return {
+        "Authorization": f"Bot {token}",
+        "Content-Type": "application/json",
+        "User-Agent": "DiscordBot (https://github.com/kalindupri/YouGotTalent, 1.0)",
+    }
 
 
 def _post(url: str, token: str, payload: dict) -> dict:
