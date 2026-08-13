@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send } from "lucide-react";
-import { FAQ_ENTRIES } from "@/lib/faqData";
-import { matchFaq, suggestedQuestions } from "@/lib/faqMatch";
+import { FAQ_ENTRIES, type FaqEntry } from "@/lib/faqData";
+import { matchFaqWithSuggestion, suggestedQuestions } from "@/lib/faqMatch";
 
 interface ChatMessage {
   id: number;
   from: "bot" | "user";
   text: string;
+  suggestion?: FaqEntry;
 }
 
 const GREETING =
@@ -32,11 +33,16 @@ export default function HelpChatWidget() {
   function ask(question: string) {
     const trimmed = question.trim();
     if (!trimmed) return;
-    const match = matchFaq(trimmed, FAQ_ENTRIES);
+    const { entry, suggestion } = matchFaqWithSuggestion(trimmed, FAQ_ENTRIES);
     setMessages((prev) => [
       ...prev,
       { id: nextId++, from: "user", text: trimmed },
-      { id: nextId++, from: "bot", text: match ? match.answer : FALLBACK },
+      {
+        id: nextId++,
+        from: "bot",
+        text: entry ? entry.answer : FALLBACK,
+        suggestion: !entry && suggestion ? suggestion : undefined,
+      },
     ]);
     setInput("");
   }
@@ -69,7 +75,7 @@ export default function HelpChatWidget() {
 
           <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
             {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}>
+              <div key={m.id} className={`flex flex-col ${m.from === "user" ? "items-end" : "items-start"}`}>
                 <div
                   className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                     m.from === "user"
@@ -79,6 +85,15 @@ export default function HelpChatWidget() {
                 >
                   {m.text}
                 </div>
+                {m.suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => ask(m.suggestion!.question)}
+                    className="mt-1.5 max-w-[85%] rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                  >
+                    Did you mean: &ldquo;{m.suggestion.question}&rdquo;
+                  </button>
+                )}
               </div>
             ))}
 

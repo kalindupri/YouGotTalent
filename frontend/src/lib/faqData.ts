@@ -360,6 +360,21 @@ export const FAQ_ENTRIES: FaqEntry[] = [
     category: "Talent profile",
   },
   {
+    id: "profile-views",
+    question: "How do I see who viewed my profile?",
+    keywords: [
+      "who viewed my profile",
+      "profile views",
+      "who viewed me",
+      "who checked my profile",
+      "see who viewed",
+      "profile visitors",
+    ],
+    answer:
+      "Premium talent can see who's been viewing their profile from Dashboard → Activity. It's a Premium-only feature — free accounts don't get visitor visibility.",
+    category: "Talent profile",
+  },
+  {
     id: "boost-visibility",
     question: "How do I get more views or show up higher in search?",
     keywords: ["more visibility", "get discovered", "boost my profile", "featured placement", "show up in search", "more views", "get noticed"],
