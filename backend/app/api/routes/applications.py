@@ -3,6 +3,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -10,7 +11,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_recruiter_profile, get_current_talent_profile
 from app.core.config import settings
 from app.core.email import send_email
-from app.core.media_processing import MediaProcessingError, compress_audio, compress_video, probe_video_duration
+from app.core.media_processing import (
+    MediaProcessingError,
+    compress_audio,
+    compress_video,
+    mix_vocal_with_instrumental,
+    probe_video_duration,
+)
 from app.core.storage import upload_media_file
 from app.crud.application import (
     create_application,
@@ -30,6 +37,7 @@ from app.schemas.application import ApplicationCreate, ApplicationRead, Applicat
 router = APIRouter(tags=["applications"])
 
 UPLOADABLE_SUBMISSION_TYPES = {"video", "audio"}
+MAX_AUDITION_RECORDING_SECONDS = 30
 
 
 def _create_application_and_notify(
@@ -140,6 +148,75 @@ def apply_to_casting_call_with_upload(
     url = upload_media_file(compressed_bytes, out_suffix, content_type)
     application_in = ApplicationCreate(role_id=role_id, message=message or None, submission_url=url)
     return _create_application_and_notify(db, background_tasks, casting_call_id, talent, application_in)
+
+
+@router.post("/casting-calls/{casting_call_id}/roles/{role_id}/audition-mix")
+def mix_audition_recording(
+    casting_call_id: uuid.UUID,
+    role_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    talent: TalentProfile = Depends(get_current_talent_profile),
+):
+    """Mixes a talent's recorded vocal onto the role's instrumental track (with reverb) and
+    returns the result for preview -- doesn't create an Application. Once the talent is happy
+    with it, the returned URL is submitted as the normal application's submission_url.
+    """
+    call = get_casting_call(db, casting_call_id)
+    if call is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Casting call not found")
+    role = next((r for r in call.roles if r.id == role_id), None)
+    if role is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That role doesn't belong to this casting call")
+    if not role.instrumental_track_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This role doesn't have a guided audition set up")
+
+    file.file.seek(0, os.SEEK_END)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > settings.MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
+        )
+
+    raw_suffix = Path(file.filename or "").suffix or ".webm"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vocal_path = os.path.join(tmpdir, f"vocal{raw_suffix}")
+        with open(vocal_path, "wb") as out:
+            out.write(file.file.read())
+
+        try:
+            duration = probe_video_duration(vocal_path)
+            if duration > MAX_AUDITION_RECORDING_SECONDS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Recordings must be {MAX_AUDITION_RECORDING_SECONDS} seconds or shorter (this one is {int(duration)}s).",
+                )
+        except MediaProcessingError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not process this recording — try recording again.",
+            )
+
+        instrumental_path = os.path.join(tmpdir, "instrumental.m4a")
+        try:
+            resp = httpx.get(role.instrumental_track_url, timeout=15.0)
+            resp.raise_for_status()
+            Path(instrumental_path).write_bytes(resp.content)
+        except httpx.HTTPError:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not load the instrumental track — try again.")
+
+        mixed_path = os.path.join(tmpdir, "mixed.m4a")
+        try:
+            mix_vocal_with_instrumental(vocal_path, instrumental_path, mixed_path)
+        except MediaProcessingError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not mix this recording — make sure it's a valid audio file.")
+
+        mixed_bytes = Path(mixed_path).read_bytes()
+
+    url = upload_media_file(mixed_bytes, ".m4a", "audio/mp4")
+    return {"url": url}
 
 
 @router.get("/casting-calls/{casting_call_id}/applications", response_model=list[ApplicationRead])

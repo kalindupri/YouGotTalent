@@ -1,11 +1,16 @@
+import os
+import tempfile
 import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_recruiter_profile
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.media_processing import MediaProcessingError, compress_audio, probe_video_duration
+from app.core.storage import upload_media_file
 from app.crud.casting_call import (
     create_casting_call,
     delete_casting_call,
@@ -23,6 +28,55 @@ from app.models.talent_profile import TalentCategory
 from app.schemas.casting_call import CastingCallCreate, CastingCallRead, CastingCallUpdate
 
 router = APIRouter(prefix="/casting-calls", tags=["casting-calls"])
+
+# Both the guide track and the instrumental a talent sings along to must be short excerpts, not
+# full songs -- same cap as the sung take a talent records against them.
+MAX_AUDITION_TRACK_SECONDS = 30
+
+
+@router.post("/audio-tracks/upload")
+def upload_audition_track(
+    file: UploadFile = File(...),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    """Uploads a guide/instrumental track for the singing-audition flow and returns its URL --
+    not tied to a specific role yet, since roles are only created as part of the casting call
+    creation payload (see CastingCallRoleCreate.guide_track_url / instrumental_track_url).
+    """
+    file.file.seek(0, os.SEEK_END)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > settings.MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
+        )
+
+    raw_suffix = Path(file.filename or "").suffix or ".m4a"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw_path = os.path.join(tmpdir, f"raw{raw_suffix}")
+        with open(raw_path, "wb") as out:
+            out.write(file.file.read())
+
+        compressed_path = os.path.join(tmpdir, "compressed.m4a")
+        try:
+            duration = probe_video_duration(raw_path)
+            if duration > MAX_AUDITION_TRACK_SECONDS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Audition tracks must be {MAX_AUDITION_TRACK_SECONDS} seconds or shorter (this one is {int(duration)}s).",
+                )
+            compress_audio(raw_path, compressed_path)
+        except MediaProcessingError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not process this file — make sure it's a valid audio file.",
+            )
+
+        compressed_bytes = Path(compressed_path).read_bytes()
+
+    url = upload_media_file(compressed_bytes, ".m4a", "audio/mp4")
+    return {"url": url}
 
 
 @router.get("", response_model=list[CastingCallRead])

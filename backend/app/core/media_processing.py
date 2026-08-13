@@ -62,6 +62,25 @@ def compress_audio(input_path: str, output_path: str) -> None:
     _run_ffmpeg(["-i", input_path, "-vn", "-c:a", "aac", "-b:a", "128k", output_path])
 
 
+def mix_vocal_with_instrumental(vocal_path: str, instrumental_path: str, output_path: str) -> None:
+    """Adds a light reverb to the talent's recorded vocal and mixes it onto the instrumental --
+    output duration follows the instrumental (duration=first), since that's the backing track
+    the talent sang along to.
+    """
+    _run_ffmpeg(
+        [
+            "-i", instrumental_path,
+            "-i", vocal_path,
+            "-filter_complex",
+            "[1:a]aecho=0.8:0.9:1000:0.3[vocal_fx];[0:a][vocal_fx]amix=inputs=2:duration=first:dropout_transition=2[out]",
+            "-map", "[out]",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            output_path,
+        ]
+    )
+
+
 def compress_photo(input_path: str, output_path: str) -> None:
     _run_ffmpeg(
         [

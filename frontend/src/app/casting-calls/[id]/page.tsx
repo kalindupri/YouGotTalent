@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Check, Clapperboard, Paperclip, Star } from "lucide-react";
 import { ApiError, CastingCall, CastingCallRole, RecruiterProfile, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import AudioAuditionRecorder from "@/components/AudioAuditionRecorder";
 import CategoryIcon from "@/components/CategoryIcon";
 import FollowRecruiterButton from "@/components/FollowRecruiterButton";
 import ReportButton from "@/components/ReportButton";
@@ -146,6 +147,9 @@ function CastingCallDetailContent() {
       </main>
     );
   }
+
+  const selectedRole = call.roles.find((r) => r.id === selectedRoleId);
+  const hasGuidedAudition = Boolean(selectedRole?.guide_track_url && selectedRole?.instrumental_track_url);
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-14">
@@ -300,7 +304,18 @@ function CastingCallDetailContent() {
                 </select>
               </label>
             )}
-            {call.audition_brief && (
+            {hasGuidedAudition && token && selectedRole ? (
+              <AudioAuditionRecorder
+                role={selectedRole}
+                castingCallId={call.id}
+                token={token}
+                onMixed={(url) => {
+                  setSubmissionUrl(url);
+                  setSubmissionMode("link");
+                }}
+              />
+            ) : (
+              call.audition_brief && (
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Your performed take</span>
                 <fieldset className="grid grid-cols-2 gap-2">
@@ -345,6 +360,7 @@ function CastingCallDetailContent() {
                   </label>
                 )}
               </div>
+              )
             )}
             <label className={labelClass}>
               Message to the recruiter (optional)

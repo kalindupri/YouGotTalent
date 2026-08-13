@@ -8,6 +8,8 @@ class CastingCallRoleCreate(BaseModel):
     criteria: str | None = None
     category: str | None = None
     compensation: str | None = None
+    guide_track_url: str | None = None
+    instrumental_track_url: str | None = None
 
 
 class CastingCallRoleRead(BaseModel):
@@ -19,3 +21,5 @@ class CastingCallRoleRead(BaseModel):
     criteria: str | None
     category: str | None
     compensation: str | None
+    guide_track_url: str | None
+    instrumental_track_url: str | None

@@ -212,6 +212,8 @@ export interface CastingCallRole {
   criteria: string | null;
   category: string | null;
   compensation: string | null;
+  guide_track_url: string | null;
+  instrumental_track_url: string | null;
 }
 
 export interface CastingCallRoleInput {
@@ -219,6 +221,8 @@ export interface CastingCallRoleInput {
   criteria?: string;
   category?: TalentCategory;
   compensation?: string;
+  guide_track_url?: string;
+  instrumental_track_url?: string;
 }
 
 export interface CastingCall {
@@ -1135,6 +1139,51 @@ export const api = {
     form.set("file", data.file);
 
     const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/applications/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === "string") detail = body.detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json();
+  },
+  uploadAuditionTrack: async (file: File, token: string): Promise<{ url: string }> => {
+    const form = new FormData();
+    form.set("file", file);
+    const res = await fetch(`${API_URL}/casting-calls/audio-tracks/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (typeof body.detail === "string") detail = body.detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.json();
+  },
+  mixAuditionRecording: async (
+    castingCallId: string,
+    roleId: string,
+    file: Blob,
+    token: string
+  ): Promise<{ url: string }> => {
+    const form = new FormData();
+    form.set("file", file, "recording.webm");
+    const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/roles/${roleId}/audition-mix`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,

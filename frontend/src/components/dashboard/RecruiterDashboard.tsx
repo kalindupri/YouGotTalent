@@ -849,10 +849,23 @@ interface RoleDraft {
   criteria: string;
   category: TalentCategory | "";
   compensation: string;
+  guideTrackUrl: string;
+  instrumentalTrackUrl: string;
+  uploadingGuide: boolean;
+  uploadingInstrumental: boolean;
 }
 
 function emptyRole(): RoleDraft {
-  return { title: "", criteria: "", category: "", compensation: "" };
+  return {
+    title: "",
+    criteria: "",
+    category: "",
+    compensation: "",
+    guideTrackUrl: "",
+    instrumentalTrackUrl: "",
+    uploadingGuide: false,
+    uploadingInstrumental: false,
+  };
 }
 
 function PostCastingCallForm({
@@ -882,6 +895,18 @@ function PostCastingCallForm({
     setRoles((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
+  async function handleTrackUpload(index: number, kind: "guide" | "instrumental", file: File) {
+    updateRole(index, kind === "guide" ? { uploadingGuide: true } : { uploadingInstrumental: true });
+    setError(null);
+    try {
+      const { url } = await api.uploadAuditionTrack(file, token);
+      updateRole(index, kind === "guide" ? { guideTrackUrl: url, uploadingGuide: false } : { instrumentalTrackUrl: url, uploadingInstrumental: false });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not upload this track.");
+      updateRole(index, kind === "guide" ? { uploadingGuide: false } : { uploadingInstrumental: false });
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -904,6 +929,8 @@ function PostCastingCallForm({
             criteria: r.criteria.trim() || undefined,
             category: r.category || category,
             compensation: r.compensation.trim() || undefined,
+            guide_track_url: r.guideTrackUrl || undefined,
+            instrumental_track_url: r.instrumentalTrackUrl || undefined,
           })),
         },
         token
@@ -1077,6 +1104,39 @@ function PostCastingCallForm({
                   className={inputClass}
                 />
               </div>
+              {(role.category || category) === "singing" && (
+                <div className="flex flex-col gap-2 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    Guided audition (optional) — up to 30 seconds each
+                  </p>
+                  <label className={labelClass}>
+                    Guide track (with vocals, for talent to learn from)
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      disabled={role.uploadingGuide}
+                      onChange={(e) => e.target.files?.[0] && handleTrackUpload(i, "guide", e.target.files[0])}
+                      className={inputClass}
+                    />
+                    {role.uploadingGuide && <span className="text-xs text-zinc-500">Uploading…</span>}
+                    {role.guideTrackUrl && !role.uploadingGuide && <span className="text-xs text-emerald-600">Uploaded ✓</span>}
+                  </label>
+                  <label className={labelClass}>
+                    Instrumental track (music only — talent sings over this)
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      disabled={role.uploadingInstrumental}
+                      onChange={(e) => e.target.files?.[0] && handleTrackUpload(i, "instrumental", e.target.files[0])}
+                      className={inputClass}
+                    />
+                    {role.uploadingInstrumental && <span className="text-xs text-zinc-500">Uploading…</span>}
+                    {role.instrumentalTrackUrl && !role.uploadingInstrumental && (
+                      <span className="text-xs text-emerald-600">Uploaded ✓</span>
+                    )}
+                  </label>
+                </div>
+              )}
             </div>
           ))}
           {isPremium ? (
