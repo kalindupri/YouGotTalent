@@ -62,17 +62,48 @@ def compress_audio(input_path: str, output_path: str) -> None:
     _run_ffmpeg(["-i", input_path, "-vn", "-c:a", "aac", "-b:a", "128k", output_path])
 
 
-def mix_vocal_with_instrumental(vocal_path: str, instrumental_path: str, output_path: str) -> None:
-    """Adds a light reverb to the talent's recorded vocal and mixes it onto the instrumental --
-    output duration follows the instrumental (duration=first), since that's the backing track
-    the talent sang along to.
+def mix_vocal_with_instrumental(
+    vocal_path: str,
+    instrumental_path: str,
+    output_path: str,
+    bass_db: float = 0.0,
+    mid_db: float = 0.0,
+    treble_db: float = 0.0,
+    reverb_amount: float = 0.0,
+    delay_ms: float = 0.0,
+    delay_feedback: float = 0.0,
+) -> None:
+    """Applies 3-band EQ + reverb + delay to the talent's recorded vocal (matching whatever
+    they dialed in on the live client-side preview -- see AudioAuditionRecorder.tsx) and mixes
+    it onto the instrumental. Output duration follows the instrumental (duration=first), since
+    that's the backing track the talent sang along to.
+
+    All effect params default to "off" (flat EQ, no reverb/delay) -- unlike the original fixed
+    version of this function, nothing is forced on unless the talent actually dialed it in.
     """
+    reverb_amount = max(0.0, min(100.0, reverb_amount)) / 100.0
+    delay_feedback = max(0.0, min(60.0, delay_feedback)) / 100.0
+    delay_ms = max(0.0, min(500.0, delay_ms))
+
+    # aecho can't take a literal 0 decay, so floor it -- at this level the tap is inaudible,
+    # which is how "reverb/delay off" is represented here.
+    reverb_decay = max(reverb_amount * 0.6, 0.001)
+    reverb_tap_ms = int(400 + reverb_amount * 800)
+    delay_decay = max(delay_feedback, 0.001)
+    delay_tap_ms = max(int(delay_ms), 1)
+
+    vocal_filter = (
+        f"bass=g={bass_db},treble=g={treble_db},equalizer=f=1000:width_type=o:width=2:g={mid_db},"
+        f"aecho=0.8:{0.3 + reverb_amount * 0.5:.3f}:{reverb_tap_ms}:{reverb_decay:.3f},"
+        f"aecho=0.8:{delay_decay:.3f}:{delay_tap_ms}:{delay_decay:.3f}"
+    )
+
     _run_ffmpeg(
         [
             "-i", instrumental_path,
             "-i", vocal_path,
             "-filter_complex",
-            "[1:a]aecho=0.8:0.9:1000:0.3[vocal_fx];[0:a][vocal_fx]amix=inputs=2:duration=first:dropout_transition=2[out]",
+            f"[1:a]{vocal_filter}[vocal_fx];[0:a][vocal_fx]amix=inputs=2:duration=first:dropout_transition=2[out]",
             "-map", "[out]",
             "-c:a", "aac",
             "-b:a", "128k",

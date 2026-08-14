@@ -1179,13 +1179,31 @@ export const api = {
     castingCallId: string,
     roleId: string,
     file: Blob,
-    token: string
+    token: string,
+    effects?: {
+      bassDb?: number;
+      midDb?: number;
+      trebleDb?: number;
+      reverbAmount?: number;
+      delayMs?: number;
+      delayFeedback?: number;
+    }
   ): Promise<{ url: string }> => {
     // Safari records to MP4/AAC rather than WebM -- name the upload to match what the browser
     // actually produced (file.type), not a hardcoded extension that wouldn't match on iOS.
     const ext = file.type.includes("mp4") ? "mp4" : file.type.includes("ogg") ? "ogg" : "webm";
     const form = new FormData();
     form.set("file", file, `recording.${ext}`);
+    if (effects) {
+      // Sent alongside the recording so the server-rendered mix matches what the talent
+      // heard in the live client-side preview (see AudioAuditionRecorder.tsx).
+      form.set("bass_db", String(effects.bassDb ?? 0));
+      form.set("mid_db", String(effects.midDb ?? 0));
+      form.set("treble_db", String(effects.trebleDb ?? 0));
+      form.set("reverb_amount", String(effects.reverbAmount ?? 0));
+      form.set("delay_ms", String(effects.delayMs ?? 0));
+      form.set("delay_feedback", String(effects.delayFeedback ?? 0));
+    }
     const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/roles/${roleId}/audition-mix`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },

@@ -155,6 +155,12 @@ def mix_audition_recording(
     casting_call_id: uuid.UUID,
     role_id: uuid.UUID,
     file: UploadFile = File(...),
+    bass_db: float = Form(0.0),
+    mid_db: float = Form(0.0),
+    treble_db: float = Form(0.0),
+    reverb_amount: float = Form(0.0),
+    delay_ms: float = Form(0.0),
+    delay_feedback: float = Form(0.0),
     db: Session = Depends(get_db),
     talent: TalentProfile = Depends(get_current_talent_profile),
 ):
@@ -209,7 +215,17 @@ def mix_audition_recording(
 
         mixed_path = os.path.join(tmpdir, "mixed.m4a")
         try:
-            mix_vocal_with_instrumental(vocal_path, instrumental_path, mixed_path)
+            mix_vocal_with_instrumental(
+                vocal_path,
+                instrumental_path,
+                mixed_path,
+                bass_db=bass_db,
+                mid_db=mid_db,
+                treble_db=treble_db,
+                reverb_amount=reverb_amount,
+                delay_ms=delay_ms,
+                delay_feedback=delay_feedback,
+            )
         except MediaProcessingError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not mix this recording — make sure it's a valid audio file.")
 

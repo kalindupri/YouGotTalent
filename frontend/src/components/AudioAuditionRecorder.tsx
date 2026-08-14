@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, CastingCallRole, api } from "@/lib/api";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
+import Knob from "@/components/Knob";
 
 const MAX_RECORDING_SECONDS = 30;
 
@@ -33,19 +34,95 @@ export default function AudioAuditionRecorder({
   const [mixing, setMixing] = useState(false);
   const [mixedUrl, setMixedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [micLevel, setMicLevel] = useState(0);
+
+  const [bassDb, setBassDb] = useState(0);
+  const [midDb, setMidDb] = useState(0);
+  const [trebleDb, setTrebleDb] = useState(0);
+  const [reverbAmount, setReverbAmount] = useState(0);
+  const [delayAmount, setDelayAmount] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const guideAudioRef = useRef<HTMLAudioElement | null>(null);
   const instrumentalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const takeAudioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micAnalyserRef = useRef<AnalyserNode | null>(null);
+  const micMeterFrameRef = useRef<number | null>(null);
+
+  // Live client-side preview graph for "Your take" -- rebuilt whenever a fresh recording is
+  // made, since createMediaElementSource can only ever be called once per <audio> element.
+  const eqNodesRef = useRef<{ bass: BiquadFilterNode; mid: BiquadFilterNode; treble: BiquadFilterNode } | null>(null);
+  const reverbWetRef = useRef<GainNode | null>(null);
+  const delayNodeRef = useRef<DelayNode | null>(null);
+  const delayFeedbackRef = useRef<GainNode | null>(null);
+  const delayWetRef = useRef<GainNode | null>(null);
+
+  const takeUrl = useMemo(() => (recordedBlob ? URL.createObjectURL(recordedBlob) : null), [recordedBlob]);
+  useEffect(() => {
+    return () => {
+      if (takeUrl) URL.revokeObjectURL(takeUrl);
+    };
+  }, [takeUrl]);
+
+  function getAudioContext(): AudioContext {
+    if (!audioContextRef.current) {
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioContextRef.current = new Ctor();
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    return ctx;
+  }
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (micMeterFrameRef.current) cancelAnimationFrame(micMeterFrameRef.current);
       mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+      audioContextRef.current?.close().catch(() => {});
     };
   }, []);
+
+  function startMicMeter(stream: MediaStream) {
+    const ctx = getAudioContext();
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    // Deliberately NOT connected onward to ctx.destination -- this tap is for the level
+    // meter only, connecting it to output would create a feedback loop through the speakers.
+    source.connect(analyser);
+    micSourceRef.current = source;
+    micAnalyserRef.current = analyser;
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const tick = () => {
+      analyser.getByteTimeDomainData(data);
+      let sumSquares = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = (data[i] - 128) / 128;
+        sumSquares += v * v;
+      }
+      const rms = Math.sqrt(sumSquares / data.length);
+      setMicLevel(Math.min(100, Math.round(rms * 350)));
+      micMeterFrameRef.current = requestAnimationFrame(tick);
+    };
+    micMeterFrameRef.current = requestAnimationFrame(tick);
+  }
+
+  function stopMicMeter() {
+    if (micMeterFrameRef.current) cancelAnimationFrame(micMeterFrameRef.current);
+    micMeterFrameRef.current = null;
+    micSourceRef.current?.disconnect();
+    micAnalyserRef.current?.disconnect();
+    micSourceRef.current = null;
+    micAnalyserRef.current = null;
+    setMicLevel(0);
+  }
 
   async function startRecording() {
     setError(null);
@@ -68,11 +145,13 @@ export default function AudioAuditionRecorder({
       recorder.onstop = () => {
         setRecordedBlob(new Blob(chunksRef.current, { type: mimeType ?? recorder.mimeType ?? "audio/webm" }));
         stream.getTracks().forEach((t) => t.stop());
+        stopMicMeter();
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
       setRecording(true);
       setSecondsLeft(MAX_RECORDING_SECONDS);
+      startMicMeter(stream);
 
       // The guide track has its own player for previewing the song beforehand -- if it was left
       // playing (or gets started mid-recording) it plays through the speakers right alongside the
@@ -109,14 +188,119 @@ export default function AudioAuditionRecorder({
     setRecordedBlob(null);
     setMixedUrl(null);
     setError(null);
+    setBassDb(0);
+    setMidDb(0);
+    setTrebleDb(0);
+    setReverbAmount(0);
+    setDelayAmount(0);
   }
+
+  // Builds the live-preview effects graph for "Your take" once its <audio> element exists.
+  // No impulse-response file for the reverb -- a small feedback-delay network (a handful of
+  // short, staggered taps with damping) keeps the frontend self-contained.
+  useEffect(() => {
+    if (!recordedBlob || !takeAudioRef.current) return;
+    const ctx = getAudioContext();
+    const source = ctx.createMediaElementSource(takeAudioRef.current);
+
+    const bass = ctx.createBiquadFilter();
+    bass.type = "lowshelf";
+    bass.frequency.value = 200;
+    const mid = ctx.createBiquadFilter();
+    mid.type = "peaking";
+    mid.frequency.value = 1000;
+    mid.Q.value = 1;
+    const treble = ctx.createBiquadFilter();
+    treble.type = "highshelf";
+    treble.frequency.value = 4000;
+
+    source.connect(bass);
+    bass.connect(mid);
+    mid.connect(treble);
+    treble.connect(ctx.destination);
+
+    const reverbWet = ctx.createGain();
+    reverbWet.gain.value = 0;
+    [0.029, 0.037, 0.053].forEach((tapSeconds) => {
+      const tapDelay = ctx.createDelay(1);
+      tapDelay.delayTime.value = tapSeconds;
+      const tapFeedback = ctx.createGain();
+      tapFeedback.gain.value = 0.35;
+      const damping = ctx.createBiquadFilter();
+      damping.type = "lowpass";
+      damping.frequency.value = 3500;
+      treble.connect(tapDelay);
+      tapDelay.connect(damping);
+      damping.connect(tapFeedback);
+      tapFeedback.connect(tapDelay);
+      damping.connect(reverbWet);
+    });
+    reverbWet.connect(ctx.destination);
+
+    const delayNode = ctx.createDelay(1);
+    delayNode.delayTime.value = 0.001;
+    const delayFeedback = ctx.createGain();
+    delayFeedback.gain.value = 0;
+    const delayWet = ctx.createGain();
+    delayWet.gain.value = 0;
+    treble.connect(delayNode);
+    delayNode.connect(delayFeedback);
+    delayFeedback.connect(delayNode);
+    delayNode.connect(delayWet);
+    delayWet.connect(ctx.destination);
+
+    eqNodesRef.current = { bass, mid, treble };
+    reverbWetRef.current = reverbWet;
+    delayNodeRef.current = delayNode;
+    delayFeedbackRef.current = delayFeedback;
+    delayWetRef.current = delayWet;
+
+    return () => {
+      source.disconnect();
+      bass.disconnect();
+      mid.disconnect();
+      treble.disconnect();
+      reverbWet.disconnect();
+      delayNode.disconnect();
+      delayFeedback.disconnect();
+      delayWet.disconnect();
+      eqNodesRef.current = null;
+      reverbWetRef.current = null;
+      delayNodeRef.current = null;
+      delayFeedbackRef.current = null;
+      delayWetRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordedBlob]);
+
+  // Updates the live graph instantly as knobs move -- no server round-trip. The same values
+  // are sent to the backend on "Mix with instrumental" so the final render matches this preview.
+  useEffect(() => {
+    const eq = eqNodesRef.current;
+    if (eq) {
+      eq.bass.gain.value = bassDb;
+      eq.mid.gain.value = midDb;
+      eq.treble.gain.value = trebleDb;
+    }
+    if (reverbWetRef.current) reverbWetRef.current.gain.value = (reverbAmount / 100) * 0.6;
+    if (delayNodeRef.current) delayNodeRef.current.delayTime.value = Math.max((delayAmount / 100) * 0.4, 0.001);
+    if (delayFeedbackRef.current) delayFeedbackRef.current.gain.value = (delayAmount / 100) * 0.35;
+    if (delayWetRef.current) delayWetRef.current.gain.value = delayAmount > 0 ? Math.min((delayAmount / 100) * 0.5, 0.5) : 0;
+  }, [bassDb, midDb, trebleDb, reverbAmount, delayAmount]);
 
   async function handleMix() {
     if (!recordedBlob) return;
     setMixing(true);
     setError(null);
     try {
-      const { url } = await api.mixAuditionRecording(castingCallId, role.id, recordedBlob, token);
+      const { url } = await api.mixAuditionRecording(castingCallId, role.id, recordedBlob, token, {
+        bassDb,
+        midDb,
+        trebleDb,
+        reverbAmount,
+        delayMs: (delayAmount / 100) * 400,
+        delayFeedback: (delayAmount / 100) * 50,
+      });
       setMixedUrl(url);
       onMixed(url);
     } catch (err) {
@@ -168,20 +352,44 @@ export default function AudioAuditionRecorder({
       )}
 
       {recording && (
-        <div className="flex items-center gap-3">
-          <span className="flex h-3 w-3 animate-pulse rounded-full bg-rose-600" />
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Recording… {secondsLeft}s left</span>
-          <button type="button" onClick={stopRecording} className={btnSecondary}>
-            Stop
-          </button>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <span className="flex h-3 w-3 animate-pulse rounded-full bg-rose-600" />
+            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Recording… {secondsLeft}s left</span>
+            <button type="button" onClick={stopRecording} className={btnSecondary}>
+              Stop
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Mic level</span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+              <div
+                className={`h-full rounded-full transition-[width] duration-75 ${
+                  micLevel > 80 ? "bg-amber-500" : "bg-emerald-500"
+                }`}
+                style={{ width: `${micLevel}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
 
       {recordedBlob && !mixedUrl && (
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Your take</span>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio controls src={URL.createObjectURL(recordedBlob)} className="w-full" />
+        <div className="flex flex-col gap-3">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Your take</span>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <audio ref={takeAudioRef} controls src={takeUrl ?? undefined} className="w-full" />
+          </div>
+
+          <div className="flex flex-wrap items-end gap-4 rounded-md bg-zinc-50 p-3 dark:bg-zinc-900/50">
+            <Knob label="Bass" value={bassDb} min={-12} max={12} step={1} unit="dB" onChange={setBassDb} />
+            <Knob label="Mid" value={midDb} min={-12} max={12} step={1} unit="dB" onChange={setMidDb} />
+            <Knob label="Treble" value={trebleDb} min={-12} max={12} step={1} unit="dB" onChange={setTrebleDb} />
+            <Knob label="Reverb" value={reverbAmount} min={0} max={100} step={5} unit="%" onChange={setReverbAmount} />
+            <Knob label="Delay" value={delayAmount} min={0} max={100} step={5} unit="%" onChange={setDelayAmount} />
+          </div>
+
           <div className="flex gap-2">
             <button type="button" onClick={handleMix} disabled={mixing} className={btnPrimary}>
               {mixing ? "Mixing…" : "Mix with instrumental"}
