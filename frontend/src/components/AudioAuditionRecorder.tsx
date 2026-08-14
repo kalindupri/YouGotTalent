@@ -389,7 +389,7 @@ export default function AudioAuditionRecorder({
         </div>
       )}
 
-      {recordedBlob && !mixedUrl && (
+      {recordedBlob && (
         <div className="flex flex-col gap-3">
           <div>
             <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Your take</span>
@@ -408,28 +408,25 @@ export default function AudioAuditionRecorder({
           </div>
           <p className="text-[11px] text-zinc-500">
             Sync shifts your vocal earlier (−) or later (+) to line it up with the instrumental if the take drifted
-            out of time.
+            out of time. Adjust and mix again as many times as you like using this same take.
           </p>
 
           <div className="flex gap-2">
             <button type="button" onClick={handleMix} disabled={mixing} className={btnPrimary}>
-              {mixing ? "Mixing…" : "Mix with instrumental"}
+              {mixing ? "Mixing…" : mixedUrl ? "Mix again" : "Mix with instrumental"}
             </button>
             <button type="button" onClick={reRecord} className={btnSecondary}>
               Re-record
             </button>
           </div>
-        </div>
-      )}
 
-      {mixedUrl && (
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-bold uppercase tracking-wide text-emerald-600">Your mixed audition</span>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio controls src={mixedUrl} className="w-full" />
-          <button type="button" onClick={reRecord} className={`w-fit ${btnSecondary}`}>
-            Re-record
-          </button>
+          {mixedUrl && (
+            <div className="flex flex-col gap-2 rounded-md border border-emerald-200 p-3 dark:border-emerald-900">
+              <span className="text-xs font-bold uppercase tracking-wide text-emerald-600">Your mixed audition</span>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <audio controls src={mixedUrl} className="w-full" />
+            </div>
+          )}
         </div>
       )}
 
