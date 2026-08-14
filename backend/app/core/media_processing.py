@@ -72,18 +72,24 @@ def mix_vocal_with_instrumental(
     reverb_amount: float = 0.0,
     delay_ms: float = 0.0,
     delay_feedback: float = 0.0,
+    vocal_gain_db: float = 0.0,
+    sync_offset_ms: float = 0.0,
 ) -> None:
-    """Applies 3-band EQ + reverb + delay to the talent's recorded vocal (matching whatever
-    they dialed in on the live client-side preview -- see AudioAuditionRecorder.tsx) and mixes
+    """Applies 3-band EQ + reverb + delay + gain to the talent's recorded vocal (matching
+    whatever they dialed in on the live client-side preview -- see AudioAuditionRecorder.tsx),
+    optionally nudges it earlier/later relative to the instrumental to fix sync drift, and mixes
     it onto the instrumental. Output duration follows the instrumental (duration=first), since
     that's the backing track the talent sang along to.
 
-    All effect params default to "off" (flat EQ, no reverb/delay) -- unlike the original fixed
-    version of this function, nothing is forced on unless the talent actually dialed it in.
+    All effect params default to "off" (flat EQ, no reverb/delay, no gain/offset change) --
+    unlike the original fixed version of this function, nothing is forced on unless the talent
+    actually dialed it in.
     """
     reverb_amount = max(0.0, min(100.0, reverb_amount)) / 100.0
     delay_feedback = max(0.0, min(60.0, delay_feedback)) / 100.0
     delay_ms = max(0.0, min(500.0, delay_ms))
+    vocal_gain_db = max(-12.0, min(12.0, vocal_gain_db))
+    sync_offset_ms = max(-1000.0, min(1000.0, sync_offset_ms))
 
     # aecho can't take a literal 0 decay, so floor it -- at this level the tap is inaudible,
     # which is how "reverb/delay off" is represented here.
@@ -93,17 +99,36 @@ def mix_vocal_with_instrumental(
     delay_tap_ms = max(int(delay_ms), 1)
 
     vocal_filter = (
+        f"volume={vocal_gain_db}dB,"
         f"bass=g={bass_db},treble=g={treble_db},equalizer=f=1000:width_type=o:width=2:g={mid_db},"
         f"aecho=0.8:{0.3 + reverb_amount * 0.5:.3f}:{reverb_tap_ms}:{reverb_decay:.3f},"
         f"aecho=0.8:{delay_decay:.3f}:{delay_tap_ms}:{delay_decay:.3f}"
+    )
+
+    # A positive offset means the vocal was sung/recorded *behind* the instrumental (needs to
+    # catch up), so delay the instrumental to meet it; negative means the vocal is ahead, so
+    # delay the vocal instead. There's no audio to pull from before the recording started, which
+    # is why this is two one-sided delays rather than a single signed shift on one stream.
+    instrumental_delay_ms = max(int(-sync_offset_ms), 0)
+    vocal_delay_ms = max(int(sync_offset_ms), 0)
+    if vocal_delay_ms:
+        vocal_filter += f",adelay={vocal_delay_ms}:all=1"
+    instrumental_filter = f"adelay={instrumental_delay_ms}:all=1" if instrumental_delay_ms else "anull"
+
+    # normalize=0 keeps the vocal's dialed-in volume intact instead of amix's default of
+    # halving both streams to guarantee no clipping; alimiter is the safety net for that instead.
+    filter_complex = (
+        f"[0:a]{instrumental_filter}[inst_fx];"
+        f"[1:a]{vocal_filter}[vocal_fx];"
+        f"[inst_fx][vocal_fx]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[mixed];"
+        f"[mixed]alimiter=limit=0.95[out]"
     )
 
     _run_ffmpeg(
         [
             "-i", instrumental_path,
             "-i", vocal_path,
-            "-filter_complex",
-            f"[1:a]{vocal_filter}[vocal_fx];[0:a][vocal_fx]amix=inputs=2:duration=first:dropout_transition=2[out]",
+            "-filter_complex", filter_complex,
             "-map", "[out]",
             "-c:a", "aac",
             "-b:a", "128k",

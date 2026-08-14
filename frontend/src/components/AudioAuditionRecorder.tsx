@@ -41,6 +41,8 @@ export default function AudioAuditionRecorder({
   const [trebleDb, setTrebleDb] = useState(0);
   const [reverbAmount, setReverbAmount] = useState(0);
   const [delayAmount, setDelayAmount] = useState(0);
+  const [vocalGainDb, setVocalGainDb] = useState(0);
+  const [syncOffsetMs, setSyncOffsetMs] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -61,6 +63,7 @@ export default function AudioAuditionRecorder({
   const delayNodeRef = useRef<DelayNode | null>(null);
   const delayFeedbackRef = useRef<GainNode | null>(null);
   const delayWetRef = useRef<GainNode | null>(null);
+  const vocalGainRef = useRef<GainNode | null>(null);
 
   const takeUrl = useMemo(() => (recordedBlob ? URL.createObjectURL(recordedBlob) : null), [recordedBlob]);
   useEffect(() => {
@@ -193,6 +196,8 @@ export default function AudioAuditionRecorder({
     setTrebleDb(0);
     setReverbAmount(0);
     setDelayAmount(0);
+    setVocalGainDb(0);
+    setSyncOffsetMs(0);
   }
 
   // Builds the live-preview effects graph for "Your take" once its <audio> element exists.
@@ -202,6 +207,9 @@ export default function AudioAuditionRecorder({
     if (!recordedBlob || !takeAudioRef.current) return;
     const ctx = getAudioContext();
     const source = ctx.createMediaElementSource(takeAudioRef.current);
+
+    const vocalGain = ctx.createGain();
+    vocalGain.gain.value = 1;
 
     const bass = ctx.createBiquadFilter();
     bass.type = "lowshelf";
@@ -214,7 +222,8 @@ export default function AudioAuditionRecorder({
     treble.type = "highshelf";
     treble.frequency.value = 4000;
 
-    source.connect(bass);
+    source.connect(vocalGain);
+    vocalGain.connect(bass);
     bass.connect(mid);
     mid.connect(treble);
     treble.connect(ctx.destination);
@@ -254,9 +263,11 @@ export default function AudioAuditionRecorder({
     delayNodeRef.current = delayNode;
     delayFeedbackRef.current = delayFeedback;
     delayWetRef.current = delayWet;
+    vocalGainRef.current = vocalGain;
 
     return () => {
       source.disconnect();
+      vocalGain.disconnect();
       bass.disconnect();
       mid.disconnect();
       treble.disconnect();
@@ -269,6 +280,7 @@ export default function AudioAuditionRecorder({
       delayNodeRef.current = null;
       delayFeedbackRef.current = null;
       delayWetRef.current = null;
+      vocalGainRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordedBlob]);
@@ -286,7 +298,8 @@ export default function AudioAuditionRecorder({
     if (delayNodeRef.current) delayNodeRef.current.delayTime.value = Math.max((delayAmount / 100) * 0.4, 0.001);
     if (delayFeedbackRef.current) delayFeedbackRef.current.gain.value = (delayAmount / 100) * 0.35;
     if (delayWetRef.current) delayWetRef.current.gain.value = delayAmount > 0 ? Math.min((delayAmount / 100) * 0.5, 0.5) : 0;
-  }, [bassDb, midDb, trebleDb, reverbAmount, delayAmount]);
+    if (vocalGainRef.current) vocalGainRef.current.gain.value = Math.pow(10, vocalGainDb / 20);
+  }, [bassDb, midDb, trebleDb, reverbAmount, delayAmount, vocalGainDb]);
 
   async function handleMix() {
     if (!recordedBlob) return;
@@ -300,6 +313,8 @@ export default function AudioAuditionRecorder({
         reverbAmount,
         delayMs: (delayAmount / 100) * 400,
         delayFeedback: (delayAmount / 100) * 50,
+        vocalGainDb,
+        syncOffsetMs,
       });
       setMixedUrl(url);
       onMixed(url);
@@ -383,12 +398,18 @@ export default function AudioAuditionRecorder({
           </div>
 
           <div className="flex flex-wrap items-end gap-4 rounded-md bg-zinc-50 p-3 dark:bg-zinc-900/50">
+            <Knob label="Volume" value={vocalGainDb} min={-12} max={12} step={1} unit="dB" onChange={setVocalGainDb} />
+            <Knob label="Sync" value={syncOffsetMs} min={-1000} max={1000} step={25} unit="ms" onChange={setSyncOffsetMs} />
             <Knob label="Bass" value={bassDb} min={-12} max={12} step={1} unit="dB" onChange={setBassDb} />
             <Knob label="Mid" value={midDb} min={-12} max={12} step={1} unit="dB" onChange={setMidDb} />
             <Knob label="Treble" value={trebleDb} min={-12} max={12} step={1} unit="dB" onChange={setTrebleDb} />
             <Knob label="Reverb" value={reverbAmount} min={0} max={100} step={5} unit="%" onChange={setReverbAmount} />
             <Knob label="Delay" value={delayAmount} min={0} max={100} step={5} unit="%" onChange={setDelayAmount} />
           </div>
+          <p className="text-[11px] text-zinc-500">
+            Sync shifts your vocal earlier (−) or later (+) to line it up with the instrumental if the take drifted
+            out of time.
+          </p>
 
           <div className="flex gap-2">
             <button type="button" onClick={handleMix} disabled={mixing} className={btnPrimary}>

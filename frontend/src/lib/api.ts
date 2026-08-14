@@ -1187,6 +1187,8 @@ export const api = {
       reverbAmount?: number;
       delayMs?: number;
       delayFeedback?: number;
+      vocalGainDb?: number;
+      syncOffsetMs?: number;
     }
   ): Promise<{ url: string }> => {
     // Safari records to MP4/AAC rather than WebM -- name the upload to match what the browser
@@ -1203,6 +1205,8 @@ export const api = {
       form.set("reverb_amount", String(effects.reverbAmount ?? 0));
       form.set("delay_ms", String(effects.delayMs ?? 0));
       form.set("delay_feedback", String(effects.delayFeedback ?? 0));
+      form.set("vocal_gain_db", String(effects.vocalGainDb ?? 0));
+      form.set("sync_offset_ms", String(effects.syncOffsetMs ?? 0));
     }
     const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/roles/${roleId}/audition-mix`, {
       method: "POST",

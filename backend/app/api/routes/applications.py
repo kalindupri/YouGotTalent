@@ -161,6 +161,8 @@ def mix_audition_recording(
     reverb_amount: float = Form(0.0),
     delay_ms: float = Form(0.0),
     delay_feedback: float = Form(0.0),
+    vocal_gain_db: float = Form(0.0),
+    sync_offset_ms: float = Form(0.0),
     db: Session = Depends(get_db),
     talent: TalentProfile = Depends(get_current_talent_profile),
 ):
@@ -225,6 +227,8 @@ def mix_audition_recording(
                 reverb_amount=reverb_amount,
                 delay_ms=delay_ms,
                 delay_feedback=delay_feedback,
+                vocal_gain_db=vocal_gain_db,
+                sync_offset_ms=sync_offset_ms,
             )
         except MediaProcessingError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not mix this recording — make sure it's a valid audio file.")
