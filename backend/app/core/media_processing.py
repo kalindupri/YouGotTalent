@@ -88,6 +88,31 @@ def compress_audio(input_path: str, output_path: str) -> None:
     _run_ffmpeg(["-i", input_path, "-vn", "-c:a", "aac", "-b:a", "128k", output_path])
 
 
+def _measure_mean_volume_db(path: str) -> float:
+    """Runs ffmpeg's volumedetect filter and returns the mean_volume it reports, in dB. Used to
+    compute how much a vocal recording needs boosting before mixing, since a flat manual gain
+    isn't enough on its own (a quiet mic recording still sounds buried after a fixed boost, and
+    the same fixed boost clips a hot one).
+    """
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-i", path, "-af", "volumedetect", "-f", "null", "-"],
+            capture_output=True,
+            timeout=COMPRESS_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise MediaProcessingError("Could not analyze this recording's volume") from exc
+
+    match = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB", result.stderr.decode(errors="replace"))
+    if not match:
+        raise MediaProcessingError("Could not analyze this recording's volume")
+    return float(match.group(1))
+
+
+TARGET_VOCAL_MEAN_DB = -20.0
+MAX_AUTO_GAIN_DB = 30.0
+
+
 def mix_vocal_with_instrumental(
     vocal_path: str,
     instrumental_path: str,
@@ -124,13 +149,20 @@ def mix_vocal_with_instrumental(
     delay_decay = max(delay_feedback, 0.001)
     delay_tap_ms = max(int(delay_ms), 1)
 
-    # A flat dB boost alone isn't reliable -- a quiet raw mic recording still sounds buried next
-    # to a mastered instrumental even after boosting it, and a hot one can clip. loudnorm brings
-    # the vocal to a consistent, present loudness first regardless of how quiet/loud the source
-    # recording was; vocal_gain_db then applies on top of that as the talent's own adjustment.
+    # Measure the vocal's actual level and compute exactly how much it needs boosting to reach
+    # a known-good target (-20dB mean, verified in practice against real instrumentals), rather
+    # than reaching for loudnorm's EBU R128 measurement -- that's tuned for broadcast speech/
+    # music, not a single a cappella vocal take, and could swing wildly (silence-adjacent output
+    # observed on real recordings) depending on the clip's spectral content. A plain measured
+    # gain is deterministic and behaves the same regardless of what's actually being sung.
+    try:
+        auto_gain_db = max(0.0, min(MAX_AUTO_GAIN_DB, TARGET_VOCAL_MEAN_DB - _measure_mean_volume_db(vocal_path)))
+    except MediaProcessingError:
+        auto_gain_db = 0.0
+    total_gain_db = max(-12.0, min(36.0, auto_gain_db + vocal_gain_db))
+
     vocal_filter = (
-        f"loudnorm=I=-16:TP=-1.5:LRA=11,"
-        f"volume={vocal_gain_db}dB,"
+        f"volume={total_gain_db}dB,"
         f"bass=g={bass_db},treble=g={treble_db},equalizer=f=1000:width_type=o:width=2:g={mid_db},"
         f"aecho=0.8:{0.3 + reverb_amount * 0.5:.3f}:{reverb_tap_ms}:{reverb_decay:.3f},"
         f"aecho=0.8:{delay_decay:.3f}:{delay_tap_ms}:{delay_decay:.3f}"
