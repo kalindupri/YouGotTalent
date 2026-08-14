@@ -51,9 +51,13 @@ export default function AudioAuditionRecorder({
     setRecordedBlob(null);
     setMixedUrl(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
+      // Deliberately no explicit echoCancellation/noiseSuppression/autoGainControl constraints
+      // here -- forcing them on was tried and made a real headphone-wearing test recording come
+      // out at -63dB mean volume (near silence/noise-floor only), likely from Chrome's forced
+      // WebRTC processing conflicting with this machine's OS-level audio driver enhancements.
+      // Bare {audio: true} lets the browser + OS pick sane defaults, which is the more broadly
+      // compatible path across devices.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = pickSupportedMimeType();
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
