@@ -36,6 +36,7 @@ export default function AudioAuditionRecorder({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const guideAudioRef = useRef<HTMLAudioElement | null>(null);
   const instrumentalAudioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -73,6 +74,13 @@ export default function AudioAuditionRecorder({
       setRecording(true);
       setSecondsLeft(MAX_RECORDING_SECONDS);
 
+      // The guide track has its own player for previewing the song beforehand -- if it was left
+      // playing (or gets started mid-recording) it plays through the speakers right alongside the
+      // instrumental, and the mic picks up its reference vocals too. Force it silent here.
+      if (guideAudioRef.current) {
+        guideAudioRef.current.pause();
+        guideAudioRef.current.currentTime = 0;
+      }
       instrumentalAudioRef.current?.play().catch(() => {});
 
       timerRef.current = setInterval(() => {
@@ -136,7 +144,17 @@ export default function AudioAuditionRecorder({
         <div className="flex flex-col gap-1">
           <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Guide track</span>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio controls src={role.guide_track_url} className="w-full" />
+          <audio
+            ref={guideAudioRef}
+            controls
+            src={role.guide_track_url}
+            className="w-full"
+            onPlay={() => {
+              // Guards against starting the guide track *during* an active recording (e.g. the
+              // user clicks play on it mid-take) -- same bleed-into-the-mic problem as above.
+              if (recording) guideAudioRef.current?.pause();
+            }}
+          />
         </div>
       )}
 
