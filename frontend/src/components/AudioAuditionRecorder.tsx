@@ -6,6 +6,16 @@ import { btnPrimary, btnSecondary } from "@/lib/ui";
 
 const MAX_RECORDING_SECONDS = 30;
 
+// iOS/macOS Safari's MediaRecorder doesn't support WebM at all -- it records to MP4/AAC
+// instead. Picking (and remembering) whichever format the browser actually supports, rather
+// than hardcoding "audio/webm", is what makes recording work on both platforms: labeling a
+// Safari-recorded MP4 blob as "audio/webm" produced a file no player could decode.
+function pickSupportedMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return undefined;
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/aac"];
+  return candidates.find((c) => MediaRecorder.isTypeSupported(c));
+}
+
 export default function AudioAuditionRecorder({
   role,
   castingCallId,
@@ -41,14 +51,17 @@ export default function AudioAuditionRecorder({
     setRecordedBlob(null);
     setMixedUrl(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const mimeType = pickSupportedMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        setRecordedBlob(new Blob(chunksRef.current, { type: "audio/webm" }));
+        setRecordedBlob(new Blob(chunksRef.current, { type: mimeType ?? recorder.mimeType ?? "audio/webm" }));
         stream.getTracks().forEach((t) => t.stop());
       };
       mediaRecorderRef.current = recorder;
@@ -108,6 +121,10 @@ export default function AudioAuditionRecorder({
         <p className="mt-0.5 text-xs text-zinc-500">
           Listen to the guide track to learn the song, then record yourself singing along to the instrumental
           (up to {MAX_RECORDING_SECONDS}s).
+        </p>
+        <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+          Use headphones/earphones while recording — without them, your mic can pick up the
+          instrumental from your speakers and turn your recording into static.
         </p>
       </div>
 

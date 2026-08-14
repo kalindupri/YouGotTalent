@@ -1181,8 +1181,11 @@ export const api = {
     file: Blob,
     token: string
   ): Promise<{ url: string }> => {
+    // Safari records to MP4/AAC rather than WebM -- name the upload to match what the browser
+    // actually produced (file.type), not a hardcoded extension that wouldn't match on iOS.
+    const ext = file.type.includes("mp4") ? "mp4" : file.type.includes("ogg") ? "ogg" : "webm";
     const form = new FormData();
-    form.set("file", file, "recording.webm");
+    form.set("file", file, `recording.${ext}`);
     const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/roles/${roleId}/audition-mix`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
