@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
+    # Per-IP throttling on auth endpoints (see app/core/rate_limit.py). Defaults on everywhere
+    # real users hit the API. The E2E suite drives dozens of registrations/logins from a single
+    # CI-runner IP in one run -- no real single user does that, so CI sets this to false via
+    # docker-compose rather than the production limit being loosened to accommodate test traffic.
+    RATE_LIMITING_ENABLED: bool = True
+
     # Plain string, not list[str] — pydantic-settings JSON-decodes list-typed env values at
     # the source level (before any validator runs), so a plain comma-separated value would
     # fail to even reach a validator. Accepting a string here and splitting it ourselves
