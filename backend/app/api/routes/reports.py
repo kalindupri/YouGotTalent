@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.discord import send_discord_message
+from app.core.rate_limit import limiter
 from app.crud.report import create_report
 from app.db.session import get_db
 from app.models.report import ReportCategory
@@ -22,7 +23,9 @@ _CATEGORY_LABELS = {
 
 
 @router.post("", response_model=ReportRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def submit_report(
+    request: Request,
     report_in: ReportCreate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),

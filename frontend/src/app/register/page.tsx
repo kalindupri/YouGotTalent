@@ -182,8 +182,15 @@ export default function RegisterPage() {
             onChange={(e) => setConsentGiven(e.target.checked)}
             className="mt-0.5 accent-rose-600"
           />
-          I consent to my personal data being processed as described in the privacy policy, in
-          line with the Personal Data Protection Act No. 9 of 2022.
+          I agree to the{" "}
+          <Link href="/terms" target="_blank" className="font-semibold text-rose-600 hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and consent to my personal data being processed as described in the{" "}
+          <Link href="/privacy" target="_blank" className="font-semibold text-rose-600 hover:underline">
+            Privacy Policy
+          </Link>
+          , in line with the Personal Data Protection Act No. 9 of 2022.
         </label>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

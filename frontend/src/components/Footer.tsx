@@ -14,17 +14,27 @@ export default function Footer() {
             <p className="text-xs text-zinc-500">Every skill. One stage.</p>
           </div>
         </div>
-        <div className="flex gap-6 text-sm font-semibold text-zinc-400">
-          <Link href="/talents" className="hover:text-rose-500">
-            Browse talent
-          </Link>
-          <Link href="/casting-calls" className="hover:text-rose-500">
-            Talent hunts
-          </Link>
-          <Link href="/community" className="hover:text-rose-500">
-            Community
-          </Link>
-          <ReportBugLink />
+        <div className="flex flex-col gap-3 sm:items-end">
+          <div className="flex gap-6 text-sm font-semibold text-zinc-400">
+            <Link href="/talents" className="hover:text-rose-500">
+              Browse talent
+            </Link>
+            <Link href="/casting-calls" className="hover:text-rose-500">
+              Talent hunts
+            </Link>
+            <Link href="/community" className="hover:text-rose-500">
+              Community
+            </Link>
+            <ReportBugLink />
+          </div>
+          <div className="flex gap-4 text-xs text-zinc-500">
+            <Link href="/privacy" className="hover:text-rose-500">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-rose-500">
+              Terms of Service
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
 
@@ -10,7 +10,7 @@ from app.models.user import UserRole
 class UserCreate(BaseModel):
     email: EmailStr
     phone: str | None = None
-    password: str
+    password: str = Field(min_length=8)
     full_name: str
     # Deliberately excludes "admin" — self-service registration can only ever create a talent
     # or recruiter account. Admin accounts are provisioned via scripts/create_admin.py.
@@ -39,7 +39,7 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     email: EmailStr
     code: str
-    new_password: str
+    new_password: str = Field(min_length=8)
 
 
 class UserRead(BaseModel):

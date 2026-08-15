@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 import app.models  # noqa: F401  (registers every model on Base.metadata before create_all)
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
@@ -16,6 +17,12 @@ from app.main import app
 from app.models.user import User, UserRole
 
 TEST_DB_NAME = "ygt_test"
+
+# The TestClient has no real per-request source IP, so every request in the suite shares
+# one rate-limit bucket -- tests that legitimately call e.g. /auth/register more than 5
+# times would trip the real production limit. Rate limiting itself is exercised by its
+# own dedicated test, not by every other test incidentally.
+limiter.enabled = False
 
 
 def _test_database_url() -> str:

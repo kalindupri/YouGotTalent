@@ -1,10 +1,11 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.rate_limit import limiter
 from app.core.security import create_access_token, verify_password
 from app.crud.user import (
     create_user,
@@ -40,7 +41,8 @@ def _send_verification_email(background_tasks: BackgroundTasks, user: User, code
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def register(user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if get_user_by_email(db, user_in.email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     if not user_in.consent_given:
@@ -52,7 +54,8 @@ def register(user_in: UserCreate, background_tasks: BackgroundTasks, db: Session
 
 
 @router.post("/verify-email", response_model=Token)
-def verify_email(payload: EmailVerifyRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def verify_email(request: Request, payload: EmailVerifyRequest, db: Session = Depends(get_db)):
     user = get_user_by_email(db, payload.email)
     if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or code")
@@ -63,7 +66,10 @@ def verify_email(payload: EmailVerifyRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/resend-verification", status_code=status.HTTP_204_NO_CONTENT)
-def resend_verification(payload: ResendVerificationRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def resend_verification(
+    request: Request, payload: ResendVerificationRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
     user = get_user_by_email(db, payload.email)
     # Stay silent on unknown emails and already-verified accounts so this endpoint can't be
     # used to probe which addresses have registered.
@@ -74,7 +80,10 @@ def resend_verification(payload: ResendVerificationRequest, background_tasks: Ba
 
 
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
-def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def forgot_password(
+    request: Request, payload: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
     user = get_user_by_email(db, payload.email)
     # Stay silent on unknown emails so this endpoint can't be used to probe which addresses
     # have registered (same reasoning as resend-verification above).
@@ -91,7 +100,8 @@ def forgot_password(payload: ForgotPasswordRequest, background_tasks: Background
 
 
 @router.post("/reset-password", response_model=Token)
-def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def reset_password(request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)):
     user = get_user_by_email(db, payload.email)
     if user is None or not reset_password_with_code(db, user, payload.code, payload.new_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired code")
@@ -100,7 +110,8 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
 
 
 @router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = get_user_by_email(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
