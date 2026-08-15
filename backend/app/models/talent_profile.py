@@ -47,6 +47,14 @@ class TalentProfile(Base):
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     city: Mapped[str | None] = mapped_column(String(120), nullable=True)
     date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Plain string, not a native enum, matching the `category`/`tier` convention -- optional,
+    # set by the talent themselves, exists so recruiters can filter casting searches by it
+    # (a normal, expected filter on casting platforms, unlike general employment listings).
+    gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Self-reported, talent-settable -- lets a content creator's follower count factor into
+    # search/filtering (e.g. "content creator with 100k+ TikTok audience") without having to
+    # integrate TikTok's API just to read a number recruiters mostly want for a quick filter.
+    tiktok_followers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     skills: Mapped[list[str] | None] = mapped_column(ARRAY(String(60)), nullable=True)
     # Structured, filterable instrument tags for music-category talent (e.g. "drums",

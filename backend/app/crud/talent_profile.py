@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from functools import reduce
 
 from sqlalchemy import String, case, cast, func, or_
@@ -18,6 +18,15 @@ def get_talent_profile_by_user(db: Session, user_id: uuid.UUID) -> TalentProfile
     return db.query(TalentProfile).filter(TalentProfile.user_id == user_id).first()
 
 
+def _years_ago(n: int) -> date:
+    today = date.today()
+    try:
+        return today.replace(year=today.year - n)
+    except ValueError:
+        # Feb 29 on a target non-leap year -- fall back to Feb 28.
+        return today.replace(year=today.year - n, day=28)
+
+
 def list_talent_profiles(
     db: Session,
     categories: list[TalentCategory] | None,
@@ -29,6 +38,10 @@ def list_talent_profiles(
     experience_max: int | None = None,
     verified_only: bool = False,
     instruments: list[str] | None = None,
+    gender: str | None = None,
+    age_min: int | None = None,
+    age_max: int | None = None,
+    min_tiktok_followers: int | None = None,
 ) -> list[TalentProfile]:
     query = db.query(TalentProfile)
     if categories:
@@ -43,6 +56,16 @@ def list_talent_profiles(
         query = query.filter(TalentProfile.experience_years >= experience_min)
     if experience_max is not None:
         query = query.filter(TalentProfile.experience_years <= experience_max)
+    if gender:
+        query = query.filter(TalentProfile.gender.ilike(gender))
+    if age_min is not None:
+        # At least age_min years old -> born on or before N years ago.
+        query = query.filter(TalentProfile.date_of_birth <= _years_ago(age_min))
+    if age_max is not None:
+        # At most age_max years old -> born after (age_max + 1) years ago.
+        query = query.filter(TalentProfile.date_of_birth > _years_ago(age_max + 1))
+    if min_tiktok_followers is not None:
+        query = query.filter(TalentProfile.tiktok_followers >= min_tiktok_followers)
     if instruments:
         # Postgres array overlap ("any of the selected instruments") — the "multi-layered"
         # search requested: pick several instrument families and match talent with ANY of them.
@@ -59,6 +82,11 @@ def list_talent_profiles(
         if tokens:
             skills_as_text = func.array_to_string(TalentProfile.skills, ",")
             categories_as_text = func.array_to_string(TalentProfile.categories, ",")
+            instruments_as_text = func.array_to_string(TalentProfile.instruments, ",")
+            # Cast the freeform per-category attributes JSONB (height/look/vocal range/etc) to
+            # text so leftover "characteristic" keywords from a smart-search query (e.g.
+            # "traditional", "athletic") can match it too, not just name/skills/bio.
+            attributes_as_text = cast(TalentProfile.attributes, String)
             match_conditions = []
             score_terms = []
             for token in tokens:
@@ -67,11 +95,17 @@ def list_talent_profiles(
                 skills_match = skills_as_text.ilike(pattern)
                 category_match = TalentProfile.category.ilike(pattern) | categories_as_text.ilike(pattern)
                 bio_match = TalentProfile.bio.ilike(pattern)
-                match_conditions.extend([name_match, skills_match, category_match, bio_match])
+                instruments_match = instruments_as_text.ilike(pattern)
+                attributes_match = attributes_as_text.ilike(pattern)
+                match_conditions.extend(
+                    [name_match, skills_match, category_match, bio_match, instruments_match, attributes_match]
+                )
                 # Weight matches by field relevance: name and skills matter most for finding the right talent.
                 score_terms.append(case((name_match, 3), else_=0))
                 score_terms.append(case((skills_match, 3), else_=0))
                 score_terms.append(case((category_match, 2), else_=0))
+                score_terms.append(case((instruments_match, 2), else_=0))
+                score_terms.append(case((attributes_match, 1), else_=0))
                 score_terms.append(case((bio_match, 1), else_=0))
             relevance = reduce(lambda a, b: a + b, score_terms)
             query = query.filter(or_(*match_conditions)).order_by(tier_boost.desc(), relevance.desc(), TalentProfile.created_at.desc())

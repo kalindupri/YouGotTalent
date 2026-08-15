@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.content_visibility import is_visible_to
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
+from app.core.talent_search_parse import parse_talent_search_query
 from app.crud import subscription as subscription_crud
 from app.crud.credit import create_credit, delete_credit, get_credit, update_credit
 from app.crud.reel import count_reels, create_reel, delete_reel, get_reel
@@ -52,6 +53,7 @@ from app.schemas.talent_profile import (
     MediaCreate,
     MediaRead,
     MediaUpdate,
+    ParsedTalentSearchQuery,
     TalentProfileCreate,
     TalentProfileRead,
     TalentProfileUpdate,
@@ -71,13 +73,39 @@ def browse_talents(
     experience_max: int | None = None,
     verified_only: bool = False,
     instruments: list[str] | None = Query(default=None),
+    gender: str | None = None,
+    age_min: int | None = None,
+    age_max: int | None = None,
+    min_tiktok_followers: int | None = None,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
 ):
     return list_talent_profiles(
-        db, categories, city, q, skip, limit, experience_min, experience_max, verified_only, instruments
+        db,
+        categories,
+        city,
+        q,
+        skip,
+        limit,
+        experience_min,
+        experience_max,
+        verified_only,
+        instruments,
+        gender,
+        age_min,
+        age_max,
+        min_tiktok_followers,
     )
+
+
+@router.get("/parse-search-query", response_model=ParsedTalentSearchQuery)
+def parse_search_query(q: str):
+    """Turns a free-text recruiter query into structured filters the frontend can prefill
+    into the normal browse/search filters (and show back to the recruiter as "detected:
+    ..." chips) -- see app/core/talent_search_parse.py for how the parsing itself works.
+    """
+    return parse_talent_search_query(q)
 
 
 @router.get("/me", response_model=TalentProfileRead)

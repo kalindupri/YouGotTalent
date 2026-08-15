@@ -3,7 +3,7 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Save, ShieldCheck } from "lucide-react";
+import { Save, ShieldCheck, Sparkles } from "lucide-react";
 import { ApiError, api, CastingCall, TALENT_CATEGORIES, TalentCategory, TalentProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -45,8 +45,61 @@ function TalentsPageContent() {
   const [experienceMax, setExperienceMax] = useState(searchParams.get("experience_max") ?? "");
   const [verifiedOnly, setVerifiedOnly] = useState(searchParams.get("verified_only") === "true");
   const [instruments, setInstruments] = useState<string[]>(searchParams.getAll("instruments"));
+  const [gender, setGender] = useState("");
+  const [ageMin, setAgeMin] = useState("");
+  const [ageMax, setAgeMax] = useState("");
+  const [minTiktokFollowers, setMinTiktokFollowers] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [smartQuery, setSmartQuery] = useState("");
+  const [smartParsing, setSmartParsing] = useState(false);
+  const [detected, setDetected] = useState<string[] | null>(null);
+
+  async function handleSmartSearch(e: FormEvent) {
+    e.preventDefault();
+    if (!smartQuery.trim()) return;
+    setSmartParsing(true);
+    try {
+      const parsed = await api.parseTalentSearchQuery(smartQuery);
+      const chips: string[] = [];
+      if (parsed.categories?.length) {
+        setCategories(parsed.categories as TalentCategory[]);
+        chips.push(...parsed.categories.map(formatCategory));
+      } else {
+        setCategories([]);
+      }
+      setGender(parsed.gender ?? "");
+      if (parsed.gender) chips.push(parsed.gender === "male" ? "Male" : "Female");
+      setAgeMin(parsed.age_min != null ? String(parsed.age_min) : "");
+      setAgeMax(parsed.age_max != null ? String(parsed.age_max) : "");
+      if (parsed.age_min != null || parsed.age_max != null) {
+        chips.push(
+          parsed.age_min != null && parsed.age_max != null
+            ? `${parsed.age_min}-${parsed.age_max} yrs`
+            : parsed.age_min != null
+              ? `Over ${parsed.age_min - 1}`
+              : `Under ${parsed.age_max! + 1}`
+        );
+      }
+      setExperienceMin(parsed.experience_min != null ? String(parsed.experience_min) : "");
+      setExperienceMax(parsed.experience_max != null ? String(parsed.experience_max) : "");
+      if (parsed.experience_min != null) chips.push(`${parsed.experience_min}+ yrs experience`);
+      if (parsed.experience_max === 0) chips.push("No experience required");
+      setInstruments(parsed.instruments ?? []);
+      if (parsed.instruments?.length) chips.push(...parsed.instruments.map(formatInstrument));
+      setMinTiktokFollowers(parsed.min_tiktok_followers ?? undefined);
+      if (parsed.min_tiktok_followers) chips.push(`${(parsed.min_tiktok_followers / 1000).toFixed(0)}k+ TikTok followers`);
+      setQ(parsed.keywords ?? "");
+      if (parsed.keywords) chips.push(`"${parsed.keywords}"`);
+      setDetected(chips.length > 0 ? chips : ["No specific filters detected — searching keywords only"]);
+      setShowAdvanced(true);
+    } catch {
+      setDetected(null);
+    } finally {
+      setSmartParsing(false);
+    }
+  }
 
   const [savingSearch, setSavingSearch] = useState(false);
   const [saveSearchMessage, setSaveSearchMessage] = useState<string | null>(null);
@@ -116,6 +169,10 @@ function TalentsPageContent() {
               experience_max: experienceMax ? Number(experienceMax) : undefined,
               verified_only: verifiedOnly || undefined,
               instruments: instruments.length > 0 ? instruments : undefined,
+              gender: gender || undefined,
+              age_min: ageMin ? Number(ageMin) : undefined,
+              age_max: ageMax ? Number(ageMax) : undefined,
+              min_tiktok_followers: minTiktokFollowers,
             })
           );
         } catch {
@@ -127,7 +184,7 @@ function TalentsPageContent() {
       load();
     }, 250);
     return () => clearTimeout(handle);
-  }, [categories, city, q, experienceMin, experienceMax, verifiedOnly, instruments]);
+  }, [categories, city, q, experienceMin, experienceMax, verifiedOnly, instruments, gender, ageMin, ageMax, minTiktokFollowers]);
 
   async function handleSaveSearch(e: FormEvent) {
     e.preventDefault();
@@ -164,7 +221,32 @@ function TalentsPageContent() {
         {loading ? "Loading…" : `${talents.length} talent profile${talents.length === 1 ? "" : "s"}`}
       </p>
 
-      <div className="mt-8 flex flex-wrap gap-3">
+      <form onSubmit={handleSmartSearch} className="mt-8 flex flex-wrap gap-2">
+        <input
+          placeholder={`Describe who you're looking for — e.g. "Actor wanted under 35 male with some experience"`}
+          value={smartQuery}
+          onChange={(e) => setSmartQuery(e.target.value)}
+          className={`${inputClass} max-w-lg flex-1`}
+        />
+        <button type="submit" disabled={smartParsing || !smartQuery.trim()} className={btnSecondary}>
+          <Sparkles className="h-4 w-4" /> {smartParsing ? "Thinking…" : "Smart search"}
+        </button>
+      </form>
+      {detected && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="font-semibold text-zinc-500">Detected:</span>
+          {detected.map((d, i) => (
+            <span
+              key={i}
+              className="rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+            >
+              {d}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-3">
         <input
           placeholder="Search by name, bio, or skill (e.g. 'screenplay', 'carnatic')"
           value={q}
@@ -222,6 +304,22 @@ function TalentsPageContent() {
               onChange={(e) => setExperienceMax(e.target.value)}
               className={`${inputClass} w-32`}
             />
+          </label>
+          <label className={labelClass}>
+            Gender
+            <select value={gender} onChange={(e) => setGender(e.target.value)} className={`${inputClass} w-32`}>
+              <option value="">Any</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </label>
+          <label className={labelClass}>
+            Min. age
+            <input type="number" min={0} value={ageMin} onChange={(e) => setAgeMin(e.target.value)} className={`${inputClass} w-24`} />
+          </label>
+          <label className={labelClass}>
+            Max. age
+            <input type="number" min={0} value={ageMax} onChange={(e) => setAgeMax(e.target.value)} className={`${inputClass} w-24`} />
           </label>
           <label className="flex items-center gap-2 pb-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-300">
             <input

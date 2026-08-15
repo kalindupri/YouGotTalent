@@ -137,6 +137,8 @@ export interface TalentProfile {
   bio: string | null;
   city: string | null;
   date_of_birth: string | null;
+  gender: string | null;
+  tiktok_followers: number | null;
   experience_years: number | null;
   skills: string[] | null;
   instruments: string[] | null;
@@ -164,6 +166,8 @@ export interface TalentProfileInput {
   bio?: string | null;
   city?: string | null;
   date_of_birth?: string | null;
+  gender?: string | null;
+  tiktok_followers?: number | null;
   experience_years?: number | null;
   skills?: string[] | null;
   instruments?: string[] | null;
@@ -176,6 +180,18 @@ export interface TalentProfileInput {
   intro_video_url?: string | null;
   attributes?: Record<string, string> | null;
   job_alert_emails?: boolean;
+}
+
+export interface ParsedTalentSearchQuery {
+  categories: string[] | null;
+  gender: string | null;
+  age_min: number | null;
+  age_max: number | null;
+  experience_min: number | null;
+  experience_max: number | null;
+  min_tiktok_followers: number | null;
+  instruments: string[] | null;
+  keywords: string | null;
 }
 
 export type RecruiterType = "individual" | "agency";
@@ -854,6 +870,10 @@ export const api = {
       experience_max?: number;
       verified_only?: boolean;
       instruments?: string[];
+      gender?: string;
+      age_min?: number;
+      age_max?: number;
+      min_tiktok_followers?: number;
     } = {}
   ) => {
     const qs = new URLSearchParams();
@@ -864,9 +884,15 @@ export const api = {
     if (params.experience_max !== undefined) qs.set("experience_max", String(params.experience_max));
     if (params.verified_only) qs.set("verified_only", "true");
     (params.instruments ?? []).forEach((i) => qs.append("instruments", i));
+    if (params.gender) qs.set("gender", params.gender);
+    if (params.age_min !== undefined) qs.set("age_min", String(params.age_min));
+    if (params.age_max !== undefined) qs.set("age_max", String(params.age_max));
+    if (params.min_tiktok_followers !== undefined) qs.set("min_tiktok_followers", String(params.min_tiktok_followers));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<TalentProfile[]>(`/talents${suffix}`);
   },
+  parseTalentSearchQuery: (q: string) =>
+    request<ParsedTalentSearchQuery>(`/talents/parse-search-query?q=${encodeURIComponent(q)}`),
   listFeaturedTalent: () => request<TalentProfile[]>("/talents/featured"),
   getTalent: (id: string, token?: string | null) => request<TalentProfile>(`/talents/${id}`, {}, token),
   getMyTalentProfile: (token: string) => request<TalentProfile>("/talents/me", {}, token),

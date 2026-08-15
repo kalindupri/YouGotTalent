@@ -19,6 +19,8 @@ class TalentProfileCreate(BaseModel):
     bio: str | None = None
     city: str | None = None
     date_of_birth: date | None = None
+    gender: str | None = None
+    tiktok_followers: int | None = None
     experience_years: int | None = None
     skills: list[str] | None = None
     instruments: list[str] | None = None
@@ -48,6 +50,8 @@ class TalentProfileUpdate(BaseModel):
     bio: str | None = None
     city: str | None = None
     date_of_birth: date | None = None
+    gender: str | None = None
+    tiktok_followers: int | None = None
     experience_years: int | None = None
     skills: list[str] | None = None
     instruments: list[str] | None = None
@@ -60,6 +64,18 @@ class TalentProfileUpdate(BaseModel):
     intro_video_url: str | None = None
     attributes: dict[str, str] | None = None
     job_alert_emails: bool | None = None
+
+
+class ParsedTalentSearchQuery(BaseModel):
+    categories: list[str] | None = None
+    gender: str | None = None
+    age_min: int | None = None
+    age_max: int | None = None
+    experience_min: int | None = None
+    experience_max: int | None = None
+    min_tiktok_followers: int | None = None
+    instruments: list[str] | None = None
+    keywords: str | None = None
 
 
 class MediaRead(BaseModel):
@@ -96,6 +112,8 @@ class TalentProfileRead(BaseModel):
     bio: str | None
     city: str | None
     date_of_birth: date | None
+    gender: str | None
+    tiktok_followers: int | None
     experience_years: int | None
     skills: list[str] | None
     instruments: list[str] | None

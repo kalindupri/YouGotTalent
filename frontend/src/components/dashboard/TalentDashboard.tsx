@@ -611,6 +611,15 @@ function EditProfileForm({
   submitting: boolean;
   setSubmitting: (v: boolean) => void;
 }) {
+  const [dateOfBirth, setDateOfBirth] = useState(profile.date_of_birth ?? "");
+  const [gender, setGender] = useState(profile.gender ?? "");
+  const [experienceYears, setExperienceYears] = useState(
+    profile.experience_years != null ? String(profile.experience_years) : ""
+  );
+  const [tiktokFollowers, setTiktokFollowers] = useState(
+    profile.tiktok_followers != null ? String(profile.tiktok_followers) : ""
+  );
+
   function toggleCategory(c: TalentCategory) {
     setCategories(categories.includes(c) ? categories.filter((x) => x !== c) : [...categories, c]);
   }
@@ -625,7 +634,16 @@ function EditProfileForm({
     setSubmitting(true);
     try {
       const updated = await api.updateMyTalentProfile(
-        { bio: bio || null, city: city || null, skills: parseSkills(skillsInput), categories },
+        {
+          bio: bio || null,
+          city: city || null,
+          skills: parseSkills(skillsInput),
+          categories,
+          date_of_birth: dateOfBirth || null,
+          gender: gender || null,
+          experience_years: experienceYears ? Number(experienceYears) : null,
+          tiktok_followers: tiktokFollowers ? Number(tiktokFollowers) : null,
+        },
         token
       );
       onSaved({ ...updated, media: profile.media });
@@ -666,6 +684,53 @@ function EditProfileForm({
         Bio
         <textarea rows={3} value={bio} onChange={(e) => setBio(e.target.value)} className={inputClass} />
       </label>
+      <div className="flex gap-3">
+        <label className={labelClass}>
+          Date of birth
+          <input
+            type="date"
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            className={inputClass}
+          />
+          <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
+            Optional — lets recruiters filter by age range.
+          </span>
+        </label>
+        <label className={labelClass}>
+          Gender
+          <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
+            <option value="">Prefer not to say</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+      </div>
+      <label className={labelClass}>
+        Years of experience
+        <input
+          type="number"
+          min={0}
+          value={experienceYears}
+          onChange={(e) => setExperienceYears(e.target.value)}
+          className={inputClass}
+        />
+      </label>
+      {(categories.includes("content_creator") || profile.category === "content_creator") && (
+        <label className={labelClass}>
+          TikTok followers
+          <input
+            type="number"
+            min={0}
+            value={tiktokFollowers}
+            onChange={(e) => setTiktokFollowers(e.target.value)}
+            className={inputClass}
+          />
+          <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
+            Lets recruiters find you by audience size.
+          </span>
+        </label>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={submitting} className={`w-fit ${btnSecondary}`}>
         {submitting ? "Saving…" : "Save"}
