@@ -149,7 +149,7 @@ function CastingCallDetailContent() {
   }
 
   const selectedRole = call.roles.find((r) => r.id === selectedRoleId);
-  const hasGuidedAudition = Boolean(selectedRole?.guide_track_url && selectedRole?.instrumental_track_url);
+  const hasGuidedAudition = Boolean(selectedRole?.guide_track_url);
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-14">
@@ -309,7 +309,7 @@ function CastingCallDetailContent() {
                 role={selectedRole}
                 castingCallId={call.id}
                 token={token}
-                onMixed={(url) => {
+                onSubmissionReady={(url) => {
                   setSubmissionUrl(url);
                   setSubmissionMode("link");
                 }}

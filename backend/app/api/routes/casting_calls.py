@@ -29,8 +29,8 @@ from app.schemas.casting_call import CastingCallCreate, CastingCallRead, Casting
 
 router = APIRouter(prefix="/casting-calls", tags=["casting-calls"])
 
-# Both the guide track and the instrumental a talent sings along to must be short excerpts, not
-# full songs -- same cap as the sung take a talent records against them.
+# The guide track must be a short excerpt, not a full song -- same cap as the take a talent
+# records against it.
 MAX_AUDITION_TRACK_SECONDS = 30
 
 
@@ -39,9 +39,9 @@ def upload_audition_track(
     file: UploadFile = File(...),
     recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
 ):
-    """Uploads a guide/instrumental track for the singing-audition flow and returns its URL --
-    not tied to a specific role yet, since roles are only created as part of the casting call
-    creation payload (see CastingCallRoleCreate.guide_track_url / instrumental_track_url).
+    """Uploads a guide track for the singing-audition flow and returns its URL -- not tied to a
+    specific role yet, since roles are only created as part of the casting call creation payload
+    (see CastingCallRoleCreate.guide_track_url).
     """
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()

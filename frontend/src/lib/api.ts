@@ -213,7 +213,6 @@ export interface CastingCallRole {
   category: string | null;
   compensation: string | null;
   guide_track_url: string | null;
-  instrumental_track_url: string | null;
 }
 
 export interface CastingCallRoleInput {
@@ -222,7 +221,6 @@ export interface CastingCallRoleInput {
   category?: TalentCategory;
   compensation?: string;
   guide_track_url?: string;
-  instrumental_track_url?: string;
 }
 
 export interface CastingCall {
@@ -1175,40 +1173,18 @@ export const api = {
     }
     return res.json();
   },
-  mixAuditionRecording: async (
+  uploadAuditionRecording: async (
     castingCallId: string,
     roleId: string,
     file: Blob,
-    token: string,
-    effects?: {
-      bassDb?: number;
-      midDb?: number;
-      trebleDb?: number;
-      reverbAmount?: number;
-      delayMs?: number;
-      delayFeedback?: number;
-      vocalGainDb?: number;
-      syncOffsetMs?: number;
-    }
+    token: string
   ): Promise<{ url: string }> => {
     // Safari records to MP4/AAC rather than WebM -- name the upload to match what the browser
     // actually produced (file.type), not a hardcoded extension that wouldn't match on iOS.
     const ext = file.type.includes("mp4") ? "mp4" : file.type.includes("ogg") ? "ogg" : "webm";
     const form = new FormData();
     form.set("file", file, `recording.${ext}`);
-    if (effects) {
-      // Sent alongside the recording so the server-rendered mix matches what the talent
-      // heard in the live client-side preview (see AudioAuditionRecorder.tsx).
-      form.set("bass_db", String(effects.bassDb ?? 0));
-      form.set("mid_db", String(effects.midDb ?? 0));
-      form.set("treble_db", String(effects.trebleDb ?? 0));
-      form.set("reverb_amount", String(effects.reverbAmount ?? 0));
-      form.set("delay_ms", String(effects.delayMs ?? 0));
-      form.set("delay_feedback", String(effects.delayFeedback ?? 0));
-      form.set("vocal_gain_db", String(effects.vocalGainDb ?? 0));
-      form.set("sync_offset_ms", String(effects.syncOffsetMs ?? 0));
-    }
-    const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/roles/${roleId}/audition-mix`, {
+    const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/roles/${roleId}/audition-upload`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,

@@ -3,7 +3,6 @@ import tempfile
 import uuid
 from pathlib import Path
 
-import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,7 +14,6 @@ from app.core.media_processing import (
     MediaProcessingError,
     compress_audio,
     compress_video,
-    mix_vocal_with_instrumental,
     probe_video_duration,
 )
 from app.core.storage import upload_media_file
@@ -150,34 +148,23 @@ def apply_to_casting_call_with_upload(
     return _create_application_and_notify(db, background_tasks, casting_call_id, talent, application_in)
 
 
-@router.post("/casting-calls/{casting_call_id}/roles/{role_id}/audition-mix")
-def mix_audition_recording(
+@router.post("/casting-calls/{casting_call_id}/roles/{role_id}/audition-upload")
+def upload_audition_recording(
     casting_call_id: uuid.UUID,
     role_id: uuid.UUID,
     file: UploadFile = File(...),
-    bass_db: float = Form(0.0),
-    mid_db: float = Form(0.0),
-    treble_db: float = Form(0.0),
-    reverb_amount: float = Form(0.0),
-    delay_ms: float = Form(0.0),
-    delay_feedback: float = Form(0.0),
-    vocal_gain_db: float = Form(0.0),
-    sync_offset_ms: float = Form(0.0),
     db: Session = Depends(get_db),
     talent: TalentProfile = Depends(get_current_talent_profile),
 ):
-    """Mixes a talent's recorded vocal onto the role's instrumental track (with reverb) and
+    """Compresses and uploads a talent's recorded voice clip for a guided audition role, and
     returns the result for preview -- doesn't create an Application. Once the talent is happy
     with it, the returned URL is submitted as the normal application's submission_url.
     """
     call = get_casting_call(db, casting_call_id)
     if call is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Casting call not found")
-    role = next((r for r in call.roles if r.id == role_id), None)
-    if role is None:
+    if not any(r.id == role_id for r in call.roles):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That role doesn't belong to this casting call")
-    if not role.instrumental_track_url:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This role doesn't have a guided audition set up")
 
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
@@ -207,35 +194,18 @@ def mix_audition_recording(
                 detail="Could not process this recording — try recording again.",
             )
 
-        instrumental_path = os.path.join(tmpdir, "instrumental.m4a")
+        compressed_path = os.path.join(tmpdir, "compressed.m4a")
         try:
-            resp = httpx.get(role.instrumental_track_url, timeout=15.0)
-            resp.raise_for_status()
-            Path(instrumental_path).write_bytes(resp.content)
-        except httpx.HTTPError:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not load the instrumental track — try again.")
-
-        mixed_path = os.path.join(tmpdir, "mixed.m4a")
-        try:
-            mix_vocal_with_instrumental(
-                vocal_path,
-                instrumental_path,
-                mixed_path,
-                bass_db=bass_db,
-                mid_db=mid_db,
-                treble_db=treble_db,
-                reverb_amount=reverb_amount,
-                delay_ms=delay_ms,
-                delay_feedback=delay_feedback,
-                vocal_gain_db=vocal_gain_db,
-                sync_offset_ms=sync_offset_ms,
-            )
+            compress_audio(vocal_path, compressed_path)
         except MediaProcessingError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not mix this recording — make sure it's a valid audio file.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not process this recording — try recording again.",
+            )
 
-        mixed_bytes = Path(mixed_path).read_bytes()
+        compressed_bytes = Path(compressed_path).read_bytes()
 
-    url = upload_media_file(mixed_bytes, ".m4a", "audio/mp4")
+    url = upload_media_file(compressed_bytes, ".m4a", "audio/mp4")
     return {"url": url}
 
 

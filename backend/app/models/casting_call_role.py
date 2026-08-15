@@ -22,12 +22,10 @@ class CastingCallRole(Base):
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     compensation: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    # Singing-audition guide: guide_track has the recruiter's reference vocal (for the talent to
-    # learn from, never mixed into anything); instrumental_track is the music-only backing track
-    # a talent's own recorded take gets mixed onto. Both optional -- only set for roles that use
-    # the guided-audition flow.
+    # Singing-audition guide track: the recruiter's reference recording for the talent to learn
+    # from before recording and submitting their own take. Optional -- only set for roles that
+    # use the guided-audition flow.
     guide_track_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    instrumental_track_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

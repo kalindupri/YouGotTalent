@@ -850,9 +850,7 @@ interface RoleDraft {
   category: TalentCategory | "";
   compensation: string;
   guideTrackUrl: string;
-  instrumentalTrackUrl: string;
   uploadingGuide: boolean;
-  uploadingInstrumental: boolean;
 }
 
 function emptyRole(): RoleDraft {
@@ -862,9 +860,7 @@ function emptyRole(): RoleDraft {
     category: "",
     compensation: "",
     guideTrackUrl: "",
-    instrumentalTrackUrl: "",
     uploadingGuide: false,
-    uploadingInstrumental: false,
   };
 }
 
@@ -895,15 +891,15 @@ function PostCastingCallForm({
     setRoles((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
-  async function handleTrackUpload(index: number, kind: "guide" | "instrumental", file: File) {
-    updateRole(index, kind === "guide" ? { uploadingGuide: true } : { uploadingInstrumental: true });
+  async function handleTrackUpload(index: number, file: File) {
+    updateRole(index, { uploadingGuide: true });
     setError(null);
     try {
       const { url } = await api.uploadAuditionTrack(file, token);
-      updateRole(index, kind === "guide" ? { guideTrackUrl: url, uploadingGuide: false } : { instrumentalTrackUrl: url, uploadingInstrumental: false });
+      updateRole(index, { guideTrackUrl: url, uploadingGuide: false });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not upload this track.");
-      updateRole(index, kind === "guide" ? { uploadingGuide: false } : { uploadingInstrumental: false });
+      updateRole(index, { uploadingGuide: false });
     }
   }
 
@@ -930,7 +926,6 @@ function PostCastingCallForm({
             category: r.category || category,
             compensation: r.compensation.trim() || undefined,
             guide_track_url: r.guideTrackUrl || undefined,
-            instrumental_track_url: r.instrumentalTrackUrl || undefined,
           })),
         },
         token
@@ -1107,33 +1102,19 @@ function PostCastingCallForm({
               {(role.category || category) === "singing" && (
                 <div className="flex flex-col gap-2 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
                   <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Guided audition (optional) — up to 30 seconds each
+                    Guided audition (optional) — up to 30 seconds
                   </p>
                   <label className={labelClass}>
-                    Guide track (with vocals, for talent to learn from)
+                    Guide track (a sample for talent to learn from before recording their own take)
                     <input
                       type="file"
                       accept="audio/*"
                       disabled={role.uploadingGuide}
-                      onChange={(e) => e.target.files?.[0] && handleTrackUpload(i, "guide", e.target.files[0])}
+                      onChange={(e) => e.target.files?.[0] && handleTrackUpload(i, e.target.files[0])}
                       className={inputClass}
                     />
                     {role.uploadingGuide && <span className="text-xs text-zinc-500">Uploading…</span>}
                     {role.guideTrackUrl && !role.uploadingGuide && <span className="text-xs text-emerald-600">Uploaded ✓</span>}
-                  </label>
-                  <label className={labelClass}>
-                    Instrumental track (music only — talent sings over this)
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      disabled={role.uploadingInstrumental}
-                      onChange={(e) => e.target.files?.[0] && handleTrackUpload(i, "instrumental", e.target.files[0])}
-                      className={inputClass}
-                    />
-                    {role.uploadingInstrumental && <span className="text-xs text-zinc-500">Uploading…</span>}
-                    {role.instrumentalTrackUrl && !role.uploadingInstrumental && (
-                      <span className="text-xs text-emerald-600">Uploaded ✓</span>
-                    )}
                   </label>
                 </div>
               )}
