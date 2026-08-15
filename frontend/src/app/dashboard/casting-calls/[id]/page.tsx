@@ -8,6 +8,7 @@ import {
   Application,
   ApplicationStatus,
   CastingCall,
+  CastingCallRole,
   Invitation,
   TALENT_CATEGORIES,
   TalentCategory,
@@ -149,6 +150,9 @@ export default function ManageCastingCallPage() {
             setCall(updated);
             setEditing(false);
           }}
+          onRoleSaved={(role) =>
+            setCall((prev) => (prev ? { ...prev, roles: prev.roles.map((r) => (r.id === role.id ? role : r)) } : prev))
+          }
         />
       )}
 
@@ -335,11 +339,13 @@ function EditCastingCallForm({
   token,
   isPremium,
   onSaved,
+  onRoleSaved,
 }: {
   call: CastingCall;
   token: string;
   isPremium: boolean;
   onSaved: (call: CastingCall) => void;
+  onRoleSaved: (role: CastingCallRole) => void;
 }) {
   const [title, setTitle] = useState(call.title);
   const [description, setDescription] = useState(call.description);
@@ -478,6 +484,122 @@ function EditCastingCallForm({
       <button type="submit" disabled={submitting} className={btnPrimary}>
         {submitting ? "Saving…" : "Save changes"}
       </button>
+
+      {call.roles.length > 0 && (
+        <div className="flex flex-col gap-3 border-t-2 border-zinc-100 pt-4 dark:border-zinc-800">
+          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Roles</p>
+          {call.roles.map((role) => (
+            <EditRoleFields key={role.id} castingCallId={call.id} role={role} token={token} onSaved={onRoleSaved} />
+          ))}
+        </div>
+      )}
     </form>
+  );
+}
+
+function EditRoleFields({
+  castingCallId,
+  role,
+  token,
+  onSaved,
+}: {
+  castingCallId: string;
+  role: CastingCallRole;
+  token: string;
+  onSaved: (role: CastingCallRole) => void;
+}) {
+  const [title, setTitle] = useState(role.title);
+  const [criteria, setCriteria] = useState(role.criteria ?? "");
+  const [compensation, setCompensation] = useState(role.compensation ?? "");
+  const [guideTrackUrl, setGuideTrackUrl] = useState(role.guide_track_url ?? "");
+  const [uploadingGuide, setUploadingGuide] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleGuideTrackUpload(file: File) {
+    setUploadingGuide(true);
+    setError(null);
+    try {
+      const { url } = await api.uploadAuditionTrack(file, token);
+      setGuideTrackUrl(url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not upload this track.");
+    } finally {
+      setUploadingGuide(false);
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const updated = await api.updateCastingCallRole(
+        castingCallId,
+        role.id,
+        { title, criteria: criteria || undefined, compensation: compensation || undefined, guide_track_url: guideTrackUrl || undefined },
+        token
+      );
+      onSaved(updated);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save this role.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border-2 border-zinc-100 p-3 dark:border-zinc-800">
+      <input
+        value={title}
+        onChange={(e) => {
+          setTitle(e.target.value);
+          setSaved(false);
+        }}
+        placeholder="Role title"
+        className={inputClass}
+      />
+      <input
+        value={criteria}
+        onChange={(e) => {
+          setCriteria(e.target.value);
+          setSaved(false);
+        }}
+        placeholder="Criteria, e.g. Content Creators, Female, 18+"
+        className={inputClass}
+      />
+      <input
+        value={compensation}
+        onChange={(e) => {
+          setCompensation(e.target.value);
+          setSaved(false);
+        }}
+        placeholder="Pay for this role (optional)"
+        className={inputClass}
+      />
+      <label className={labelClass}>
+        Guide track (a sample for talent to learn from before recording their own take)
+        <input
+          type="file"
+          accept="audio/*"
+          disabled={uploadingGuide}
+          onChange={(e) => {
+            if (e.target.files?.[0]) {
+              handleGuideTrackUpload(e.target.files[0]);
+              setSaved(false);
+            }
+          }}
+          className={inputClass}
+        />
+        {uploadingGuide && <span className="text-xs text-zinc-500">Uploading…</span>}
+        {guideTrackUrl && !uploadingGuide && <span className="text-xs text-emerald-600">Uploaded ✓</span>}
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="button" disabled={saving || uploadingGuide} onClick={handleSave} className={`w-fit ${btnSmall}`}>
+        {saving ? "Saving…" : saved ? "Saved ✓" : "Save role"}
+      </button>
+    </div>
   );
 }

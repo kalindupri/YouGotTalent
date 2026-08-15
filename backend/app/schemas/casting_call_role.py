@@ -11,6 +11,14 @@ class CastingCallRoleCreate(BaseModel):
     guide_track_url: str | None = None
 
 
+class CastingCallRoleUpdate(BaseModel):
+    title: str | None = None
+    criteria: str | None = None
+    category: str | None = None
+    compensation: str | None = None
+    guide_track_url: str | None = None
+
+
 class CastingCallRoleRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -1114,6 +1114,17 @@ export const api = {
   ) => request<CastingCall>(`/casting-calls/${castingCallId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
   deleteCastingCall: (castingCallId: string, token: string) =>
     request<void>(`/casting-calls/${castingCallId}`, { method: "DELETE" }, token),
+  updateCastingCallRole: (
+    castingCallId: string,
+    roleId: string,
+    data: { title?: string; criteria?: string; category?: string; compensation?: string; guide_track_url?: string },
+    token: string
+  ) =>
+    request<CastingCallRole>(
+      `/casting-calls/${castingCallId}/roles/${roleId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      token
+    ),
 
   applyToCastingCall: (
     castingCallId: string,

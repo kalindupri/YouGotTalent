@@ -18,6 +18,7 @@ from app.crud.casting_call import (
     increment_view_count,
     list_casting_calls,
     update_casting_call,
+    update_casting_call_role,
 )
 from app.crud.follow import list_follower_talents
 from app.crud.recruiter_profile import count_open_casting_calls
@@ -26,6 +27,7 @@ from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentCategory
 from app.schemas.casting_call import CastingCallCreate, CastingCallRead, CastingCallUpdate
+from app.schemas.casting_call_role import CastingCallRoleRead, CastingCallRoleUpdate
 
 router = APIRouter(prefix="/casting-calls", tags=["casting-calls"])
 
@@ -190,3 +192,18 @@ def delete_my_casting_call(
 ):
     call = _get_own_casting_call(db, casting_call_id, recruiter)
     delete_casting_call(db, call)
+
+
+@router.patch("/{casting_call_id}/roles/{role_id}", response_model=CastingCallRoleRead)
+def update_my_casting_call_role(
+    casting_call_id: uuid.UUID,
+    role_id: uuid.UUID,
+    role_in: CastingCallRoleUpdate,
+    db: Session = Depends(get_db),
+    recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
+):
+    call = _get_own_casting_call(db, casting_call_id, recruiter)
+    role = next((r for r in call.roles if r.id == role_id), None)
+    if role is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+    return update_casting_call_role(db, role, role_in)
