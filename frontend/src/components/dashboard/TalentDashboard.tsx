@@ -3,6 +3,7 @@
 import { FormEvent, createElement, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  BookOpen,
   Calendar,
   CalendarDays,
   Check,
@@ -40,6 +41,11 @@ import {
   TALENT_CATEGORIES,
   TalentCategory,
   TalentProfile,
+  WritingSample,
+  WritingType,
+  WritingLanguage,
+  WRITING_TYPES,
+  WRITING_LANGUAGES,
   api,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -75,6 +81,9 @@ import {
   libraryLabel,
   premiumBadgeClass,
   PREMIUM_REEL_LIMIT,
+  FREE_TIER_WRITING_LIMIT,
+  WRITING_TYPE_LABELS,
+  WRITING_LANGUAGE_LABELS,
   reelPlatformLabel,
   REEL_PLATFORM_ICONS,
   sectionClass,
@@ -187,6 +196,7 @@ export default function TalentDashboard() {
             />
             <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
             <ReelsCard profile={profile} onUpdated={setProfile} token={token!} />
+            <WritingSamplesCard profile={profile} onUpdated={setProfile} token={token!} />
             <LibraryCard profile={profile} token={token!} />
           </>
         )}
@@ -2061,6 +2071,281 @@ function ReelsCard({
             </ul>
           )}
         </>
+      )}
+    </section>
+  );
+}
+
+const NEW_SAMPLE_DEFAULTS = {
+  title: "",
+  writing_type: "novel" as WritingType,
+  language: "english" as WritingLanguage,
+  body: "",
+  visible_lines: 8,
+  visibility: "public" as ContentVisibility,
+  is_published: false,
+};
+
+function WritingSamplesCard({
+  profile,
+  onUpdated,
+  token,
+}: {
+  profile: TalentProfile;
+  onUpdated: (p: TalentProfile) => void;
+  token: string;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(NEW_SAMPLE_DEFAULTS);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(NEW_SAMPLE_DEFAULTS);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const publishedCount = profile.writing_samples.filter((s) => s.is_published).length;
+  const isPremium = profile.tier === "premium";
+  const atPublishLimit = !isPremium && publishedCount >= FREE_TIER_WRITING_LIMIT;
+
+  function startEditing(sample: WritingSample) {
+    setEditingId(sample.id);
+    setEditForm({
+      title: sample.title,
+      writing_type: sample.writing_type,
+      language: sample.language,
+      body: sample.body,
+      visible_lines: sample.visible_lines,
+      visibility: sample.visibility,
+      is_published: sample.is_published,
+    });
+    setEditError(null);
+  }
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const sample = await api.addMyWritingSample(form, token);
+      onUpdated({ ...profile, writing_samples: [sample, ...profile.writing_samples] });
+      setForm(NEW_SAMPLE_DEFAULTS);
+      setShowForm(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save this piece.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleEditSave(e: FormEvent) {
+    e.preventDefault();
+    if (!editingId) return;
+    setEditError(null);
+    setEditSubmitting(true);
+    try {
+      const updated = await api.updateMyWritingSample(editingId, editForm, token);
+      onUpdated({
+        ...profile,
+        writing_samples: profile.writing_samples.map((s) => (s.id === updated.id ? updated : s)),
+      });
+      setEditingId(null);
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : "Could not save these changes.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
+  async function handleDelete(sample: WritingSample) {
+    setDeletingId(sample.id);
+    try {
+      await api.deleteMyWritingSample(sample.id, token);
+      onUpdated({ ...profile, writing_samples: profile.writing_samples.filter((s) => s.id !== sample.id) });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function renderFields(
+    values: typeof NEW_SAMPLE_DEFAULTS,
+    setValues: (v: typeof NEW_SAMPLE_DEFAULTS) => void,
+    disablePublish: boolean
+  ) {
+    return (
+      <>
+        <label className={labelClass}>
+          Title
+          <input
+            required
+            value={values.title}
+            onChange={(e) => setValues({ ...values, title: e.target.value })}
+            className={inputClass}
+          />
+        </label>
+        <label className={labelClass}>
+          Type
+          <select
+            value={values.writing_type}
+            onChange={(e) => setValues({ ...values, writing_type: e.target.value as WritingType })}
+            className={inputClass}
+          >
+            {WRITING_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {WRITING_TYPE_LABELS[t] ?? t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          Language
+          <select
+            value={values.language}
+            onChange={(e) => setValues({ ...values, language: e.target.value as WritingLanguage })}
+            className={inputClass}
+          >
+            {WRITING_LANGUAGES.map((l) => (
+              <option key={l} value={l}>
+                {WRITING_LANGUAGE_LABELS[l] ?? l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          Your writing
+          <textarea
+            required
+            rows={8}
+            value={values.body}
+            onChange={(e) => setValues({ ...values, body: e.target.value })}
+            className={inputClass}
+          />
+        </label>
+        <label className={labelClass}>
+          Lines to show non-owners when published
+          <input
+            required
+            type="number"
+            min={1}
+            value={values.visible_lines}
+            onChange={(e) => setValues({ ...values, visible_lines: Number(e.target.value) })}
+            className={inputClass}
+          />
+        </label>
+        <label className={labelClass}>
+          Who can see this
+          <select
+            value={values.visibility}
+            onChange={(e) => setValues({ ...values, visibility: e.target.value as ContentVisibility })}
+            className={inputClass}
+          >
+            {VISIBILITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <input
+            type="checkbox"
+            checked={values.is_published}
+            disabled={disablePublish && !values.is_published}
+            onChange={(e) => setValues({ ...values, is_published: e.target.checked })}
+          />
+          Publish to my profile
+        </label>
+        {disablePublish && !values.is_published && (
+          <p className="text-xs text-zinc-400">
+            You've published {publishedCount} of {FREE_TIER_WRITING_LIMIT} free pieces. Upgrade to Premium to
+            publish more — you can still save this as a draft.
+          </p>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <section className={sectionClass}>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Writing samples</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Novels, scripts, songs, or poems — in Sinhala, Tamil, or English. Save drafts privately, and choose
+            how many lines to show when you publish.
+          </p>
+        </div>
+        <button onClick={() => setShowForm((v) => !v)} className={btnSmall}>
+          {showForm ? "Cancel" : "+ Add writing"}
+        </button>
+      </div>
+
+      {!isPremium && (
+        <p className="mt-2 text-xs text-zinc-400">
+          {publishedCount} of {FREE_TIER_WRITING_LIMIT} published pieces used (free tier). Drafts don't count.
+        </p>
+      )}
+
+      {showForm && (
+        <form onSubmit={handleAdd} className="mt-4 flex max-w-md flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800">
+          {renderFields(form, setForm, atPublishLimit)}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={submitting} className={`w-fit ${btnPrimary}`}>
+            {submitting ? "Saving…" : form.is_published ? "Publish" : "Save draft"}
+          </button>
+        </form>
+      )}
+
+      {profile.writing_samples.length === 0 ? (
+        <p className="mt-4 text-sm text-zinc-500">No writing samples yet.</p>
+      ) : (
+        <ul className="mt-4 flex flex-col gap-2">
+          {profile.writing_samples.map((s) =>
+            editingId === s.id ? (
+              <li key={s.id} className="rounded-2xl border-2 border-zinc-100 p-4 dark:border-zinc-800">
+                <form onSubmit={handleEditSave} className="flex flex-col gap-3">
+                  {renderFields(editForm, setEditForm, atPublishLimit && !s.is_published)}
+                  {editError && <p className="text-sm text-red-600">{editError}</p>}
+                  <div className="flex items-center gap-3">
+                    <button type="submit" disabled={editSubmitting} className={`w-fit ${btnPrimary}`}>
+                      {editSubmitting ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" onClick={() => setEditingId(null)} className={`w-fit ${btnSmall}`}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </li>
+            ) : (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border-2 border-zinc-100 px-4 py-3 text-sm dark:border-zinc-800"
+              >
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 font-semibold text-zinc-900 dark:text-zinc-50">
+                    <BookOpen className="h-4 w-4 shrink-0 text-zinc-500" />
+                    <span className="truncate">{s.title}</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {WRITING_TYPE_LABELS[s.writing_type] ?? s.writing_type} ·{" "}
+                    {WRITING_LANGUAGE_LABELS[s.language] ?? s.language} ·{" "}
+                    {s.is_published ? `Published, ${s.visible_lines} lines shown` : "Draft (private)"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button onClick={() => startEditing(s)} className={btnSmall}>
+                    Edit
+                  </button>
+                  <button onClick={() => handleDelete(s)} disabled={deletingId === s.id} className={btnSmall}>
+                    Delete
+                  </button>
+                </div>
+              </li>
+            )
+          )}
+        </ul>
       )}
     </section>
   );

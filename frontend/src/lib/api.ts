@@ -128,6 +128,39 @@ export interface ReelInput {
   visibility?: ContentVisibility;
 }
 
+export type WritingType = "novel" | "script" | "song" | "poem" | "other";
+export type WritingLanguage = "sinhala" | "tamil" | "english" | "other";
+
+export const WRITING_TYPES: WritingType[] = ["novel", "script", "song", "poem", "other"];
+export const WRITING_LANGUAGES: WritingLanguage[] = ["sinhala", "tamil", "english", "other"];
+
+export interface WritingSample {
+  id: string;
+  talent_profile_id: string;
+  title: string;
+  writing_type: WritingType;
+  language: WritingLanguage;
+  body: string;
+  visible_lines: number;
+  is_published: boolean;
+  visibility: ContentVisibility;
+  created_at: string;
+  updated_at: string;
+  // True when `body` above has been truncated to `visible_lines` for a non-owner viewer --
+  // the full piece is longer than what's shown here.
+  is_excerpt: boolean;
+}
+
+export interface WritingSampleInput {
+  title: string;
+  writing_type: WritingType;
+  language: WritingLanguage;
+  body: string;
+  visible_lines?: number;
+  visibility?: ContentVisibility;
+  is_published?: boolean;
+}
+
 export interface TalentProfile {
   id: string;
   user_id: string;
@@ -158,6 +191,7 @@ export interface TalentProfile {
   media: Media[];
   credits: Credit[];
   reels: Reel[];
+  writing_samples: WritingSample[];
 }
 
 export interface TalentProfileInput {
@@ -1031,6 +1065,13 @@ export const api = {
     request<Reel>("/talents/me/reels", { method: "POST", body: JSON.stringify(data) }, token),
   deleteMyReel: (reelId: string, token: string) =>
     request<void>(`/talents/me/reels/${reelId}`, { method: "DELETE" }, token),
+  addMyWritingSample: (data: WritingSampleInput, token: string) =>
+    request<WritingSample>("/talents/me/writing-samples", { method: "POST", body: JSON.stringify(data) }, token),
+  listMyWritingSamples: (token: string) => request<WritingSample[]>("/talents/me/writing-samples", {}, token),
+  updateMyWritingSample: (sampleId: string, data: Partial<WritingSampleInput>, token: string) =>
+    request<WritingSample>(`/talents/me/writing-samples/${sampleId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
+  deleteMyWritingSample: (sampleId: string, token: string) =>
+    request<void>(`/talents/me/writing-samples/${sampleId}`, { method: "DELETE" }, token),
 
   createMyRecruiterProfile: (data: { company_name: string; recruiter_type?: RecruiterType; industry?: string }, token: string) =>
     request<RecruiterProfile>("/recruiters/me", { method: "POST", body: JSON.stringify(data) }, token),

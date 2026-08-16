@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import (
     get_current_recruiter_profile,
     get_current_talent_profile,
+    get_optional_current_user,
     get_optional_recruiter_profile,
     get_optional_viewer_role,
     require_talent,
@@ -21,6 +22,15 @@ from app.core.talent_search_parse import parse_talent_search_query
 from app.crud import subscription as subscription_crud
 from app.crud.credit import create_credit, delete_credit, get_credit, update_credit
 from app.crud.reel import count_reels, create_reel, delete_reel, get_reel
+from app.crud.writing_sample import (
+    count_published_writing_samples,
+    create_writing_sample,
+    delete_writing_sample,
+    get_writing_sample,
+    list_writing_samples_for_profile,
+    to_read_schema as writing_sample_to_read_schema,
+    update_writing_sample,
+)
 from app.crud.profile_view import count_profile_views, list_distinct_viewers, record_profile_view
 from app.crud.review import get_talent_review_summary
 from app.crud.saved_talent import get_saved_talent, save_talent, unsave_talent
@@ -47,6 +57,8 @@ from app.models.talent_profile import TalentCategory, TalentProfile
 from app.models.user import User, UserRole
 from app.schemas.credit import CreditCreate, CreditRead, CreditUpdate
 from app.schemas.reel import ReelCreate, ReelRead
+from app.schemas.writing_sample import WritingSampleCreate, WritingSampleRead, WritingSampleUpdate
+from app.models.writing_sample import WRITING_LANGUAGES, WRITING_TYPES
 from app.schemas.profile_view import ProfileViewSummary
 from app.schemas.review import TalentReviewSummary
 from app.schemas.talent_profile import (
@@ -134,15 +146,25 @@ def get_talent(
     db: Session = Depends(get_db),
     viewer: RecruiterProfile | None = Depends(get_optional_recruiter_profile),
     viewer_role: UserRole | None = Depends(get_optional_viewer_role),
+    viewer_user: User | None = Depends(get_optional_current_user),
 ):
     profile = get_talent_profile(db, talent_id)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
     if viewer is not None:
         record_profile_view(db, profile.id, viewer.id)
+    is_owner = viewer_user is not None and viewer_user.id == profile.user_id
     data = TalentProfileRead.model_validate(profile)
     data.media = [m for m in data.media if is_visible_to(m.visibility, viewer_role)]
     data.reels = [r for r in data.reels if is_visible_to(r.visibility, viewer_role)]
+    # Drafts never leave the owner's own dashboard regardless of `visibility`; published ones
+    # go through the normal visibility gate, and the body itself is truncated for non-owners
+    # (see writing_sample_to_read_schema) so the full text is never actually sent to them.
+    data.writing_samples = [
+        writing_sample_to_read_schema(ws, is_owner=is_owner)
+        for ws in profile.writing_samples
+        if is_owner or (ws.is_published and is_visible_to(ws.visibility, viewer_role))
+    ]
     return data
 
 
@@ -474,6 +496,78 @@ def delete_my_reel(
     if reel is None or reel.talent_profile_id != profile.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reel not found")
     delete_reel(db, reel)
+
+
+@router.post("/me/writing-samples", response_model=WritingSampleRead, status_code=status.HTTP_201_CREATED)
+def add_my_writing_sample(
+    sample_in: WritingSampleCreate,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    if sample_in.writing_type not in WRITING_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"writing_type must be one of {WRITING_TYPES}")
+    if sample_in.language not in WRITING_LANGUAGES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"language must be one of {WRITING_LANGUAGES}")
+    if (
+        sample_in.is_published
+        and profile.tier != "premium"
+        and count_published_writing_samples(db, profile.id) >= settings.FREE_TIER_WRITING_LIMIT
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Free accounts can publish up to {settings.FREE_TIER_WRITING_LIMIT} writing samples. Upgrade to publish more, or keep this one as a draft.",
+        )
+    sample = create_writing_sample(db, profile.id, sample_in)
+    return writing_sample_to_read_schema(sample, is_owner=True)
+
+
+@router.get("/me/writing-samples", response_model=list[WritingSampleRead])
+def list_my_writing_samples(
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    samples = list_writing_samples_for_profile(db, profile.id, owner_view=True)
+    return [writing_sample_to_read_schema(s, is_owner=True) for s in samples]
+
+
+@router.patch("/me/writing-samples/{sample_id}", response_model=WritingSampleRead)
+def update_my_writing_sample(
+    sample_id: uuid.UUID,
+    sample_in: WritingSampleUpdate,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    sample = get_writing_sample(db, sample_id)
+    if sample is None or sample.talent_profile_id != profile.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing sample not found")
+    if sample_in.writing_type is not None and sample_in.writing_type not in WRITING_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"writing_type must be one of {WRITING_TYPES}")
+    if sample_in.language is not None and sample_in.language not in WRITING_LANGUAGES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"language must be one of {WRITING_LANGUAGES}")
+    wants_publish = sample_in.is_published and not sample.is_published
+    if (
+        wants_publish
+        and profile.tier != "premium"
+        and count_published_writing_samples(db, profile.id) >= settings.FREE_TIER_WRITING_LIMIT
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Free accounts can publish up to {settings.FREE_TIER_WRITING_LIMIT} writing samples. Upgrade to publish more.",
+        )
+    updated = update_writing_sample(db, sample, sample_in)
+    return writing_sample_to_read_schema(updated, is_owner=True)
+
+
+@router.delete("/me/writing-samples/{sample_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_writing_sample(
+    sample_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    profile: TalentProfile = Depends(get_current_talent_profile),
+):
+    sample = get_writing_sample(db, sample_id)
+    if sample is None or sample.talent_profile_id != profile.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Writing sample not found")
+    delete_writing_sample(db, sample)
 
 
 @router.post("/{talent_id}/save", status_code=status.HTTP_204_NO_CONTENT)

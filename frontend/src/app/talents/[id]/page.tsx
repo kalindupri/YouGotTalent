@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Bookmark, Check, Crown, Share2, ShieldCheck, Star } from "lucide-react";
-import { ApiError, Credit, LibraryItem, Reel, TalentProfile, TalentReviewSummary, api } from "@/lib/api";
+import { BookOpen, Bookmark, Check, Crown, Share2, ShieldCheck, Star } from "lucide-react";
+import { ApiError, Credit, LibraryItem, Reel, TalentProfile, TalentReviewSummary, WritingSample, api } from "@/lib/api";
 import {
   CREDIT_PROJECT_TYPES,
   SOCIAL_LINK_FIELDS,
@@ -20,6 +20,8 @@ import {
   reelPlatformLabel,
   REEL_PLATFORM_ICONS,
   verifiedBadgeClass,
+  WRITING_TYPE_LABELS,
+  WRITING_LANGUAGE_LABELS,
 } from "@/lib/ui";
 import { useAuth } from "@/lib/auth-context";
 import TalentAvatar from "@/components/TalentAvatar";
@@ -240,6 +242,17 @@ export default function TalentDetailPage() {
         </div>
       )}
 
+      {talent.writing_samples.length > 0 && (
+        <div className="mt-10">
+          <h2 className="font-heading text-2xl font-bold text-zinc-900 dark:text-zinc-50">Writing samples</h2>
+          <div className="mt-5 flex flex-col gap-4">
+            {talent.writing_samples.map((s) => (
+              <WritingSampleCard key={s.id} sample={s} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {reviewSummary && reviewSummary.review_count > 0 && (
         <div className="mt-10 pb-10">
           <h2 className="flex items-center gap-2 font-heading text-2xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -374,4 +387,30 @@ function ReelCard({ reel }: { reel: Reel }) {
     </a>
   );
 }
+
+function WritingSampleCard({ sample }: { sample: WritingSample }) {
+  return (
+    <div className="rounded-2xl border-2 border-zinc-100 p-5 dark:border-zinc-800">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-zinc-900 dark:text-zinc-50">
+          <BookOpen className="h-4 w-4 shrink-0 text-zinc-500" />
+          {sample.title}
+        </h3>
+        <div className="flex shrink-0 gap-1.5">
+          <span className={badgeClassStatic}>{WRITING_TYPE_LABELS[sample.writing_type] ?? sample.writing_type}</span>
+          <span className={badgeClassStatic}>{WRITING_LANGUAGE_LABELS[sample.language] ?? sample.language}</span>
+        </div>
+      </div>
+      <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{sample.body}</p>
+      {sample.is_excerpt && (
+        <p className="mt-3 text-xs italic text-zinc-400">
+          Excerpt only — the writer has kept the rest of this piece private. Contact them to request the full work.
+        </p>
+      )}
+    </div>
+  );
+}
+
+const badgeClassStatic =
+  "rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300";
 

@@ -100,3 +100,9 @@ class TalentProfile(Base):
     reels: Mapped[list["Reel"]] = relationship(
         "Reel", back_populates="talent_profile", cascade="all, delete-orphan", order_by="Reel.created_at.desc()"
     )
+    writing_samples: Mapped[list["WritingSample"]] = relationship(
+        "WritingSample",
+        back_populates="talent_profile",
+        cascade="all, delete-orphan",
+        order_by="WritingSample.created_at.desc()",
+    )

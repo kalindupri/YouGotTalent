@@ -38,6 +38,10 @@ class Settings(BaseSettings):
 
     # Free-tier limits. Premium accounts (tier="premium") are exempt from these.
     FREE_TIER_MEDIA_LIMIT: int = 3
+    # Applies to *published* writing samples only -- drafts don't count, so a free-tier writer
+    # can keep drafting/revising as much as they want and only hits the wall when they try to
+    # put a 4th piece live on their public profile.
+    FREE_TIER_WRITING_LIMIT: int = 3
     FREE_TIER_OPEN_CASTING_CALL_LIMIT: int = 2
 
     # Video auditions are quota'd separately from the general media limit above — premium

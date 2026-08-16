@@ -322,6 +322,25 @@ export const SOCIAL_LINK_FIELDS: { key: SocialLinkKey; label: string; icon: Luci
 // Mirrors backend/app/core/config.py's PREMIUM_REEL_LIMIT.
 export const PREMIUM_REEL_LIMIT = 10;
 
+// Mirrors backend/app/core/config.py's FREE_TIER_WRITING_LIMIT -- applies to *published*
+// writing samples only, drafts are unlimited on any tier.
+export const FREE_TIER_WRITING_LIMIT = 3;
+
+export const WRITING_TYPE_LABELS: Record<string, string> = {
+  novel: "Novel",
+  script: "Script",
+  song: "Song",
+  poem: "Poem",
+  other: "Other",
+};
+
+export const WRITING_LANGUAGE_LABELS: Record<string, string> = {
+  sinhala: "Sinhala",
+  tamil: "Tamil",
+  english: "English",
+  other: "Other",
+};
+
 export const REEL_PLATFORM_ICONS: Record<string, LucideIcon> = {
   tiktok: Music2,
   instagram: Aperture,

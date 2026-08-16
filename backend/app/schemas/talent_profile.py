@@ -8,6 +8,7 @@ from app.models.media import MediaType
 from app.models.talent_profile import TalentCategory
 from app.schemas.credit import CreditRead
 from app.schemas.reel import ReelRead
+from app.schemas.writing_sample import WritingSampleRead
 
 
 class TalentProfileCreate(BaseModel):
@@ -133,3 +134,4 @@ class TalentProfileRead(BaseModel):
     media: list[MediaRead] = []
     credits: list[CreditRead] = []
     reels: list[ReelRead] = []
+    writing_samples: list[WritingSampleRead] = []
