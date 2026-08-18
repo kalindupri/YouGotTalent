@@ -370,3 +370,110 @@ def test_the_owner_still_gets_their_real_date_of_birth(client, talent_headers, t
 
 def test_a_recruiter_browsing_never_sees_a_date_of_birth(client, talent_headers, talent_profile, recruiter_headers):
     assert "date_of_birth" not in client.get("/api/v1/talents", headers=recruiter_headers).text
+
+
+# --- Abuse resistance on the consent endpoint ----------------------------------------------
+
+
+def test_an_oversized_document_is_rejected_without_being_read_into_memory(client, talent_headers):
+    """The size check seeks rather than reading. Without that, an attacker could force the
+    server to buffer an arbitrarily large upload before the limit was ever consulted.
+    """
+    from app.core.config import settings
+
+    create_profile(client, talent_headers, age=13)
+    oversized = b"%PDF-1.7\n" + b"\x00" * (settings.MAX_DOCUMENT_SIZE_BYTES + 1024)
+    resp = client.post(
+        "/api/v1/talents/me/guardian-consent",
+        data={
+            "guardian_full_name": "Nimal Perera",
+            "guardian_relationship": "father",
+            "minor_full_name": "Sanduni Perera",
+            "consented_scopes": ["profile_public"],
+            "agreed": "true",
+        },
+        files={"birth_certificate": ("big.pdf", oversized, "application/pdf")},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 413
+
+
+def test_an_executable_disguised_as_a_birth_certificate_is_rejected(client, talent_headers):
+    create_profile(client, talent_headers, age=13)
+    resp = client.post(
+        "/api/v1/talents/me/guardian-consent",
+        data={
+            "guardian_full_name": "Nimal Perera",
+            "guardian_relationship": "father",
+            "minor_full_name": "Sanduni Perera",
+            "consented_scopes": ["profile_public"],
+            "agreed": "true",
+        },
+        # Claims to be a PDF by both filename and content type. Only the bytes are trusted.
+        files={"birth_certificate": ("cert.pdf", b"MZ\x90\x00\x03payload", "application/pdf")},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_absurdly_long_names_are_rejected_as_validation_not_a_server_error(client, talent_headers):
+    create_profile(client, talent_headers, age=13)
+    resp = client.post(
+        "/api/v1/talents/me/guardian-consent",
+        data={
+            "guardian_full_name": "A" * 5000,
+            "guardian_relationship": "father",
+            "minor_full_name": "Sanduni Perera",
+            "consented_scopes": ["profile_public"],
+            "agreed": "true",
+        },
+        files={"birth_certificate": ("cert.pdf", PDF, "application/pdf")},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_an_unknown_consent_scope_is_rejected(client, talent_headers):
+    create_profile(client, talent_headers, age=13)
+    resp = client.post(
+        "/api/v1/talents/me/guardian-consent",
+        data={
+            "guardian_full_name": "Nimal Perera",
+            "guardian_relationship": "father",
+            "minor_full_name": "Sanduni Perera",
+            "consented_scopes": ["profile_public", "become_admin"],
+            "agreed": "true",
+        },
+        files={"birth_certificate": ("cert.pdf", PDF, "application/pdf")},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_a_talent_cannot_mint_a_document_link(client, talent_headers, admin_headers):
+    create_profile(client, talent_headers, age=13)
+    consent = submit_consent(client, talent_headers).json()
+    doc_id = consent["documents"][0]["id"]
+    resp = client.post(
+        f"/api/v1/admin/guardian-consents/{consent['id']}/documents/{doc_id}/link", headers=talent_headers
+    )
+    assert resp.status_code == 403
+
+
+def test_a_document_link_cannot_be_repointed_at_another_document(client, talent_headers, admin_headers):
+    from app.core.security import create_document_token
+
+    create_profile(client, talent_headers, age=13)
+    consent = submit_consent(client, talent_headers).json()
+    doc_id = consent["documents"][0]["id"]
+
+    # A validly-signed token for a *different* document must not open this one.
+    other = create_document_token("00000000-0000-0000-0000-000000000000", ttl_seconds=60)
+    assert client.get(f"/api/v1/documents/{doc_id}?t={other}").status_code == 401
+
+
+def test_a_document_cannot_be_fetched_with_a_login_token(client, talent_headers, admin_headers, talent_token):
+    create_profile(client, talent_headers, age=13)
+    consent = submit_consent(client, talent_headers).json()
+    doc_id = consent["documents"][0]["id"]
+    assert client.get(f"/api/v1/documents/{doc_id}?t={talent_token}").status_code == 401

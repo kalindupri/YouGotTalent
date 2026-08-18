@@ -11,7 +11,8 @@ from app.core.config import settings
 from app.core.private_storage import upload_private_file
 from app.core.security import create_document_token
 from app.core.talent_eligibility import is_adult
-from app.core.upload_validation import enforce_document_size, sniff_document
+from app.core.rate_limit import limiter
+from app.core.upload_validation import read_document_upload, sniff_document
 from app.crud import guardian_consent as consent_crud
 from app.crud.notification import create_notification
 from app.crud.talent_profile import get_talent_profile
@@ -54,14 +55,20 @@ def read_my_guardian_consent(
 
 
 @router.post("/talents/me/guardian-consent", response_model=GuardianConsentRead, status_code=status.HTTP_201_CREATED)
+# Accepts file uploads and writes to private storage, so it's rate limited like the other
+# abuse-prone endpoints. Generous enough that a guardian correcting a rejected submission
+# never notices it.
+@limiter.limit("5/minute")
 def submit_my_guardian_consent(
     request: Request,
     background_tasks: BackgroundTasks,
-    guardian_full_name: str = Form(...),
-    guardian_relationship: str = Form(...),
-    minor_full_name: str = Form(...),
-    guardian_email: str | None = Form(default=None),
-    guardian_phone: str | None = Form(default=None),
+    # Lengths match the columns these land in -- without them an over-long value reaches
+    # Postgres and surfaces as a 500 instead of a validation error.
+    guardian_full_name: str = Form(..., min_length=1, max_length=255),
+    guardian_relationship: str = Form(..., max_length=40),
+    minor_full_name: str = Form(..., min_length=1, max_length=255),
+    guardian_email: str | None = Form(default=None, max_length=255),
+    guardian_phone: str | None = Form(default=None, max_length=32),
     consented_scopes: list[str] = Form(...),
     agreed: bool = Form(...),
     birth_certificate: UploadFile = File(...),
@@ -90,8 +97,8 @@ def submit_my_guardian_consent(
     for doc_type, upload in (("birth_certificate", birth_certificate), ("guardian_id", guardian_id)):
         if upload is None:
             continue
-        data = upload.file.read()
-        enforce_document_size(len(data))
+        # Size is checked by seeking before any bytes are read into memory.
+        data = read_document_upload(upload)
         # Type comes from the bytes, never from the filename or the declared content type.
         content_type, extension = sniff_document(data)
         key = upload_private_file(data, extension, content_type)

@@ -8,6 +8,8 @@ Everything below is decided from the file's own leading bytes. The client-suppli
 and Content-Type are never trusted: both are attacker-controlled, and a mismatch between them
 and the real content is exactly how a "profile photo" turns out to be an HTML page.
 """
+import os
+
 from fastapi import HTTPException, status
 
 from app.core.config import settings
@@ -42,6 +44,20 @@ def enforce_document_size(size: int) -> None:
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"That file is too large (max {settings.MAX_DOCUMENT_SIZE_BYTES // (1024 * 1024)}MB).",
         )
+
+
+def read_document_upload(upload) -> bytes:
+    """Size-check an UploadFile by seeking, then read it.
+
+    Deliberately measures before reading. Starlette spools a large upload to a temp file, so
+    calling .read() first would pull the whole thing into memory -- a 2GB upload would cost 2GB
+    of RAM before the size limit was ever consulted. Seeking to the end costs nothing.
+    """
+    upload.file.seek(0, os.SEEK_END)
+    size = upload.file.tell()
+    upload.file.seek(0)
+    enforce_document_size(size)
+    return upload.file.read()
 
 
 def is_image(content_type: str) -> bool:
