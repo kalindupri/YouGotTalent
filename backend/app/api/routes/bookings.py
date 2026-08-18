@@ -32,6 +32,14 @@ from app.crud.review import create_review
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
+from app.core.talent_eligibility import (
+    GUARDIAN_MUST_SIGN_DETAIL,
+    is_adult,
+    require_engageable,
+    require_working_age,
+)
+from app.crud.guardian_consent import get_latest_for_profile
+from app.models.guardian_consent import GuardianConsentStatus
 from app.models.talent_profile import TalentProfile
 from app.models.user import User
 from app.schemas.availability import AvailabilityWindowCreate, AvailabilityWindowRead
@@ -72,6 +80,9 @@ def read_talent_availability(talent_id: uuid.UUID, db: Session = Depends(get_db)
     talent = get_talent_profile(db, talent_id)
     if talent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+
+    # An unconsented minor's calendar is a discovery surface like any other.
+    require_engageable(talent)
     return list_availability_for_talent(db, talent_id)
 
 
@@ -86,6 +97,10 @@ def request_booking(
     talent = get_talent_profile(db, talent_id)
     if talent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+    # Before any of the offer/availability branching below, so it covers both shapes this
+    # endpoint serves: a paid offer against an application, and a standalone session booking.
+    require_engageable(talent)
+    require_working_age(talent)
 
     is_offer = booking_in.application_id is not None
     if is_offer:
@@ -198,6 +213,13 @@ def cancel_booking(
     return update_booking_status(db, booking, "cancelled")
 
 
+def _names_match(signature: str, guardian_name: str) -> bool:
+    """Compare a typed signature to the registered guardian's name, ignoring case and stray
+    whitespace -- someone typing their own name shouldn't be defeated by a double space.
+    """
+    return " ".join(signature.split()).casefold() == " ".join(guardian_name.split()).casefold()
+
+
 @router.patch("/bookings/{booking_id}/agreement/sign", response_model=BookingRead)
 def sign_booking_agreement(
     booking_id: uuid.UUID,
@@ -219,6 +241,21 @@ def sign_booking_agreement(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No pending agreement to sign for this booking")
     if (party == "talent" and booking.talent_signed_at) or (party == "recruiter" and booking.recruiter_signed_at):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You've already signed this agreement")
+
+    if party == "talent":
+        # Re-checked at signing, not just when the offer was sent: the date of birth may have
+        # been corrected in between, and this is the moment the engagement becomes binding.
+        require_working_age(booking.talent, own=True)
+        if not is_adult(booking.talent):
+            consent = get_latest_for_profile(db, booking.talent_id)
+            approved = consent is not None and consent.status == GuardianConsentStatus.APPROVED.value
+            signed_by_guardian = (
+                agreement_in.signed_as_guardian
+                and approved
+                and _names_match(agreement_in.signature_name, consent.guardian_full_name)
+            )
+            if not signed_by_guardian:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GUARDIAN_MUST_SIGN_DETAIL)
 
     updated = sign_agreement(db, booking, party, agreement_in.signature_name)
 

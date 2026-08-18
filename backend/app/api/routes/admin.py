@@ -51,7 +51,7 @@ from app.schemas.pricing import AdminPricingOverview, CurrentPricing, PricingUpd
 from app.schemas.recruiter_profile import RecruiterProfileRead
 from app.schemas.report import ReportRead, ReportStatusUpdate, ReportWithReporter
 from app.schemas.subscription import PaymentRead
-from app.schemas.talent_profile import TalentProfileRead
+from app.schemas.talent_profile import TalentProfileOwnerRead, TalentProfileRead
 from app.schemas.user import UserRead
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -95,12 +95,12 @@ def update_user_status(
     return set_user_active(db, user, payload.is_active)
 
 
-@router.get("/verification-requests/talents", response_model=list[TalentProfileRead])
+@router.get("/verification-requests/talents", response_model=list[TalentProfileOwnerRead])
 def read_pending_talent_verifications(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     return list_pending_talent_verifications(db)
 
 
-@router.post("/verification-requests/talents/{talent_id}/approve", response_model=TalentProfileRead)
+@router.post("/verification-requests/talents/{talent_id}/approve", response_model=TalentProfileOwnerRead)
 def approve_talent(talent_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     profile = get_talent_profile(db, talent_id)
     if profile is None:
@@ -108,7 +108,7 @@ def approve_talent(talent_id: uuid.UUID, db: Session = Depends(get_db), _: User 
     return approve_talent_verification(db, profile)
 
 
-@router.post("/verification-requests/talents/{talent_id}/reject", response_model=TalentProfileRead)
+@router.post("/verification-requests/talents/{talent_id}/reject", response_model=TalentProfileOwnerRead)
 def reject_talent(talent_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     profile = get_talent_profile(db, talent_id)
     if profile is None:

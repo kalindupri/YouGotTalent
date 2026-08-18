@@ -47,12 +47,18 @@ function categoryLabel(slug: string): string {
     .join(" ");
 }
 
+// An ordinary adult. Specs that care about age (guardian consent, minimum working age) pass
+// their own dateOfBirth; everything else just needs a profile that isn't a minor's.
+export const ADULT_DOB = "1995-06-15";
+
 export async function createTalentProfile(
   page: Page,
-  opts: { displayName: string; category?: string; city?: string; bio?: string }
+  opts: { displayName: string; category?: string; city?: string; bio?: string; dateOfBirth?: string }
 ) {
   await page.goto("/dashboard");
   await page.getByLabel("Display name").fill(opts.displayName);
+  // Required: it decides whether guardian consent is needed and whether paid work is allowed.
+  await page.getByLabel("Date of birth").fill(opts.dateOfBirth ?? ADULT_DOB);
   if (opts.category) {
     // Categories are a checkbox group (multi-category support), not a <select> — "acting"
     // defaults checked, so clear it before checking the requested one for a clean single-value state.

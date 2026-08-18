@@ -6,6 +6,8 @@ from sqlalchemy import String, case, cast, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.age import years_ago
+from app.core.config import settings
+from app.models.guardian_consent import GuardianConsentStatus
 from app.models.media import Media, MediaType
 from app.models.talent_profile import TalentCategory, TalentProfile
 from app.schemas.talent_profile import MediaCreate, MediaUpdate, TalentProfileCreate, TalentProfileUpdate
@@ -31,6 +33,22 @@ def list_talent_profiles_by_user(db: Session, user_id: uuid.UUID) -> list[Talent
 
 
 
+def _listable(query):
+    """Hide minors whose guardian consent isn't approved from every discovery surface.
+
+    Mirrors talent_eligibility.is_engageable in SQL, age first: anyone born on or before 18
+    years ago is listable regardless of the stored status, so an 18th birthday takes effect
+    with no scheduler. A null date of birth is excluded -- unknown age fails closed.
+    """
+    return query.filter(
+        TalentProfile.date_of_birth.isnot(None),
+        or_(
+            TalentProfile.date_of_birth <= years_ago(settings.GUARDIAN_CONSENT_AGE),
+            TalentProfile.guardian_consent_status == GuardianConsentStatus.APPROVED.value,
+        ),
+    )
+
+
 def list_talent_profiles(
     db: Session,
     categories: list[TalentCategory] | None,
@@ -47,7 +65,7 @@ def list_talent_profiles(
     age_max: int | None = None,
     min_tiktok_followers: int | None = None,
 ) -> list[TalentProfile]:
-    query = db.query(TalentProfile)
+    query = _listable(db.query(TalentProfile))
     if categories:
         # "Any of the selected categories" — same array-overlap pattern used for instruments
         # below, so a talent who does both acting and singing is found by filtering on either.
@@ -123,7 +141,7 @@ def list_talent_profiles_for_job_alert(db: Session, categories: set[str]) -> lis
     if not categories:
         return []
     return (
-        db.query(TalentProfile)
+        _listable(db.query(TalentProfile))
         .filter(TalentProfile.categories.op("&&")(list(categories)), TalentProfile.job_alert_emails.is_(True))
         .all()
     )
@@ -137,7 +155,7 @@ def list_featured_talent(db: Session, limit: int) -> list[TalentProfile]:
     """
     rotation_key = func.md5(func.concat(cast(TalentProfile.id, String), func.to_char(func.now(), "IYYY-IW")))
     return (
-        db.query(TalentProfile)
+        _listable(db.query(TalentProfile))
         .filter(TalentProfile.tier == "premium", TalentProfile.is_verified.is_(True))
         .order_by(rotation_key)
         .limit(limit)
@@ -154,7 +172,7 @@ def list_new_arrivals(db: Session, categories: set[str], hours: int = 48) -> lis
         return []
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     return (
-        db.query(TalentProfile)
+        _listable(db.query(TalentProfile))
         .filter(TalentProfile.categories.op("&&")(list(categories)), TalentProfile.created_at >= cutoff)
         .order_by(TalentProfile.created_at.desc())
         .all()

@@ -75,6 +75,15 @@ class TalentProfile(Base):
     # Whether this talent wants "a new job matching your category was just posted" emails.
     job_alert_emails: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
+    # Denormalized from the latest guardian_consents row so list queries can filter without a
+    # join. It is a query hint, not the source of truth: talent_eligibility checks age first,
+    # so an 18th birthday takes effect immediately without anything having to update this.
+    # server_default is declared here as well as in the migration because tests build the
+    # schema with Base.metadata.create_all(), which never runs migrations.
+    guardian_consent_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="not_required"
+    )
+
     instagram_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     facebook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     tiktok_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -93,6 +102,16 @@ class TalentProfile(Base):
     attributes: Mapped[dict[str, str] | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def age(self) -> int | None:
+        """Completed years, or None if date_of_birth was never set (legacy rows only -- it's
+        required on creation now). Pydantic picks this up via from_attributes, the same way
+        Subscription.subscriber_name and Title.average_rating are surfaced.
+        """
+        from app.core.age import calculate_age
+
+        return calculate_age(self.date_of_birth) if self.date_of_birth else None
 
     user: Mapped["User"] = relationship("User", back_populates="talent_profiles")
     media: Mapped[list["Media"]] = relationship("Media", back_populates="talent_profile", cascade="all, delete-orphan")

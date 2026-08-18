@@ -18,9 +18,11 @@ from app.core.config import settings
 from app.core.content_visibility import is_visible_to
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
+from app.core.talent_eligibility import is_engageable, needs_guardian_consent
 from app.core.talent_search_parse import parse_talent_search_query
 from app.crud import subscription as subscription_crud
 from app.crud.credit import create_credit, delete_credit, get_credit, update_credit
+from app.crud.guardian_consent import mark_required
 from app.crud.reel import count_reels, create_reel, delete_reel, get_reel
 from app.crud.writing_sample import (
     count_published_writing_samples,
@@ -62,6 +64,7 @@ from app.models.writing_sample import WRITING_LANGUAGES, WRITING_TYPES
 from app.schemas.profile_view import ProfileViewSummary
 from app.schemas.review import TalentReviewSummary
 from app.schemas.talent_profile import (
+    TalentProfileOwnerRead,
     MediaCreate,
     MediaRead,
     MediaUpdate,
@@ -120,7 +123,7 @@ def parse_search_query(q: str):
     return parse_talent_search_query(q)
 
 
-@router.get("/me", response_model=TalentProfileRead)
+@router.get("/me", response_model=TalentProfileOwnerRead)
 def read_my_profile(profile: TalentProfile = Depends(get_current_talent_profile)):
     return profile
 
@@ -154,6 +157,11 @@ def get_talent(
     if viewer is not None:
         record_profile_view(db, profile.id, viewer.id)
     is_owner = viewer_user is not None and viewer_user.id == profile.user_id
+    is_admin = viewer_user is not None and viewer_user.role == UserRole.ADMIN
+    if not is_engageable(profile) and not (is_owner or is_admin):
+        # 404, not 403: revealing "this exists but is hidden" would confirm a minor's profile
+        # to anyone guessing ids.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
     data = TalentProfileRead.model_validate(profile)
     data.media = [m for m in data.media if is_visible_to(m.visibility, viewer_role)]
     data.reels = [r for r in data.reels if is_visible_to(r.visibility, viewer_role)]
@@ -176,7 +184,7 @@ def read_talent_reviews(talent_id: uuid.UUID, db: Session = Depends(get_db)):
     return get_talent_review_summary(db, talent_id)
 
 
-@router.post("/me", response_model=TalentProfileRead, status_code=status.HTTP_201_CREATED)
+@router.post("/me", response_model=TalentProfileOwnerRead, status_code=status.HTTP_201_CREATED)
 def create_my_profile(
     profile_in: TalentProfileCreate,
     db: Session = Depends(get_db),
@@ -187,10 +195,13 @@ def create_my_profile(
     # profile here. The guardian flow replaces this with a guardian-aware check.
     if get_talent_profile_by_user(db, user.id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Talent profile already exists")
-    return create_talent_profile(db, user.id, profile_in)
+    profile = create_talent_profile(db, user.id, profile_in)
+    if needs_guardian_consent(profile):
+        mark_required(db, profile)
+    return profile
 
 
-@router.patch("/me", response_model=TalentProfileRead)
+@router.patch("/me", response_model=TalentProfileOwnerRead)
 def update_my_profile(
     profile_in: TalentProfileUpdate,
     db: Session = Depends(get_db),
@@ -363,7 +374,7 @@ def delete_my_media(
     delete_media(db, media)
 
 
-@router.post("/me/intro-video", response_model=TalentProfileRead, status_code=status.HTTP_201_CREATED)
+@router.post("/me/intro-video", response_model=TalentProfileOwnerRead, status_code=status.HTTP_201_CREATED)
 def upload_my_intro_video(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -413,7 +424,7 @@ def upload_my_intro_video(
     return updated
 
 
-@router.post("/me/request-verification", response_model=TalentProfileRead)
+@router.post("/me/request-verification", response_model=TalentProfileOwnerRead)
 def request_my_verification(
     db: Session = Depends(get_db),
     profile: TalentProfile = Depends(get_current_talent_profile),
@@ -421,7 +432,7 @@ def request_my_verification(
     return request_verification(db, profile)
 
 
-@router.post("/me/upgrade", response_model=TalentProfileRead)
+@router.post("/me/upgrade", response_model=TalentProfileOwnerRead)
 def upgrade_my_tier(
     db: Session = Depends(get_db),
     profile: TalentProfile = Depends(get_current_talent_profile),

@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.guardian_consent import GuardianConsent, GuardianConsentDocument, GuardianConsentEvent
 from app.models.talent_profile import TalentProfile
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.media import Media
@@ -32,6 +33,9 @@ from app.models.support_chat import SupportConversation, SupportMessage
 
 __all__ = [
     "User",
+    "GuardianConsent",
+    "GuardianConsentDocument",
+    "GuardianConsentEvent",
     "TalentProfile",
     "RecruiterProfile",
     "Media",

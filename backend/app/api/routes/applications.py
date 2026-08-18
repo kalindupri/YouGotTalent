@@ -29,6 +29,7 @@ from app.crud.notification import create_notification
 from app.db.session import get_db
 from app.models.application import ApplicationStatus
 from app.models.recruiter_profile import RecruiterProfile
+from app.core.talent_eligibility import require_engageable, require_working_age
 from app.models.talent_profile import TalentProfile
 from app.schemas.application import ApplicationCreate, ApplicationRead, ApplicationStatusUpdate
 
@@ -55,6 +56,10 @@ def _create_application_and_notify(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This talent hunt is open to Premium talent only. Upgrade your account to apply.",
         )
+    # Sri Lanka's minimum working age. Applying is applying for a job, so it's gated here
+    # rather than only at the offer.
+    require_working_age(talent, own=True)
+    require_engageable(talent, own=True)
 
     try:
         application = create_application(db, casting_call_id, talent.id, application_in)

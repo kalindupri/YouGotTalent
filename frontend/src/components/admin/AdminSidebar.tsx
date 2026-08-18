@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  Baby as BabyIcon,
   Clapperboard,
   DollarSign,
   Flag,
@@ -28,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Overview", icon: Gauge },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/verification", label: "Verification", icon: ShieldCheck },
+  { href: "/admin/guardian-consents", label: "Guardian consent", icon: BabyIcon },
   { href: "/admin/casting-calls", label: "Talent hunts", icon: Clapperboard },
   { href: "/admin/community", label: "Community", icon: MessagesSquare },
   { href: "/admin/reports", label: "Reports", icon: Flag },

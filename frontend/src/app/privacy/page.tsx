@@ -42,7 +42,15 @@ export default function PrivacyPage() {
             <strong>Talent profile</strong>: category/skills, bio, city, date of birth, gender,
             experience, portfolio media (photos, video, audio), social media links, and any
             category-specific details you choose to add (e.g. height, vocal range, TikTok
-            follower count).
+            follower count). Date of birth is required — it is how we know whether guardian
+            consent is needed and whether someone is old enough for paid work — but it is never
+            shown publicly. Other people only ever see an age.
+          </li>
+          <li>
+            <strong>Guardian verification documents</strong>: for a profile belonging to someone
+            under 18, the birth certificate or other proof of guardianship the guardian uploads,
+            along with their name, relationship, and contact details. These are stored privately
+            and are only seen by the staff who review them — see Section 7.
           </li>
           <li>
             <strong>Recruiter profile</strong>: company/organizer name, industry, and casting
@@ -114,10 +122,63 @@ export default function PrivacyPage() {
           Act No. 9 of 2022.
         </p>
 
-        <h2>7. Children</h2>
+        <h2>7. Young people under 18</h2>
         <p>
-          YouGotTalent is not intended for anyone under 18. If you are a parent or guardian and
-          believe a minor has created an account, contact us and we will remove it.
+          Young performers are welcome on YouGotTalent, but a profile for anyone under 18 must be
+          created and controlled by their parent or legal guardian. The guardian is the account
+          holder: they register in their own name, with their own email address, and manage all
+          activity on the profile. The young person does not get their own login.
+        </p>
+        <p>
+          Under the Personal Data Protection Act No. 9 of 2022, a child&apos;s personal data is a
+          special category and consent must come from a parent or legal guardian. Before a profile
+          belonging to someone under 18 is visible to talent hunts or reachable by anyone, we ask
+          the guardian to:
+        </p>
+        <ul>
+          <li>
+            tell us their own legal name, their relationship to the young person, and the young
+            person&apos;s legal name;
+          </li>
+          <li>
+            upload proof of that relationship — a certified copy of the birth certificate, or
+            another document proving legal guardianship;
+          </li>
+          <li>
+            choose specifically what they are consenting to, rather than agreeing to everything at
+            once: being listed publicly, showing photos and audition media, being contacted by
+            talent hunts, and being considered for paid work.
+          </li>
+        </ul>
+        <p>
+          Until a member of our team has reviewed those documents and approved the consent, the
+          profile does not appear in search or browse, is not included in job-alert emails, and
+          cannot be messaged, invited, or booked. If we cannot approve it, we tell the guardian why
+          so they can correct it.
+        </p>
+        <p>
+          <strong>Verification documents are treated differently from everything else on the
+          platform.</strong> They are stored separately from profile media, are never published on
+          the profile, are not accessible by any public link, and can only be opened by the small
+          number of staff who review them — through a link that expires within minutes. We delete
+          them [PLACEHOLDER — number] days after the review is complete.
+        </p>
+        <p>
+          <strong>We never show a date of birth publicly.</strong> Talent hunts see an age, not a
+          birth date. This applies to every profile, not only those belonging to young people.
+        </p>
+        <p>
+          <strong>Paid work.</strong> Sri Lanka&apos;s minimum age of employment is 16. Talent under
+          16 can build a profile and showcase their work, but cannot be offered or booked for paid
+          engagements through YouGotTalent. For 16 and 17 year olds, any contract must be signed by
+          their registered guardian, not by the young person.
+        </p>
+        <p>
+          A guardian can withdraw consent at any time from the profile&apos;s dashboard, or by
+          contacting us at [PLACEHOLDER — email address]. Withdrawing consent hides the profile
+          immediately. If you believe a profile for a young person has been created by someone who
+          is not their parent or legal guardian, contact us and we will investigate and take it
+          down.
         </p>
 
         <h2>8. Security</h2>

@@ -143,7 +143,10 @@ class TalentProfileRead(BaseModel):
     categories: list[str]
     bio: str | None
     city: str | None
-    date_of_birth: date | None
+    # Age, never the birth date. Recruiters cast by age; nobody outside the account needs a
+    # minor's exact date of birth, which the PDPA treats as special-category data.
+    # TalentProfileOwnerRead below re-adds the real date for the account that owns the profile.
+    age: int | None
     gender: str | None
     tiktok_followers: int | None
     experience_years: int | None
@@ -166,3 +169,14 @@ class TalentProfileRead(BaseModel):
     credits: list[CreditRead] = []
     reels: list[ReelRead] = []
     writing_samples: list[WritingSampleRead] = []
+
+
+class TalentProfileOwnerRead(TalentProfileRead):
+    """What the account managing this profile sees -- and the only schema exposing the real
+    date of birth. Every other schema that nests a talent profile (applications, invitations,
+    saved talents, list members, new arrivals) inherits the plain read above, so opting in
+    here is the entire surface on which a birth date can leak.
+    """
+
+    date_of_birth: date | None
+    guardian_consent_status: str

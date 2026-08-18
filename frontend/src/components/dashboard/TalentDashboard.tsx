@@ -40,6 +40,7 @@ import {
   Reel,
   TALENT_CATEGORIES,
   TalentCategory,
+  MyTalentProfile,
   TalentProfile,
   WritingSample,
   WritingType,
@@ -100,6 +101,7 @@ import LibraryItemCard from "@/components/LibraryItemCard";
 import HeadshotUploader from "@/components/HeadshotUploader";
 import SubmissionPreview from "@/components/SubmissionPreview";
 import DashboardSidebar, { DashboardNavItem } from "@/components/dashboard/DashboardSidebar";
+import GuardianConsentCard from "@/components/dashboard/GuardianConsentCard";
 
 function parseSkills(raw: string): string[] {
   return raw
@@ -121,7 +123,7 @@ const TALENT_NAV_ITEMS: DashboardNavItem[] = [
 export default function TalentDashboard() {
   const { token } = useAuth();
   const [activeSection, setActiveSection] = useState<TalentSection>("profile");
-  const [profile, setProfile] = useState<TalentProfile | null>(null);
+  const [profile, setProfile] = useState<MyTalentProfile | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -178,6 +180,11 @@ export default function TalentDashboard() {
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         {activeSection === "profile" && (
           <>
+            <GuardianConsentCard
+              profile={profile}
+              token={token!}
+              onSubmitted={() => api.getMyTalentProfile(token!).then(setProfile).catch(() => {})}
+            />
             <ProfileSummary profile={profile} onUpdated={setProfile} token={token!} />
             <IntroVideoCard profile={profile} onUpdated={setProfile} token={token!} />
             <SocialLinksCard profile={profile} onUpdated={setProfile} token={token!} />
@@ -378,7 +385,7 @@ export default function TalentDashboard() {
   );
 }
 
-function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p: TalentProfile) => void }) {
+function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p: MyTalentProfile) => void }) {
   const [displayName, setDisplayName] = useState("");
   const [categories, setCategories] = useState<TalentCategory[]>(["acting"]);
   const [city, setCity] = useState("");
@@ -489,8 +496,8 @@ function ProfileSummary({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [editing, setEditing] = useState(false);
@@ -621,7 +628,7 @@ function EditProfileForm({
   submitting,
   setSubmitting,
 }: {
-  profile: TalentProfile;
+  profile: MyTalentProfile;
   token: string;
   bio: string;
   city: string;
@@ -631,7 +638,7 @@ function EditProfileForm({
   setCity: (v: string) => void;
   setSkillsInput: (v: string) => void;
   setCategories: (v: TalentCategory[]) => void;
-  onSaved: (p: TalentProfile) => void;
+  onSaved: (p: MyTalentProfile) => void;
   error: string | null;
   setError: (v: string | null) => void;
   submitting: boolean;
@@ -770,8 +777,8 @@ function MembershipCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [requestingVerification, setRequestingVerification] = useState(false);
@@ -1307,8 +1314,8 @@ function NotificationPreferencesCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [saving, setSaving] = useState(false);
@@ -1345,8 +1352,8 @@ function IntroVideoCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [editing, setEditing] = useState(false);
@@ -1477,8 +1484,8 @@ function SocialLinksCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [editing, setEditing] = useState(false);
@@ -1549,8 +1556,8 @@ function AttributesCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const fields = categoryAttributeFields(profile.category);
@@ -1637,8 +1644,8 @@ function InstrumentsCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [selected, setSelected] = useState<string[]>(profile.instruments ?? []);
@@ -1700,8 +1707,8 @@ function CreditsCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -1961,8 +1968,8 @@ function ReelsCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [url, setUrl] = useState("");
@@ -2107,8 +2114,8 @@ function WritingSamplesCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -2372,8 +2379,8 @@ function MediaGalleryCard({
   onUpdated,
   token,
 }: {
-  profile: TalentProfile;
-  onUpdated: (p: TalentProfile) => void;
+  profile: MyTalentProfile;
+  onUpdated: (p: MyTalentProfile) => void;
   token: string;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -2480,7 +2487,7 @@ function AddMediaForm({
   onAdded,
 }: {
   token: string;
-  profile: TalentProfile;
+  profile: MyTalentProfile;
   onAdded: (m: Media) => void;
 }) {
   const [url, setUrl] = useState("");
@@ -2639,7 +2646,7 @@ const LIBRARY_UPLOAD_TYPES: { value: "photo" | "video" | "audio"; label: string 
   { value: "audio", label: "Audio" },
 ];
 
-function LibraryCard({ profile, token }: { profile: TalentProfile; token: string }) {
+function LibraryCard({ profile, token }: { profile: MyTalentProfile; token: string }) {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"upload" | "url">("upload");

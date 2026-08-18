@@ -15,6 +15,7 @@ from app.crud.invitation import (
     list_invitations_for_talent,
     update_invitation_status,
 )
+from app.core.talent_eligibility import is_engageable, require_engageable
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.invitation import INVITATION_STATUSES
@@ -45,6 +46,7 @@ def invite_talent_to_casting_call(
     talent = get_talent_profile(db, invitation_in.talent_id)
     if talent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+    require_engageable(talent)
 
     try:
         invitation = create_invitation(db, casting_call_id, recruiter.id, invitation_in)
@@ -87,7 +89,7 @@ def bulk_invite_talent_to_casting_call(
     skipped = []
     for talent_id in payload.talent_ids:
         talent = get_talent_profile(db, talent_id)
-        if talent is None:
+        if talent is None or not is_engageable(talent):
             skipped.append(talent_id)
             continue
         try:

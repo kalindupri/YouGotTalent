@@ -19,6 +19,7 @@ from app.crud.conversation import (
     unread_count,
 )
 from app.crud.notification import create_notification
+from app.core.talent_eligibility import require_engageable
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.conversation import Conversation
@@ -62,8 +63,10 @@ def start_conversation(
     db: Session = Depends(get_db),
     recruiter: RecruiterProfile = Depends(get_current_recruiter_profile),
 ):
-    if get_talent_profile(db, conversation_in.talent_id) is None:
+    talent = get_talent_profile(db, conversation_in.talent_id)
+    if talent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+    require_engageable(talent)
 
     conversation = get_conversation_by_participants(db, recruiter.id, conversation_in.talent_id) or create_conversation(
         db, recruiter.id, conversation_in.talent_id, conversation_in.casting_call_id

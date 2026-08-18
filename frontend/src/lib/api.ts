@@ -169,7 +169,7 @@ export interface TalentProfile {
   categories: TalentCategory[];
   bio: string | null;
   city: string | null;
-  date_of_birth: string | null;
+  age: number | null;
   gender: string | null;
   tiktok_followers: number | null;
   experience_years: number | null;
@@ -192,6 +192,55 @@ export interface TalentProfile {
   credits: Credit[];
   reels: Reel[];
   writing_samples: WritingSample[];
+}
+
+
+/** What the account managing a profile sees. `date_of_birth` is deliberately absent from the
+ * public `TalentProfile` — only these owner-facing endpoints return it. */
+export interface MyTalentProfile extends TalentProfile {
+  date_of_birth: string | null;
+  guardian_consent_status: GuardianConsentStatus;
+}
+
+export type GuardianConsentStatus =
+  | "not_required"
+  | "required"
+  | "submitted"
+  | "approved"
+  | "rejected"
+  | "revoked"
+  | "expired";
+
+export interface GuardianConsentDocument {
+  id: string;
+  doc_type: string;
+  content_type: string;
+  size_bytes: number;
+  original_filename: string | null;
+  uploaded_at: string;
+}
+
+export interface GuardianConsent {
+  id: string;
+  talent_profile_id: string;
+  guardian_full_name: string;
+  guardian_relationship: string;
+  guardian_email: string | null;
+  guardian_phone: string | null;
+  minor_full_name: string;
+  minor_date_of_birth: string;
+  status: GuardianConsentStatus;
+  consented_scopes: string[] | null;
+  decision_reason: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  documents: GuardianConsentDocument[];
+}
+
+export interface AdminGuardianConsent extends GuardianConsent {
+  minor_age: number | null;
+  talent_display_name: string | null;
 }
 
 export interface TalentProfileInput {
@@ -929,12 +978,12 @@ export const api = {
     request<ParsedTalentSearchQuery>(`/talents/parse-search-query?q=${encodeURIComponent(q)}`),
   listFeaturedTalent: () => request<TalentProfile[]>("/talents/featured"),
   getTalent: (id: string, token?: string | null) => request<TalentProfile>(`/talents/${id}`, {}, token),
-  getMyTalentProfile: (token: string) => request<TalentProfile>("/talents/me", {}, token),
+  getMyTalentProfile: (token: string) => request<MyTalentProfile>("/talents/me", {}, token),
   createMyTalentProfile: (data: TalentProfileInput, token: string) =>
-    request<TalentProfile>("/talents/me", { method: "POST", body: JSON.stringify(data) }, token),
+    request<MyTalentProfile>("/talents/me", { method: "POST", body: JSON.stringify(data) }, token),
   updateMyTalentProfile: (data: Partial<TalentProfileInput>, token: string) =>
-    request<TalentProfile>("/talents/me", { method: "PATCH", body: JSON.stringify(data) }, token),
-  uploadMyIntroVideo: async (file: File, token: string): Promise<TalentProfile> => {
+    request<MyTalentProfile>("/talents/me", { method: "PATCH", body: JSON.stringify(data) }, token),
+  uploadMyIntroVideo: async (file: File, token: string): Promise<MyTalentProfile> => {
     const form = new FormData();
     form.set("file", file);
 
@@ -1053,8 +1102,8 @@ export const api = {
     request<void>(`/talents/${talentId}/save`, { method: "DELETE" }, token),
   listSavedTalents: (token: string) => request<TalentProfile[]>("/recruiters/me/saved-talents", {}, token),
   requestTalentVerification: (token: string) =>
-    request<TalentProfile>("/talents/me/request-verification", { method: "POST" }, token),
-  upgradeTalentTier: (token: string) => request<TalentProfile>("/talents/me/upgrade", { method: "POST" }, token),
+    request<MyTalentProfile>("/talents/me/request-verification", { method: "POST" }, token),
+  upgradeTalentTier: (token: string) => request<MyTalentProfile>("/talents/me/upgrade", { method: "POST" }, token),
   addMyCredit: (data: CreditInput, token: string) =>
     request<Credit>("/talents/me/credits", { method: "POST", body: JSON.stringify(data) }, token),
   updateMyCredit: (creditId: string, data: CreditUpdateInput, token: string) =>
@@ -1417,6 +1466,28 @@ export const api = {
     ),
   adminGetUserDetail: (userId: string, token: string) =>
     request<AdminUserDetail>(`/admin/users/${userId}`, {}, token),
+  adminListGuardianConsents: (token: string, statusFilter = "submitted") =>
+    request<AdminGuardianConsent[]>(`/admin/guardian-consents?status_filter=${statusFilter}`, {}, token),
+  adminApproveGuardianConsent: (consentId: string, token: string, note?: string) =>
+    request<AdminGuardianConsent>(
+      `/admin/guardian-consents/${consentId}/approve`,
+      { method: "POST", body: JSON.stringify({ note: note ?? null }) },
+      token
+    ),
+  adminRejectGuardianConsent: (consentId: string, reason: string, token: string) =>
+    request<AdminGuardianConsent>(
+      `/admin/guardian-consents/${consentId}/reject`,
+      { method: "POST", body: JSON.stringify({ reason }) },
+      token
+    ),
+  adminGuardianConsentDocumentLink: (consentId: string, documentId: string, token: string) =>
+    request<{ url: string; expires_at: string }>(
+      `/admin/guardian-consents/${consentId}/documents/${documentId}/link`,
+      { method: "POST" },
+      token
+    ),
+  getMyGuardianConsent: (token: string) =>
+    request<GuardianConsent | null>("/talents/me/guardian-consent", {}, token),
   adminListPendingTalentVerifications: (token: string) =>
     request<TalentProfile[]>("/admin/verification-requests/talents", {}, token),
   adminApproveTalentVerification: (talentId: string, token: string) =>

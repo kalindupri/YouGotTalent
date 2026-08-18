@@ -38,6 +38,9 @@ class BookingStatusUpdate(BaseModel):
 
 class BookingAgreementSign(BaseModel):
     signature_name: str
+    # Required when the talent is under 18: a minor cannot bind themselves to a contract, so
+    # the signature must be the registered guardian's, and they must say so explicitly.
+    signed_as_guardian: bool = False
 
 
 class BookingRead(BaseModel):
