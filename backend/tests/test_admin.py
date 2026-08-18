@@ -1,4 +1,4 @@
-from tests.conftest import DEFAULT_PASSWORD
+from tests.conftest import ADULT_DOB, DEFAULT_PASSWORD
 
 
 def test_register_rejects_admin_role(client):
@@ -31,7 +31,7 @@ def test_admin_endpoints_reject_recruiter(client, recruiter_headers):
 
 
 def test_stats_reflect_platform_state(client, admin_headers, talent_headers, recruiter_headers, recruiter_profile):
-    client.post("/api/v1/talents/me", json={"display_name": "Stats Talent", "category": "acting"}, headers=talent_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Stats Talent", "category": "acting"}, headers=talent_headers)
     call = client.post(
         "/api/v1/casting-calls",
         json={"title": "Stats call", "description": "x", "category": "acting", "roles": [{"title": "x"}]},
@@ -114,7 +114,7 @@ def test_suspend_unknown_user_404(client, admin_headers):
 
 
 def test_talent_verification_approve_flow(client, admin_headers, talent_headers):
-    client.post("/api/v1/talents/me", json={"display_name": "Verify Me", "category": "acting"}, headers=talent_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Verify Me", "category": "acting"}, headers=talent_headers)
     talent = client.get("/api/v1/talents/me", headers=talent_headers).json()
     client.post("/api/v1/talents/me/request-verification", headers=talent_headers)
 
@@ -133,7 +133,7 @@ def test_talent_verification_approve_flow(client, admin_headers, talent_headers)
 
 
 def test_talent_verification_reject_flow(client, admin_headers, talent_headers):
-    client.post("/api/v1/talents/me", json={"display_name": "Reject Me", "category": "acting"}, headers=talent_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Reject Me", "category": "acting"}, headers=talent_headers)
     talent = client.get("/api/v1/talents/me", headers=talent_headers).json()
     client.post("/api/v1/talents/me/request-verification", headers=talent_headers)
 
@@ -184,7 +184,7 @@ def test_casting_call_moderation_close_and_reopen(client, admin_headers, recruit
 def test_casting_call_admin_detail_includes_recruiter_and_counts(
     client, admin_headers, talent_headers, recruiter_headers, recruiter_profile, casting_call
 ):
-    client.post("/api/v1/talents/me", json={"display_name": "Applicant", "category": "acting"}, headers=talent_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Applicant", "category": "acting"}, headers=talent_headers)
     role_id = casting_call["roles"][0]["id"]
     client.post(
         f"/api/v1/casting-calls/{casting_call['id']}/applications",
@@ -205,7 +205,7 @@ def test_casting_call_admin_detail_includes_recruiter_and_counts(
 def test_financial_overview_reflects_tiers(client, admin_headers, talent_headers, recruiter_headers, recruiter_profile):
     from app.core.config import settings
 
-    client.post("/api/v1/talents/me", json={"display_name": "Fin Talent", "category": "acting"}, headers=talent_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Fin Talent", "category": "acting"}, headers=talent_headers)
     client.post("/api/v1/talents/me/upgrade", headers=talent_headers)
 
     resp = client.get("/api/v1/admin/financial-overview", headers=admin_headers)
@@ -228,7 +228,7 @@ def test_admin_endpoints_reject_non_admin_for_new_routes(client, talent_headers)
 def test_user_detail_includes_talent_profile(client, admin_headers, talent_headers, db_session):
     from app.models.user import User
 
-    client.post("/api/v1/talents/me", json={"display_name": "Detail Talent", "category": "singing"}, headers=talent_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Detail Talent", "category": "singing"}, headers=talent_headers)
     talent_user = db_session.query(User).filter(User.email == "talent_fixture@example.com").first()
 
     resp = client.get(f"/api/v1/admin/users/{talent_user.id}", headers=admin_headers)

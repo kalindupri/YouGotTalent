@@ -14,6 +14,10 @@ backend/.env
 # Local media upload fallback (used when Azure Blob Storage isn't configured)
 backend/media_uploads/
 
+# Local fallback for identity documents (guardian ID, birth certificates). Unlike
+# media_uploads/ this is never served by the app -- see app/core/private_storage.py.
+backend/private_uploads/
+
 # Node / Next.js
 frontend/node_modules/
 frontend/.next/

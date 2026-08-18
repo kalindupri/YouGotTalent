@@ -1,5 +1,5 @@
 import app.api.routes.casting_calls as casting_calls_routes
-from tests.conftest import auth_headers, register_and_verify
+from tests.conftest import ADULT_DOB, auth_headers, register_and_verify
 
 
 class RecordingSendEmail:
@@ -60,7 +60,7 @@ def test_follower_is_emailed_when_recruiter_posts_new_casting_call(
     other_token = register_and_verify(client, db_session, "notfollowing@example.com", role="talent")
     client.post(
         "/api/v1/talents/me",
-        json={"display_name": "Not Following", "category": "dancing"},
+        json={"date_of_birth": ADULT_DOB, "display_name": "Not Following", "category": "dancing"},
         headers=auth_headers(other_token),
     )
 

@@ -1,5 +1,5 @@
 import app.api.routes.casting_calls as casting_calls_routes
-from tests.conftest import register_and_verify, auth_headers
+from tests.conftest import ADULT_DOB, register_and_verify, auth_headers
 
 
 class RecordingSendEmail:
@@ -11,7 +11,7 @@ class RecordingSendEmail:
 
 
 def create_talent(client, headers, **overrides):
-    payload = {"display_name": "Talent", "category": "modeling"}
+    payload = {"date_of_birth": ADULT_DOB, "display_name": "Talent", "category": "modeling"}
     payload.update(overrides)
     return client.post("/api/v1/talents/me", json=payload, headers=headers).json()
 

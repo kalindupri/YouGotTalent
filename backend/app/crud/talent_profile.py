@@ -5,6 +5,7 @@ from functools import reduce
 from sqlalchemy import String, case, cast, func, or_
 from sqlalchemy.orm import Session
 
+from app.core.age import years_ago
 from app.models.media import Media, MediaType
 from app.models.talent_profile import TalentCategory, TalentProfile
 from app.schemas.talent_profile import MediaCreate, MediaUpdate, TalentProfileCreate, TalentProfileUpdate
@@ -28,13 +29,6 @@ def list_talent_profiles_by_user(db: Session, user_id: uuid.UUID) -> list[Talent
     )
 
 
-def _years_ago(n: int) -> date:
-    today = date.today()
-    try:
-        return today.replace(year=today.year - n)
-    except ValueError:
-        # Feb 29 on a target non-leap year -- fall back to Feb 28.
-        return today.replace(year=today.year - n, day=28)
 
 
 def list_talent_profiles(
@@ -70,10 +64,10 @@ def list_talent_profiles(
         query = query.filter(TalentProfile.gender.ilike(gender))
     if age_min is not None:
         # At least age_min years old -> born on or before N years ago.
-        query = query.filter(TalentProfile.date_of_birth <= _years_ago(age_min))
+        query = query.filter(TalentProfile.date_of_birth <= years_ago(age_min))
     if age_max is not None:
         # At most age_max years old -> born after (age_max + 1) years ago.
-        query = query.filter(TalentProfile.date_of_birth > _years_ago(age_max + 1))
+        query = query.filter(TalentProfile.date_of_birth > years_ago(age_max + 1))
     if min_tiktok_followers is not None:
         query = query.filter(TalentProfile.tiktok_followers >= min_tiktok_followers)
     if instruments:

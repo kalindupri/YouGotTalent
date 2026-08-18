@@ -1,3 +1,4 @@
+from tests.conftest import ADULT_DOB
 from datetime import datetime, timedelta, timezone
 
 
@@ -136,7 +137,7 @@ def test_non_party_cannot_review_booking(client, db_session, talent_headers, tal
 
     other_token = register_and_verify(client, db_session, "notparty@example.com", role="talent")
     other_headers = auth_headers(other_token)
-    client.post("/api/v1/talents/me", json={"display_name": "Not Party", "category": "acting"}, headers=other_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Not Party", "category": "acting"}, headers=other_headers)
 
     resp = client.post(f"/api/v1/bookings/{booking['id']}/reviews", json={"rating": 5}, headers=other_headers)
     assert resp.status_code == 404

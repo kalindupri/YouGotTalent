@@ -1,14 +1,33 @@
 import uuid
 from datetime import date, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
+from app.core.age import today_lk, years_ago
 from app.models.content_visibility import ContentVisibility
 from app.models.media import MediaType
 from app.models.talent_profile import TalentCategory
 from app.schemas.credit import CreditRead
 from app.schemas.reel import ReelRead
 from app.schemas.writing_sample import WritingSampleRead
+
+# Oldest plausible date of birth. Not a real limit on anyone, just a guard against a typo
+# ("1902" for "1992") silently making someone look old enough to work.
+_MAX_PLAUSIBLE_AGE = 120
+
+
+def _validate_date_of_birth(value: date) -> date:
+    if value > today_lk():
+        raise ValueError("That date of birth is in the future.")
+    if value < years_ago(_MAX_PLAUSIBLE_AGE):
+        raise ValueError("Please enter a real date of birth.")
+    return value
+
+
+# Date of birth decides whether guardian consent is required and whether paid work is allowed,
+# so it's validated everywhere it's accepted rather than trusted from the client.
+DateOfBirth = Annotated[date, AfterValidator(_validate_date_of_birth)]
 
 
 class TalentProfileCreate(BaseModel):
@@ -19,7 +38,9 @@ class TalentProfileCreate(BaseModel):
     categories: list[TalentCategory] | None = None
     bio: str | None = None
     city: str | None = None
-    date_of_birth: date | None = None
+    # Required: the platform cannot tell a 13-year-old from a 30-year-old without it, and both
+    # the guardian-consent rule and the minimum-working-age rule depend on knowing.
+    date_of_birth: DateOfBirth
     gender: str | None = None
     tiktok_followers: int | None = None
     experience_years: int | None = None
@@ -50,7 +71,9 @@ class TalentProfileUpdate(BaseModel):
     categories: list[TalentCategory] | None = Field(default=None, min_length=1)
     bio: str | None = None
     city: str | None = None
-    date_of_birth: date | None = None
+    # Correctable, but not erasable: an explicit null is rejected below, because clearing it
+    # would drop the profile out of every age check.
+    date_of_birth: DateOfBirth | None = None
     gender: str | None = None
     tiktok_followers: int | None = None
     experience_years: int | None = None
@@ -65,6 +88,14 @@ class TalentProfileUpdate(BaseModel):
     intro_video_url: str | None = None
     attributes: dict[str, str] | None = None
     job_alert_emails: bool | None = None
+
+    @model_validator(mode="after")
+    def _date_of_birth_cannot_be_cleared(self) -> "TalentProfileUpdate":
+        # Every other field here treats None as "not supplied", so the two cases are only
+        # distinguishable via model_fields_set.
+        if "date_of_birth" in self.model_fields_set and self.date_of_birth is None:
+            raise ValueError("Date of birth can be corrected but not removed.")
+        return self
 
 
 class ParsedTalentSearchQuery(BaseModel):

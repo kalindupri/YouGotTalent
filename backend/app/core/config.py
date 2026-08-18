@@ -71,6 +71,37 @@ class Settings(BaseSettings):
     # Only used to build absolute URLs for the local-disk upload fallback above.
     BACKEND_PUBLIC_URL: str = "http://localhost:8000"
 
+    # Separate, PRIVATE container for identity documents (guardian ID, a child's birth
+    # certificate). AZURE_STORAGE_CONTAINER is provisioned with public blob access -- anything
+    # in it is readable by anyone holding the URL -- so these must never go there.
+    #
+    # The name must not be a sub- or superstring of AZURE_STORAGE_CONTAINER: delete_media_file
+    # decides whether a URL is "ours" by looking for the container name in it.
+    AZURE_PRIVATE_CONTAINER: str = "identity-documents"
+
+    # ID scans are photos or PDFs, not video -- a far smaller cap than MAX_UPLOAD_SIZE_BYTES.
+    MAX_DOCUMENT_SIZE_BYTES: int = 10 * 1024 * 1024
+
+    # How long an admin's link to view a consent document stays valid.
+    DOCUMENT_LINK_TTL_SECONDS: int = 600
+
+    # Sri Lanka's minimum age of employment, raised from 14 to 16 in January 2021 (amending the
+    # Employment of Women, Young Persons and Children Act among others). Talent below this can
+    # hold a profile but cannot be offered or booked for paid work.
+    #
+    # A setting, not a literal, because whether a child-performance exemption exists here is a
+    # question for a Sri Lankan lawyer -- if one does, this relaxes without a code change.
+    MINIMUM_WORKING_AGE: int = 16
+
+    # Age of majority. Below it, the PDPA treats personal data as a special category and
+    # consent must come from a parent or legal guardian.
+    GUARDIAN_CONSENT_AGE: int = 18
+
+    # Stamped onto each consent record so we can always show which wording was agreed to.
+    # Bump when the Terms or Privacy Policy text materially changes.
+    CONSENT_TERMS_VERSION: str = "2026-08"
+    CONSENT_PRIVACY_VERSION: str = "2026-08"
+
     # Founding-member / year-1 monthly prices. Locked onto each Subscription as price_lkr at
     # signup, so raising these later never changes what an existing subscriber pays.
     PREMIUM_TALENT_PRICE_LKR: int = 490

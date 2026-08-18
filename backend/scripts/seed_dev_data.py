@@ -113,6 +113,18 @@ PROJECT_ADJECTIVES = ["Monsoon", "Golden", "Silent", "Broken", "Crimson", "Midni
 PROJECT_NOUNS = ["Diaries", "Skies", "Harbor", "Echoes", "Horizon", "Garden", "Tides", "Legacy", "Reverie", "Crossing"]
 
 
+# Ages spread across the branches the guardian-consent and minimum-working-age rules care
+# about, so every state is demoable in dev: under 16 (no paid work), 16-17 (guardian consent
+# + working age), and adults. Deterministic by index so re-seeding is reproducible.
+_SEED_AGES = [12, 15, 17, 18]
+
+
+def seed_date_of_birth(index: int) -> date:
+    # Every 7th profile is a deliberate edge case; the rest are ordinary adults.
+    age = _SEED_AGES[(index // 7) % len(_SEED_AGES)] if index % 7 == 0 else random.randint(19, 55)
+    return date.today() - timedelta(days=age * 365 + random.randint(0, 300))
+
+
 def random_instruments() -> list[str]:
     return random.sample(INSTRUMENTS, k=random.randint(1, 3))
 
@@ -535,6 +547,7 @@ def seed_talents(db, count: int = 100) -> None:
             category=category,
             bio=bio,
             city=city,
+            date_of_birth=seed_date_of_birth(created),
             experience_years=years,
             skills=skills,
             tier="premium" if created % 5 == 0 else "free",

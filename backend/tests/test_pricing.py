@@ -1,5 +1,5 @@
 from app.core.config import settings
-from tests.conftest import auth_headers, register_and_verify
+from tests.conftest import ADULT_DOB, auth_headers, register_and_verify
 
 
 def test_public_pricing_defaults_match_settings_when_no_versions_exist(client):
@@ -65,7 +65,7 @@ def test_new_signup_after_price_change_gets_the_new_price(client, db_session, ad
     new_headers = auth_headers(new_token)
     resp = client.post(
         "/api/v1/talents/me",
-        json={"display_name": "New Talent", "category": "acting", "city": "Colombo"},
+        json={"date_of_birth": ADULT_DOB, "display_name": "New Talent", "category": "acting", "city": "Colombo"},
         headers=new_headers,
     )
     assert resp.status_code == 201, resp.text

@@ -1,8 +1,8 @@
-from tests.conftest import register_and_verify, auth_headers
+from tests.conftest import ADULT_DOB, register_and_verify, auth_headers
 
 
 def create_profile(client, headers, **overrides):
-    payload = {"display_name": "Test Talent", "category": "acting", "city": "Colombo"}
+    payload = {"date_of_birth": ADULT_DOB, "display_name": "Test Talent", "category": "acting", "city": "Colombo"}
     payload.update(overrides)
     resp = client.post("/api/v1/talents/me", json=payload, headers=headers)
     assert resp.status_code == 201, resp.text
@@ -24,7 +24,7 @@ def test_create_profile_twice_rejected(client, talent_headers):
     create_profile(client, talent_headers)
     resp = client.post(
         "/api/v1/talents/me",
-        json={"display_name": "Again", "category": "acting"},
+        json={"date_of_birth": ADULT_DOB, "display_name": "Again", "category": "acting"},
         headers=talent_headers,
     )
     assert resp.status_code == 400
@@ -33,7 +33,7 @@ def test_create_profile_twice_rejected(client, talent_headers):
 def test_create_profile_requires_talent_role(client, recruiter_headers):
     resp = client.post(
         "/api/v1/talents/me",
-        json={"display_name": "Recruiter as talent", "category": "acting"},
+        json={"date_of_birth": ADULT_DOB, "display_name": "Recruiter as talent", "category": "acting"},
         headers=recruiter_headers,
     )
     assert resp.status_code == 403

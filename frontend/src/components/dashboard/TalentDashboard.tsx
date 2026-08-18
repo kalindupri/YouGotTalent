@@ -383,6 +383,7 @@ function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p:
   const [categories, setCategories] = useState<TalentCategory[]>(["acting"]);
   const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [skillsInput, setSkillsInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -406,7 +407,7 @@ function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p:
           categories,
           city: city || null,
           bio: bio || null,
-          date_of_birth: null,
+          date_of_birth: dateOfBirth,
           experience_years: null,
           skills: parseSkills(skillsInput),
         },
@@ -430,6 +431,21 @@ function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p:
         <label className={labelClass}>
           Display name
           <input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} />
+        </label>
+        <label className={labelClass}>
+          Date of birth
+          <input
+            required
+            type="date"
+            max={new Date().toISOString().slice(0, 10)}
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            className={inputClass}
+          />
+          <span className="mt-1 block text-xs font-normal text-zinc-500">
+            Never shown publicly — talent hunts only see your age. If you&apos;re under 18, a parent or
+            guardian must hold this account.
+          </span>
         </label>
         <fieldset className="flex flex-col gap-1.5">
           <legend className={labelClass}>Categories — pick all that apply</legend>

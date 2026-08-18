@@ -1,5 +1,8 @@
+from tests.conftest import ADULT_DOB
+
+
 def create_talent(client, talent_headers, **overrides):
-    payload = {"display_name": "Nadeesha P.", "category": "modeling"}
+    payload = {"date_of_birth": ADULT_DOB, "display_name": "Nadeesha P.", "category": "modeling"}
     payload.update(overrides)
     return client.post("/api/v1/talents/me", json=payload, headers=talent_headers).json()
 

@@ -1,8 +1,8 @@
-from tests.conftest import auth_headers, register_and_verify
+from tests.conftest import ADULT_DOB, auth_headers, register_and_verify
 
 
 def create_talent_profile(client, headers, **overrides):
-    payload = {"display_name": "New Arrival", "category": "acting"}
+    payload = {"date_of_birth": ADULT_DOB, "display_name": "New Arrival", "category": "acting"}
     payload.update(overrides)
     resp = client.post("/api/v1/talents/me", json=payload, headers=headers)
     assert resp.status_code == 201, resp.text

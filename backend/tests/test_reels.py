@@ -1,4 +1,4 @@
-from tests.conftest import auth_headers, register_and_verify
+from tests.conftest import ADULT_DOB, auth_headers, register_and_verify
 
 
 def add_reel(client, headers, *, url="https://www.tiktok.com/@user/video/123", caption=None):
@@ -82,7 +82,7 @@ def test_talent_cannot_delete_another_talents_reel(client, db_session, talent_he
     other_headers = auth_headers(other_token)
     resp = client.post(
         "/api/v1/talents/me",
-        json={"display_name": "Other Talent", "category": "acting", "city": "Kandy"},
+        json={"date_of_birth": ADULT_DOB, "display_name": "Other Talent", "category": "acting", "city": "Kandy"},
         headers=other_headers,
     )
     assert resp.status_code == 201, resp.text

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from tests.conftest import auth_headers, register_and_verify
+from tests.conftest import ADULT_DOB, auth_headers, register_and_verify
 
 
 def next_weekday_at(day_of_week: int, hour: int, minute: int = 0) -> datetime:
@@ -158,7 +158,7 @@ def test_non_owner_talent_cannot_respond(client, talent_headers, talent_profile,
 
     other_token = register_and_verify(client, db_session, "otherbooking@example.com", role="talent")
     other_headers = auth_headers(other_token)
-    client.post("/api/v1/talents/me", json={"display_name": "Other", "category": "acting"}, headers=other_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Other", "category": "acting"}, headers=other_headers)
 
     resp = client.patch(f"/api/v1/bookings/{booking['id']}/respond", json={"status": "accepted"}, headers=other_headers)
     assert resp.status_code == 404

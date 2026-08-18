@@ -1,5 +1,8 @@
+from tests.conftest import ADULT_DOB
+
+
 def create_talent_profile(client, headers, **overrides):
-    payload = {"display_name": "Fixture Talent", "category": "acting", "city": "Colombo"}
+    payload = {"date_of_birth": ADULT_DOB, "display_name": "Fixture Talent", "category": "acting", "city": "Colombo"}
     payload.update(overrides)
     resp = client.post("/api/v1/talents/me", json=payload, headers=headers)
     assert resp.status_code == 201, resp.text

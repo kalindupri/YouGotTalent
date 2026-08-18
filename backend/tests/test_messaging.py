@@ -1,9 +1,9 @@
-from tests.conftest import register_and_verify, auth_headers
+from tests.conftest import ADULT_DOB, register_and_verify, auth_headers
 
 
 def setup_talent_and_recruiter(client, talent_headers, recruiter_headers):
     talent = client.post(
-        "/api/v1/talents/me", json={"display_name": "Ishara Fernando", "category": "singing"}, headers=talent_headers
+        "/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Ishara Fernando", "category": "singing"}, headers=talent_headers
     ).json()
     recruiter = client.post(
         "/api/v1/recruiters/me", json={"company_name": "Panthera Model Management"}, headers=recruiter_headers
@@ -98,14 +98,14 @@ def test_non_participant_cannot_read_messages(client, talent_headers, recruiter_
 
     intruder_token = register_and_verify(client, db_session, "intruder@example.com", role="talent")
     intruder_headers = auth_headers(intruder_token)
-    client.post("/api/v1/talents/me", json={"display_name": "Intruder", "category": "acting"}, headers=intruder_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Intruder", "category": "acting"}, headers=intruder_headers)
 
     resp = client.get(f"/api/v1/conversations/{conversation['id']}/messages", headers=intruder_headers)
     assert resp.status_code == 403
 
 
 def test_read_messages_unknown_conversation_404(client, talent_headers):
-    client.post("/api/v1/talents/me", json={"display_name": "Solo", "category": "acting"}, headers=talent_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Solo", "category": "acting"}, headers=talent_headers)
     resp = client.get(
         "/api/v1/conversations/00000000-0000-0000-0000-000000000000/messages", headers=talent_headers
     )

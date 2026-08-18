@@ -1,8 +1,8 @@
-from tests.conftest import register_and_verify, auth_headers
+from tests.conftest import ADULT_DOB, register_and_verify, auth_headers
 
 
 def create_talent_profile(client, headers, **overrides):
-    payload = {"display_name": "Invitee", "category": "acting"}
+    payload = {"date_of_birth": ADULT_DOB, "display_name": "Invitee", "category": "acting"}
     payload.update(overrides)
     resp = client.post("/api/v1/talents/me", json=payload, headers=headers)
     assert resp.status_code == 201, resp.text
@@ -196,7 +196,7 @@ def test_non_invitee_talent_cannot_respond(client, recruiter_headers, talent_hea
 
     other_token = register_and_verify(client, db_session, "notinvited@example.com", role="talent")
     other_headers = auth_headers(other_token)
-    client.post("/api/v1/talents/me", json={"display_name": "Not invited", "category": "acting"}, headers=other_headers)
+    client.post("/api/v1/talents/me", json={"date_of_birth": ADULT_DOB, "display_name": "Not invited", "category": "acting"}, headers=other_headers)
 
     resp = client.patch(f"/api/v1/invitations/{invitation['id']}", json={"status": "accepted"}, headers=other_headers)
     assert resp.status_code == 404

@@ -90,6 +90,11 @@ def client(db_session):
 
 DEFAULT_PASSWORD = "TestPass123!"
 
+# Date of birth is required on every talent profile. Most tests don't care about age, they just
+# need a profile that isn't a minor -- use this so the intent ("an ordinary adult talent") is
+# obvious and the tests that DO care about age stand out by picking their own.
+ADULT_DOB = "1995-06-15"
+
 
 def register_user(client, email: str, *, password: str = DEFAULT_PASSWORD, full_name: str = "Test User", role: str = "talent") -> dict:
     resp = client.post(
@@ -160,7 +165,12 @@ def talent_headers(talent_token):
 def talent_profile(client, talent_headers):
     resp = client.post(
         "/api/v1/talents/me",
-        json={"display_name": "Fixture Talent", "categories": ["acting"], "city": "Colombo"},
+        json={
+            "display_name": "Fixture Talent",
+            "categories": ["acting"],
+            "city": "Colombo",
+            "date_of_birth": ADULT_DOB,
+        },
         headers=talent_headers,
     )
     assert resp.status_code == 201, resp.text

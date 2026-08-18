@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from tests.conftest import auth_headers, register_and_verify
+from tests.conftest import ADULT_DOB, auth_headers, register_and_verify
 from tests.test_bookings import next_weekday_at
 
 
@@ -57,7 +57,7 @@ def test_talent_cannot_delete_another_talents_calendar_entry(client, db_session,
     other_headers = auth_headers(other_token)
     resp = client.post(
         "/api/v1/talents/me",
-        json={"display_name": "Other Talent", "category": "acting", "city": "Kandy"},
+        json={"date_of_birth": ADULT_DOB, "display_name": "Other Talent", "category": "acting", "city": "Kandy"},
         headers=other_headers,
     )
     assert resp.status_code == 201, resp.text
