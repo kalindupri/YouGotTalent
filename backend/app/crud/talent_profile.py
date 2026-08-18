@@ -18,6 +18,16 @@ def get_talent_profile_by_user(db: Session, user_id: uuid.UUID) -> TalentProfile
     return db.query(TalentProfile).filter(TalentProfile.user_id == user_id).first()
 
 
+def list_talent_profiles_by_user(db: Session, user_id: uuid.UUID) -> list[TalentProfile]:
+    """Every profile this account manages -- one for ordinary talent, one per child for a guardian."""
+    return (
+        db.query(TalentProfile)
+        .filter(TalentProfile.user_id == user_id)
+        .order_by(TalentProfile.created_at.asc())
+        .all()
+    )
+
+
 def _years_ago(n: int) -> date:
     today = date.today()
     try:

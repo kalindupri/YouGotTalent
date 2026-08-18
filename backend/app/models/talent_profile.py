@@ -32,7 +32,10 @@ class TalentProfile(Base):
     __tablename__ = "talent_profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    # Deliberately NOT unique: a parent/legal guardian holds one account and may manage a
+    # profile for each of their children (siblings in child performance are common). The
+    # "which profile am I acting as" question is resolved by get_current_talent_profile.
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
 
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     # Stored as plain text (not a Postgres native enum) so new skill categories can be
@@ -91,7 +94,7 @@ class TalentProfile(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    user: Mapped["User"] = relationship("User", back_populates="talent_profile")
+    user: Mapped["User"] = relationship("User", back_populates="talent_profiles")
     media: Mapped[list["Media"]] = relationship("Media", back_populates="talent_profile", cascade="all, delete-orphan")
     applications: Mapped[list["Application"]] = relationship("Application", back_populates="talent", cascade="all, delete-orphan")
     credits: Mapped[list["Credit"]] = relationship(

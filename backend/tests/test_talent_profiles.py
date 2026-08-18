@@ -361,3 +361,71 @@ def test_browse_verified_only_filter(client, talent_headers, db_session):
     assert resp.status_code == 200
     names = {t["display_name"] for t in resp.json()}
     assert names == {"Verified"}
+
+
+# --- Multiple profiles per account (a guardian managing several children) -------------------
+#
+# The API still refuses to create a second profile (nothing yet distinguishes a guardian), so
+# these insert the second one directly, the same way test_browse_verified_only_filter flips a
+# flag the API doesn't expose.
+
+
+def _add_second_profile(db_session, owner_user_id, *, display_name: str):
+    from app.models.talent_profile import TalentProfile
+
+    profile = TalentProfile(user_id=owner_user_id, display_name=display_name, category="singing", categories=["singing"])
+    db_session.add(profile)
+    db_session.commit()
+    db_session.refresh(profile)
+    return profile
+
+
+def test_second_profile_for_same_account_is_allowed_by_the_database(client, talent_headers, talent_profile, db_session):
+    from app.models.user import User
+
+    user = db_session.query(User).filter(User.email == "talent_fixture@example.com").first()
+    second = _add_second_profile(db_session, user.id, display_name="Second Child")
+
+    assert second.id != talent_profile["id"]
+    assert len(user.talent_profiles) == 2
+
+
+def test_me_requires_choosing_when_the_account_manages_several_profiles(client, talent_headers, talent_profile, db_session):
+    from app.models.user import User
+
+    user = db_session.query(User).filter(User.email == "talent_fixture@example.com").first()
+    _add_second_profile(db_session, user.id, display_name="Second Child")
+
+    resp = client.get("/api/v1/talents/me", headers=talent_headers)
+    assert resp.status_code == 409
+    assert "more than one profile" in resp.json()["detail"]
+
+
+def test_profile_header_selects_which_profile_me_acts_as(client, talent_headers, talent_profile, db_session):
+    from app.models.user import User
+
+    user = db_session.query(User).filter(User.email == "talent_fixture@example.com").first()
+    second = _add_second_profile(db_session, user.id, display_name="Second Child")
+
+    resp = client.get("/api/v1/talents/me", headers={**talent_headers, "X-Talent-Profile-Id": str(second.id)})
+    assert resp.status_code == 200
+    assert resp.json()["display_name"] == "Second Child"
+
+    resp = client.get("/api/v1/talents/me", headers={**talent_headers, "X-Talent-Profile-Id": talent_profile["id"]})
+    assert resp.status_code == 200
+    assert resp.json()["display_name"] == "Fixture Talent"
+
+
+def test_cannot_act_as_a_profile_belonging_to_someone_else(client, talent_headers, talent_profile, db_session):
+    other_token = register_and_verify(client, db_session, "other_talent@example.com", role="talent")
+    other = create_profile(client, auth_headers(other_token), display_name="Not Yours")
+
+    resp = client.get("/api/v1/talents/me", headers={**talent_headers, "X-Talent-Profile-Id": other["id"]})
+    assert resp.status_code == 403
+    assert "isn't yours" in resp.json()["detail"]
+
+
+def test_single_profile_accounts_never_need_the_header(client, talent_headers, talent_profile):
+    resp = client.get("/api/v1/talents/me", headers=talent_headers)
+    assert resp.status_code == 200
+    assert resp.json()["display_name"] == "Fixture Talent"

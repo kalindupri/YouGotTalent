@@ -8,7 +8,7 @@ from app.core.payments.factory import get_gateway
 from app.crud import pricing as pricing_crud
 from app.crud import subscription as subscription_crud
 from app.crud.recruiter_profile import get_recruiter_profile_by_user
-from app.crud.talent_profile import get_talent_profile_by_user
+from app.crud.talent_profile import list_talent_profiles_by_user
 from app.db.session import get_db
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.talent_profile import TalentProfile
@@ -26,7 +26,16 @@ def read_current_pricing(db: Session = Depends(get_db)):
 
 def _current_profile(db: Session, user: User) -> TalentProfile | RecruiterProfile:
     if user.role == UserRole.TALENT:
-        profile = get_talent_profile_by_user(db, user.id)
+        # A subscription belongs to one profile, so an account managing several children must
+        # say which one it means. Refusing beats silently charging the wrong child's profile.
+        # TODO: accept X-Talent-Profile-Id here once the dashboard has a profile switcher.
+        profiles = list_talent_profiles_by_user(db, user.id)
+        if len(profiles) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="You manage more than one profile. Choose which one you're working on.",
+            )
+        profile = profiles[0] if profiles else None
     elif user.role == UserRole.RECRUITER:
         profile = get_recruiter_profile_by_user(db, user.id)
     else:

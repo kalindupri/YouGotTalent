@@ -105,18 +105,20 @@ function UserDetailPanel({ userId, token }: { userId: string; token: string }) {
     <div className="mt-3 flex flex-col gap-2 border-t border-zinc-200 pt-3 text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
       <p>Phone: {detail.phone ?? "—"}</p>
       <p>Joined: {new Date(detail.created_at).toLocaleDateString()}</p>
-      {detail.talent_profile && (
-        <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/60">
-          <p className="font-semibold text-zinc-700 dark:text-zinc-300">Talent profile</p>
-          <p className="mt-1">
-            {detail.talent_profile.display_name} · {formatCategory(detail.talent_profile.category)} ·{" "}
-            {detail.talent_profile.city ?? "no city set"}
+      {detail.talent_profiles.map((profile) => (
+        <div key={profile.id} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/60">
+          <p className="font-semibold text-zinc-700 dark:text-zinc-300">
+            Talent profile
+            {detail.talent_profiles.length > 1 && <span className="font-normal"> (managed account)</span>}
           </p>
           <p className="mt-1">
-            Tier: {detail.talent_profile.tier} · {detail.talent_profile.is_verified ? "Verified" : "Not verified"}
+            {profile.display_name} · {formatCategory(profile.category)} · {profile.city ?? "no city set"}
+          </p>
+          <p className="mt-1">
+            Tier: {profile.tier} · {profile.is_verified ? "Verified" : "Not verified"}
           </p>
         </div>
-      )}
+      ))}
       {detail.recruiter_profile && (
         <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/60">
           <p className="font-semibold text-zinc-700 dark:text-zinc-300">Recruiter profile</p>
@@ -128,7 +130,9 @@ function UserDetailPanel({ userId, token }: { userId: string; token: string }) {
           </p>
         </div>
       )}
-      {!detail.talent_profile && !detail.recruiter_profile && <p>No linked talent or recruiter profile.</p>}
+      {detail.talent_profiles.length === 0 && !detail.recruiter_profile && (
+        <p>No linked talent or recruiter profile.</p>
+      )}
     </div>
   );
 }

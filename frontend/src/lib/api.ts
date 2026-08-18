@@ -616,7 +616,7 @@ export interface CheckoutResponse {
 }
 
 export interface AdminUserDetail extends User {
-  talent_profile: TalentProfile | null;
+  talent_profiles: TalentProfile[];
   recruiter_profile: RecruiterProfile | null;
 }
 

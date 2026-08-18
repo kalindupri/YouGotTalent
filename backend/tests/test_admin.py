@@ -235,7 +235,7 @@ def test_user_detail_includes_talent_profile(client, admin_headers, talent_heade
     assert resp.status_code == 200
     body = resp.json()
     assert body["email"] == "talent_fixture@example.com"
-    assert body["talent_profile"]["display_name"] == "Detail Talent"
+    assert [p["display_name"] for p in body["talent_profiles"]] == ["Detail Talent"]
     assert body["recruiter_profile"] is None
 
 
@@ -248,7 +248,7 @@ def test_user_detail_includes_recruiter_profile(client, admin_headers, recruiter
     assert resp.status_code == 200
     body = resp.json()
     assert body["recruiter_profile"]["company_name"] == recruiter_profile["company_name"]
-    assert body["talent_profile"] is None
+    assert body["talent_profiles"] == []
 
 
 def test_user_detail_with_no_profile_returns_nulls(client, admin_headers, db_session):
@@ -262,7 +262,7 @@ def test_user_detail_with_no_profile_returns_nulls(client, admin_headers, db_ses
     resp = client.get(f"/api/v1/admin/users/{user.id}", headers=admin_headers)
     assert resp.status_code == 200
     body = resp.json()
-    assert body["talent_profile"] is None
+    assert body["talent_profiles"] == []
     assert body["recruiter_profile"] is None
     assert token  # unused otherwise; keeps the fixture call meaningful
 

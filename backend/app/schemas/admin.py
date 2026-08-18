@@ -52,7 +52,8 @@ class FinancialOverview(BaseModel):
 
 
 class AdminUserDetail(UserRead):
-    talent_profile: TalentProfileRead | None = None
+    # A list, not one profile: a guardian's account holds a profile per child.
+    talent_profiles: list[TalentProfileRead] = []
     recruiter_profile: RecruiterProfileRead | None = None
 
 

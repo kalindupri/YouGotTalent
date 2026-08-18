@@ -182,6 +182,9 @@ def create_my_profile(
     db: Session = Depends(get_db),
     user: User = Depends(require_talent),
 ):
+    # The DB no longer enforces one-profile-per-account (a guardian may manage several
+    # children), but nothing yet distinguishes a guardian, so keep ordinary talent to one
+    # profile here. The guardian flow replaces this with a guardian-aware check.
     if get_talent_profile_by_user(db, user.id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Talent profile already exists")
     return create_talent_profile(db, user.id, profile_in)

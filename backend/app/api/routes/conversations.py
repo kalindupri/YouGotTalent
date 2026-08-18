@@ -74,9 +74,11 @@ def start_conversation(
 @router.get("", response_model=list[ConversationSummary])
 def read_my_conversations(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if user.role == UserRole.TALENT:
-        if user.talent_profile is None:
+        # One inbox across every profile this account manages, so a guardian with more than
+        # one child doesn't have to switch profiles to notice a new message.
+        conversations = [c for p in user.talent_profiles for c in list_conversations_for_talent(db, p.id)]
+        if not conversations:
             return []
-        conversations = list_conversations_for_talent(db, user.talent_profile.id)
     elif user.role == UserRole.RECRUITER:
         if user.recruiter_profile is None:
             return []

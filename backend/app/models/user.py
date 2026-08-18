@@ -41,5 +41,10 @@ class User(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    talent_profile: Mapped["TalentProfile | None"] = relationship("TalentProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # A list, not a single profile: a parent/legal guardian holds one account and may manage a
+    # profile per child. Ordinary adult talent have exactly one. Use get_current_talent_profile
+    # to resolve "which profile is this request acting as".
+    talent_profiles: Mapped[list["TalentProfile"]] = relationship(
+        "TalentProfile", back_populates="user", cascade="all, delete-orphan"
+    )
     recruiter_profile: Mapped["RecruiterProfile | None"] = relationship("RecruiterProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
