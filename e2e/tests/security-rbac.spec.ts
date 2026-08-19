@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { uniqueEmail } from "../helpers/db";
+import { ADULT_DOB } from "../helpers/actions";
 
 const API_BASE = "http://localhost:8000/api/v1";
 
@@ -57,7 +58,7 @@ test.describe("RBAC — role and auth boundaries", () => {
     const { token } = await registerVerifyAndGetToken(request, "rbac_escalation", "talent");
     await request.post(`${API_BASE}/talents/me`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { display_name: "Escalation Test", category: "acting" },
+      data: { display_name: "Escalation Test", category: "acting", date_of_birth: ADULT_DOB },
     });
     const resp = await request.patch(`${API_BASE}/talents/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -94,7 +95,7 @@ test.describe("input validation — injection safety", () => {
     const { token } = await registerVerifyAndGetToken(request, "xss_talent", "talent");
     const createResp = await request.post(`${API_BASE}/talents/me`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { display_name: "XSS Test Talent", category: "acting" },
+      data: { display_name: "XSS Test Talent", category: "acting", date_of_birth: ADULT_DOB },
     });
     const profile = await createResp.json();
     const payload = '<img src=x onerror="window.__xss_fired = true">';

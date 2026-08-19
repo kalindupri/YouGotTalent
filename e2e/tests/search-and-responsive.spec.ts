@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { createTalentProfile, logout, registerAndVerify } from "../helpers/actions";
+import { ADULT_DOB, createTalentProfile, logout, registerAndVerify } from "../helpers/actions";
 import { uniqueEmail } from "../helpers/db";
 
 const API_BASE = "http://localhost:8000/api/v1";
@@ -54,7 +54,7 @@ test.describe("talent search — filter combinations", () => {
     const guitarToken = await registerVerifyAndGetToken("instr_guitar");
     await request.post(`${API_BASE}/talents/me`, {
       headers: { Authorization: `Bearer ${guitarToken}` },
-      data: { display_name: `Guitar Player ${Date.now()}`, category: "music" },
+      data: { display_name: `Guitar Player ${Date.now()}`, category: "music", date_of_birth: ADULT_DOB },
     });
     await request.patch(`${API_BASE}/talents/me`, {
       headers: { Authorization: `Bearer ${guitarToken}` },
@@ -67,7 +67,7 @@ test.describe("talent search — filter combinations", () => {
     const drumsToken = await registerVerifyAndGetToken("instr_drums");
     await request.post(`${API_BASE}/talents/me`, {
       headers: { Authorization: `Bearer ${drumsToken}` },
-      data: { display_name: `Drums Player ${Date.now()}`, category: "music" },
+      data: { display_name: `Drums Player ${Date.now()}`, category: "music", date_of_birth: ADULT_DOB },
     });
     await request.patch(`${API_BASE}/talents/me`, {
       headers: { Authorization: `Bearer ${drumsToken}` },
