@@ -7,3 +7,6 @@ class ContentVisibility(str, enum.Enum):
     PUBLIC = "public"
     MEMBERS = "members"
     RECRUITERS = "recruiters"
+    # Owner only -- not even admins. For work in progress the talent wants to keep on their
+    # own dashboard without publishing it anywhere.
+    PRIVATE = "private"

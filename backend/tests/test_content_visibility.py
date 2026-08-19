@@ -90,3 +90,70 @@ def test_owner_sees_all_their_own_content_regardless_of_tier(client, talent_head
     resp = client.get("/api/v1/talents/me", headers=talent_headers)
     assert resp.status_code == 200
     assert len(resp.json()["media"]) == 1
+
+
+# --- "Only me" visibility -------------------------------------------------------------------
+
+
+def test_private_media_is_visible_only_to_its_owner(client, db_session, talent_headers, talent_profile, recruiter_headers, recruiter_profile, admin_headers):
+    """"Only me" is checked before the admin short-circuit. Labelling something "Only me" and
+    then showing it to staff would be a false promise, and there is nothing to moderate in
+    content nobody else can reach.
+    """
+    resp = client.post(
+        "/api/v1/talents/me/media",
+        json={"url": "https://example.com/secret.jpg", "media_type": "photo", "title": "WIP", "visibility": "private"},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    def titles_for(headers=None):
+        body = client.get(f"/api/v1/talents/{talent_profile['id']}", headers=headers or {}).json()
+        return {m["title"] for m in body["media"]}
+
+    assert "WIP" in titles_for(talent_headers)   # the owner
+    assert "WIP" not in titles_for()             # a guest
+    assert "WIP" not in titles_for(recruiter_headers)
+    assert "WIP" not in titles_for(admin_headers)
+
+
+def test_private_is_a_valid_visibility_on_every_content_type(client, talent_headers, talent_profile):
+    media = client.post(
+        "/api/v1/talents/me/media",
+        json={"url": "https://example.com/a.jpg", "media_type": "photo", "visibility": "private"},
+        headers=talent_headers,
+    )
+    assert media.status_code == 201
+    assert media.json()["visibility"] == "private"
+
+    sample = client.post(
+        "/api/v1/talents/me/writing-samples",
+        json={
+            "title": "Private draft",
+            "writing_type": "poem",
+            "language": "english",
+            "body": "one\ntwo",
+            "visibility": "private",
+            "is_published": True,
+        },
+        headers=talent_headers,
+    )
+    assert sample.status_code == 201
+    assert sample.json()["visibility"] == "private"
+
+
+def test_a_published_but_private_writing_sample_stays_hidden(client, talent_headers, talent_profile):
+    client.post(
+        "/api/v1/talents/me/writing-samples",
+        json={
+            "title": "Not for anyone",
+            "writing_type": "poem",
+            "language": "english",
+            "body": "one\ntwo",
+            "visibility": "private",
+            "is_published": True,
+        },
+        headers=talent_headers,
+    )
+    body = client.get(f"/api/v1/talents/{talent_profile['id']}").json()
+    assert [s["title"] for s in body["writing_samples"]] == []

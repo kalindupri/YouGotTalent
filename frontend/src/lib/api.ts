@@ -22,7 +22,7 @@ export type TalentCategory =
 export type ApplicationStatus = "pending" | "shortlisted" | "rejected" | "accepted";
 export type CastingCallStatus = "open" | "closed";
 export type MediaType = "photo" | "video" | "audio" | "document";
-export type ContentVisibility = "public" | "members" | "recruiters";
+export type ContentVisibility = "public" | "members" | "recruiters" | "private";
 
 export const TALENT_CATEGORIES: TalentCategory[] = [
   "acting",

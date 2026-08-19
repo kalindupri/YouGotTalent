@@ -17,6 +17,22 @@ from app.core.config import settings
 
 LOCAL_PRIVATE_DIR = Path(__file__).resolve().parent.parent.parent / "private_uploads"
 
+# Marks a Media.url as "this lives in the private container under this key" rather than being a
+# fetchable URL. Chosen so it can never be mistaken for one: nothing will try to GET it.
+PRIVATE_URL_PREFIX = "private:"
+
+
+def private_ref(key: str) -> str:
+    return f"{PRIVATE_URL_PREFIX}{key}"
+
+
+def is_private_ref(url: str | None) -> bool:
+    return bool(url) and url.startswith(PRIVATE_URL_PREFIX)
+
+
+def key_from_ref(url: str) -> str:
+    return url[len(PRIVATE_URL_PREFIX) :]
+
 
 def upload_private_file(data: bytes, extension: str, content_type: str) -> str:
     """Store bytes privately and return an opaque storage key (never a URL)."""

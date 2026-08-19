@@ -10,6 +10,7 @@ from app.models.guardian_consent import (
     GuardianConsentEvent,
     GuardianConsentStatus,
 )
+from app.models.media import Media
 from app.models.talent_profile import TalentProfile
 
 
@@ -157,9 +158,40 @@ def decide(
     consent.reviewed_by_user_id = reviewer_user_id
     consent.decision_reason = reason
     profile.guardian_consent_status = new_status
+    if approved:
+        _publish_private_media(db, profile)
     db.commit()
     db.refresh(consent)
     return consent
+
+
+def _publish_private_media(db: Session, profile: TalentProfile) -> None:
+    """Move media held back pending consent into the public container.
+
+    Anything uploaded while the profile was awaiting consent went to the private lane, which
+    the public profile can't serve. Now that a guardian has agreed to it being shown, it moves
+    across and the row points at a normal public URL again.
+
+    Best-effort per item: one unreadable blob shouldn't block the approval itself, and the
+    stale private ref simply stays hidden rather than becoming wrongly public.
+    """
+    from app.core.private_storage import delete_private_file, is_private_ref, key_from_ref, open_private_file
+    from app.core.storage import upload_media_file
+
+    for item in db.query(Media).filter(Media.talent_profile_id == profile.id).all():
+        if not is_private_ref(item.url):
+            continue
+        key = key_from_ref(item.url)
+        try:
+            data = b"".join(open_private_file(key))
+        except (FileNotFoundError, ValueError):
+            continue
+        extension = f".{key.rsplit('.', 1)[-1]}" if "." in key else ""
+        content_type = {"photo": "image/jpeg", "video": "video/mp4", "audio": "audio/mp4"}.get(
+            item.media_type, "application/octet-stream"
+        )
+        item.url = upload_media_file(data, extension, content_type)
+        delete_private_file(key)
 
 
 def revoke(db: Session, consent: GuardianConsent, profile: TalentProfile, *, actor_user_id: uuid.UUID, reason: str | None) -> GuardianConsent:

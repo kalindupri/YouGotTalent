@@ -477,3 +477,85 @@ def test_a_document_cannot_be_fetched_with_a_login_token(client, talent_headers,
     consent = submit_consent(client, talent_headers).json()
     doc_id = consent["documents"][0]["id"]
     assert client.get(f"/api/v1/documents/{doc_id}?t={talent_token}").status_code == 401
+
+
+# --- A minor's media stays out of the public container until consent -----------------------
+
+
+def _upload_photo(client, headers, *, title="Headshot"):
+    """Cover-photo upload goes through ffmpeg, so use a real (tiny) JPEG."""
+    jpeg = bytes.fromhex(
+        "ffd8ffe000104a46494600010100000100010000ffdb004300"
+        + "08" * 64
+        + "ffc0000b080001000101011100ffc40014000100000000000000000000000000000009"
+        + "ffc40014100100000000000000000000000000000000ffda0008010100003f00d2cf20ffd9"
+    )
+    return client.post(
+        "/api/v1/talents/me/cover-photo",
+        files={"file": ("headshot.jpg", jpeg, "image/jpeg")},
+        headers=headers,
+    )
+
+
+def test_a_minors_media_is_not_written_to_the_public_container(client, db_session, talent_headers):
+    from app.core.private_storage import is_private_ref
+    from app.models.media import Media
+
+    profile = create_profile(client, talent_headers, age=13)
+    resp = _upload_photo(client, talent_headers)
+    assert resp.status_code == 201, resp.text
+
+    row = db_session.query(Media).filter(Media.talent_profile_id == profile["id"]).first()
+    # The public media container is provisioned with public blob access -- a child's photo
+    # must not land there before a guardian has agreed to it being shown.
+    assert is_private_ref(row.url), row.url
+
+
+def test_an_adults_media_still_goes_to_the_public_container(client, db_session, talent_headers):
+    from app.core.private_storage import is_private_ref
+    from app.models.media import Media
+
+    profile = create_profile(client, talent_headers, age=30)
+    assert _upload_photo(client, talent_headers).status_code == 201
+
+    row = db_session.query(Media).filter(Media.talent_profile_id == profile["id"]).first()
+    assert not is_private_ref(row.url)
+
+
+def test_the_owner_gets_a_working_signed_link_not_a_raw_private_ref(client, talent_headers):
+    create_profile(client, talent_headers, age=13)
+    _upload_photo(client, talent_headers)
+
+    body = client.get("/api/v1/talents/me", headers=talent_headers).json()
+    url = body["media"][0]["url"]
+    assert not url.startswith("private:")
+    assert "/documents/media/" in url and "t=" in url
+
+
+def test_approval_migrates_the_media_into_the_public_container(client, db_session, talent_headers, admin_headers):
+    from app.core.private_storage import is_private_ref
+    from app.models.media import Media
+
+    profile = create_profile(client, talent_headers, age=13)
+    _upload_photo(client, talent_headers)
+    consent = submit_consent(client, talent_headers).json()
+
+    row = db_session.query(Media).filter(Media.talent_profile_id == profile["id"]).first()
+    assert is_private_ref(row.url)
+
+    assert approve(client, admin_headers, consent["id"]).status_code == 200
+
+    db_session.refresh(row)
+    # Consent given, so it can now be served the ordinary way.
+    assert not is_private_ref(row.url)
+
+
+def test_private_media_cannot_be_fetched_without_a_valid_token(client, db_session, talent_headers):
+    from app.models.media import Media
+
+    profile = create_profile(client, talent_headers, age=13)
+    _upload_photo(client, talent_headers)
+    media_id = db_session.query(Media).filter(Media.talent_profile_id == profile["id"]).first().id
+
+    assert client.get(f"/api/v1/documents/media/{media_id}?t=garbage").status_code == 401
+    assert client.get(f"/api/v1/documents/media/{media_id}").status_code == 422

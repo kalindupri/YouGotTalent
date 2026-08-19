@@ -17,6 +17,8 @@ from app.api.deps import (
 from app.core.config import settings
 from app.core.content_visibility import is_visible_to
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
+from app.core.private_storage import is_private_ref, private_ref, upload_private_file
+from app.core.security import create_document_token
 from app.core.storage import delete_media_file, upload_media_file
 from app.core.talent_eligibility import is_engageable, needs_guardian_consent
 from app.core.talent_search_parse import parse_talent_search_query
@@ -79,6 +81,32 @@ UPLOADABLE_MEDIA_TYPES = {"video", "audio"}
 router = APIRouter(prefix="/talents", tags=["talents"])
 
 
+def _store_media_bytes(profile: TalentProfile, data: bytes, extension: str, content_type: str) -> str:
+    """Public container for ordinary talent; private lane for a minor awaiting consent.
+
+    A child's photographs are special-category data under the PDPA just as much as their date
+    of birth, and the media container is provisioned with public blob access -- anything in it
+    is readable by anyone holding the URL. Until a guardian has consented, their media doesn't
+    go there. It migrates to the public container on approval.
+    """
+    if needs_guardian_consent(profile):
+        return private_ref(upload_private_file(data, extension, content_type))
+    return upload_media_file(data, extension, content_type)
+
+
+def _sign_private_media(items: list[MediaRead]) -> list[MediaRead]:
+    """Swap `private:<key>` refs for short-lived signed URLs the browser can actually load.
+
+    Only ever called for viewers already entitled to see the profile -- the owner or an admin;
+    an unconsented minor's profile 404s for everyone else.
+    """
+    for item in items:
+        if is_private_ref(item.url):
+            token = create_document_token(str(item.id), ttl_seconds=settings.DOCUMENT_LINK_TTL_SECONDS)
+            item.url = f"{settings.BACKEND_PUBLIC_URL}{settings.API_V1_PREFIX}/documents/media/{item.id}?t={token}"
+    return items
+
+
 @router.get("", response_model=list[TalentProfileRead])
 def browse_talents(
     categories: list[TalentCategory] | None = Query(default=None),
@@ -125,7 +153,9 @@ def parse_search_query(q: str):
 
 @router.get("/me", response_model=TalentProfileOwnerRead)
 def read_my_profile(profile: TalentProfile = Depends(get_current_talent_profile)):
-    return profile
+    data = TalentProfileOwnerRead.model_validate(profile)
+    data.media = _sign_private_media(data.media)
+    return data
 
 
 @router.get("/me/profile-views", response_model=ProfileViewSummary)
@@ -163,15 +193,17 @@ def get_talent(
         # to anyone guessing ids.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
     data = TalentProfileRead.model_validate(profile)
-    data.media = [m for m in data.media if is_visible_to(m.visibility, viewer_role)]
-    data.reels = [r for r in data.reels if is_visible_to(r.visibility, viewer_role)]
+    data.media = _sign_private_media(
+        [m for m in data.media if is_visible_to(m.visibility, viewer_role, is_owner=is_owner)]
+    )
+    data.reels = [r for r in data.reels if is_visible_to(r.visibility, viewer_role, is_owner=is_owner)]
     # Drafts never leave the owner's own dashboard regardless of `visibility`; published ones
     # go through the normal visibility gate, and the body itself is truncated for non-owners
     # (see writing_sample_to_read_schema) so the full text is never actually sent to them.
     data.writing_samples = [
         writing_sample_to_read_schema(ws, is_owner=is_owner)
         for ws in profile.writing_samples
-        if is_owner or (ws.is_published and is_visible_to(ws.visibility, viewer_role))
+        if is_owner or (ws.is_published and is_visible_to(ws.visibility, viewer_role, is_owner=is_owner))
     ]
     return data
 
@@ -290,7 +322,7 @@ def upload_my_media(
 
         compressed_bytes = Path(compressed_path).read_bytes()
 
-    url = upload_media_file(compressed_bytes, out_suffix, content_type)
+    url = _store_media_bytes(profile, compressed_bytes, out_suffix, content_type)
     media_in = MediaCreate(url=url, media_type=MediaType(media_type), title=title or None, visibility=visibility)
     return add_media(db, profile.id, media_in)
 
@@ -338,7 +370,7 @@ def upload_my_cover_photo(
 
         compressed_bytes = Path(compressed_path).read_bytes()
 
-    url = upload_media_file(compressed_bytes, ".jpg", "image/jpeg")
+    url = _store_media_bytes(profile, compressed_bytes, ".jpg", "image/jpeg")
 
     if existing_cover is not None:
         delete_media_file(existing_cover.url)
@@ -413,7 +445,7 @@ def upload_my_intro_video(
 
         compressed_bytes = Path(compressed_path).read_bytes()
 
-    url = upload_media_file(compressed_bytes, ".mp4", "video/mp4")
+    url = _store_media_bytes(profile, compressed_bytes, ".mp4", "video/mp4")
 
     previous_url = profile.intro_video_url
     updated = update_talent_profile(db, profile, TalentProfileUpdate(intro_video_url=url))

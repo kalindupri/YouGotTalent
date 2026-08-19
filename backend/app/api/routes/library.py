@@ -6,16 +6,17 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_talent_profile, get_optional_viewer_role
+from app.api.deps import get_optional_current_user, get_current_talent_profile, get_optional_viewer_role
 from app.core.config import settings
 from app.core.content_visibility import is_visible_to
+from app.core.talent_eligibility import require_engageable
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud.library_item import create_library_item, delete_library_item, get_library_item, list_library_items
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.talent_profile import TalentProfile
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.schemas.library_item import LibraryItemCreate, LibraryItemRead
 
 router = APIRouter(tags=["library"])
@@ -125,9 +126,12 @@ def read_talent_library(
     talent_id: uuid.UUID,
     db: Session = Depends(get_db),
     viewer_role: UserRole | None = Depends(get_optional_viewer_role),
+    viewer_user: User | None = Depends(get_optional_current_user),
 ):
     talent = get_talent_profile(db, talent_id)
     if talent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talent profile not found")
+    require_engageable(talent)
+    is_owner = viewer_user is not None and viewer_user.id == talent.user_id
     items = list_library_items(db, talent_id)
-    return [item for item in items if is_visible_to(item.visibility, viewer_role)]
+    return [item for item in items if is_visible_to(item.visibility, viewer_role, is_owner=is_owner)]
