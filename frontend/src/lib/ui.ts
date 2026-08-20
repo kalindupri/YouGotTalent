@@ -176,9 +176,33 @@ export function defaultContractTemplate({
   );
 }
 
-// Mirrors backend/app/core/config.py's MAX_VIDEO_DURATION_SECONDS — the server is the real
-// gate, this just lets us reject an overlong file before spending time uploading it.
+// Mirrors backend/app/core/config.py — the server is the real gate (see core/upload_limits.py),
+// this just lets us reject an overlong file before spending time uploading it. Duration is the
+// dial that drives recurring bandwidth cost, since every view re-pays for the clip's length.
 export const MAX_VIDEO_DURATION_SECONDS = 30;
+export const PREMIUM_MAX_VIDEO_DURATION_SECONDS = 120;
+
+export function maxVideoDurationFor(tier: string | null | undefined): number {
+  return tier === "premium" ? PREMIUM_MAX_VIDEO_DURATION_SECONDS : MAX_VIDEO_DURATION_SECONDS;
+}
+
+/** "30 seconds" / "2 minutes" — the limit as a person would say it. */
+export function formatVideoDurationLimit(seconds: number): string {
+  if (seconds % 60 === 0) {
+    const minutes = seconds / 60;
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  return `${seconds} seconds`;
+}
+
+export function videoTooLongMessage(duration: number, tier: string | null | undefined): string {
+  const limit = maxVideoDurationFor(tier);
+  const upgrade =
+    tier === "premium"
+      ? ""
+      : ` Premium accounts can upload videos up to ${formatVideoDurationLimit(PREMIUM_MAX_VIDEO_DURATION_SECONDS)} long.`;
+  return `Videos must be ${formatVideoDurationLimit(limit)} or shorter (this one is ${Math.round(duration)}s).${upgrade}`;
+}
 
 export function getVideoDurationSeconds(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -236,6 +260,16 @@ export function categoryColor(category: string): CategoryColor {
 
 export function categoryBadgeClass(category: string): string {
   return `inline-flex items-center rounded-sm px-3 py-1 text-xs font-bold uppercase tracking-wide ${categoryColor(category).soft}`;
+}
+
+// Mirrors WRITING_SAMPLE_CATEGORIES in backend/app/models/writing_sample.py — the API returns
+// 403 for anyone else, so the card is hidden rather than shown-then-rejected. Keep the two lists
+// in sync. Songwriters/lyricists sit under `music`; there is no separate songwriting category.
+export const WRITING_SAMPLE_CATEGORIES = ["script_writing", "music"];
+
+export function canAddWritingSamples(profile: { category: string; categories?: string[] | null }): boolean {
+  const categories = profile.categories?.length ? profile.categories : [profile.category];
+  return categories.some((c) => WRITING_SAMPLE_CATEGORIES.includes(c));
 }
 
 export function initials(name: string): string {

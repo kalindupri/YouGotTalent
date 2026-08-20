@@ -47,3 +47,15 @@ class BusyRange(BaseModel):
     start_date: date
     end_date: date
     title: str | None = None
+
+
+class CalendarEntryUpdate(BaseModel):
+    """Partial update. Dates are validated as a pair below, since editing just one of them
+    can still invert the range.
+    """
+
+    title: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    notes: str | None = None
+    is_public: bool | None = None

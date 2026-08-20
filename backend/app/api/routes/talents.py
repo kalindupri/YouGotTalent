@@ -16,6 +16,7 @@ from app.api.deps import (
 )
 from app.core.config import settings
 from app.core.content_visibility import is_visible_to
+from app.core.upload_limits import enforce_upload_size, enforce_video_duration
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.private_storage import is_private_ref, private_ref, upload_private_file
 from app.core.security import create_document_token
@@ -62,7 +63,7 @@ from app.models.user import User, UserRole
 from app.schemas.credit import CreditCreate, CreditRead, CreditUpdate
 from app.schemas.reel import ReelCreate, ReelRead
 from app.schemas.writing_sample import WritingSampleCreate, WritingSampleRead, WritingSampleUpdate
-from app.models.writing_sample import WRITING_LANGUAGES, WRITING_TYPES
+from app.models.writing_sample import WRITING_LANGUAGES, WRITING_TYPES, can_add_writing_samples
 from app.schemas.profile_view import ProfileViewSummary
 from app.schemas.review import TalentReviewSummary
 from app.schemas.talent_profile import (
@@ -287,11 +288,7 @@ def upload_my_media(
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
     file.file.seek(0)
-    if size > settings.MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
-        )
+    enforce_upload_size(size, profile.tier)
 
     raw_suffix = Path(file.filename or "").suffix or (".mp4" if media_type == "video" else ".m4a")
     out_suffix = ".mp4" if media_type == "video" else ".m4a"
@@ -306,11 +303,7 @@ def upload_my_media(
         try:
             if media_type == "video":
                 duration = probe_video_duration(raw_path)
-                if duration > settings.MAX_VIDEO_DURATION_SECONDS:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
-                    )
+                enforce_video_duration(duration, profile.tier)
                 compress_video(raw_path, compressed_path)
             else:
                 compress_audio(raw_path, compressed_path)
@@ -346,11 +339,7 @@ def upload_my_cover_photo(
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
     file.file.seek(0)
-    if size > settings.MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
-        )
+    enforce_upload_size(size, profile.tier)
 
     raw_suffix = Path(file.filename or "").suffix or ".jpg"
 
@@ -415,11 +404,7 @@ def upload_my_intro_video(
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
     file.file.seek(0)
-    if size > settings.MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
-        )
+    enforce_upload_size(size, profile.tier)
 
     raw_suffix = Path(file.filename or "").suffix or ".mp4"
 
@@ -431,11 +416,7 @@ def upload_my_intro_video(
         compressed_path = os.path.join(tmpdir, "compressed.mp4")
         try:
             duration = probe_video_duration(raw_path)
-            if duration > settings.MAX_VIDEO_DURATION_SECONDS:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
-                )
+            enforce_video_duration(duration, profile.tier)
             compress_video(raw_path, compressed_path)
         except MediaProcessingError:
             raise HTTPException(
@@ -550,6 +531,14 @@ def add_my_writing_sample(
     db: Session = Depends(get_db),
     profile: TalentProfile = Depends(get_current_talent_profile),
 ):
+    if not can_add_writing_samples(profile):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Writing samples are for script writers and songwriters. Add Script Writing or "
+                "Music to your categories to use them."
+            ),
+        )
     if sample_in.writing_type not in WRITING_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"writing_type must be one of {WRITING_TYPES}")
     if sample_in.language not in WRITING_LANGUAGES:

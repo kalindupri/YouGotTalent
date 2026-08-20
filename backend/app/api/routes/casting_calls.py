@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_recruiter_profile
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.upload_limits import enforce_upload_size, enforce_video_duration
 from app.core.media_processing import MediaProcessingError, compress_audio, probe_video_duration
 from app.core.storage import upload_media_file
 from app.crud.casting_call import (
@@ -48,11 +49,7 @@ def upload_audition_track(
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
     file.file.seek(0)
-    if size > settings.MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
-        )
+    enforce_upload_size(size, recruiter.tier)
 
     raw_suffix = Path(file.filename or "").suffix or ".m4a"
     with tempfile.TemporaryDirectory() as tmpdir:

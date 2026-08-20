@@ -38,6 +38,14 @@ def list_calendar_entries(db: Session, talent_id: uuid.UUID) -> list[CalendarEnt
     )
 
 
+def update_calendar_entry(db: Session, entry: CalendarEntry, entry_in) -> CalendarEntry:
+    for field, value in entry_in.model_dump(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
 def delete_calendar_entry(db: Session, entry: CalendarEntry) -> None:
     db.delete(entry)
     db.commit()

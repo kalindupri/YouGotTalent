@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_optional_current_user, get_current_talent_profile, get_optional_viewer_role
-from app.core.config import settings
 from app.core.content_visibility import is_visible_to
 from app.core.talent_eligibility import require_engageable
+from app.core.upload_limits import enforce_upload_size, enforce_video_duration
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud.library_item import create_library_item, delete_library_item, get_library_item, list_library_items
@@ -66,11 +66,7 @@ def upload_my_library_item(
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
     file.file.seek(0)
-    if size > settings.MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
-        )
+    enforce_upload_size(size, profile.tier)
 
     raw_suffix = Path(file.filename or "").suffix or {"video": ".mp4", "audio": ".m4a", "photo": ".jpg"}[media_type]
     out_suffix = {"video": ".mp4", "audio": ".m4a", "photo": ".jpg"}[media_type]
@@ -85,11 +81,7 @@ def upload_my_library_item(
         try:
             if media_type == "video":
                 duration = probe_video_duration(raw_path)
-                if duration > settings.MAX_VIDEO_DURATION_SECONDS:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
-                    )
+                enforce_video_duration(duration, profile.tier)
                 compress_video(raw_path, compressed_path)
             elif media_type == "audio":
                 compress_audio(raw_path, compressed_path)

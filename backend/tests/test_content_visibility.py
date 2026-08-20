@@ -117,7 +117,7 @@ def test_private_media_is_visible_only_to_its_owner(client, db_session, talent_h
     assert "WIP" not in titles_for(admin_headers)
 
 
-def test_private_is_a_valid_visibility_on_every_content_type(client, talent_headers, talent_profile):
+def test_private_is_a_valid_visibility_on_every_content_type(client, talent_headers, writer_profile):
     media = client.post(
         "/api/v1/talents/me/media",
         json={"url": "https://example.com/a.jpg", "media_type": "photo", "visibility": "private"},

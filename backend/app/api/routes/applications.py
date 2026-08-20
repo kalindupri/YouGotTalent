@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_recruiter_profile, get_current_talent_profile
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.upload_limits import enforce_upload_size, enforce_video_duration
 from app.core.media_processing import (
     MediaProcessingError,
     compress_audio,
@@ -113,11 +114,7 @@ def apply_to_casting_call_with_upload(
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
     file.file.seek(0)
-    if size > settings.MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
-        )
+    enforce_upload_size(size, talent.tier)
 
     raw_suffix = Path(file.filename or "").suffix or (".mp4" if media_type == "video" else ".m4a")
     out_suffix = ".mp4" if media_type == "video" else ".m4a"
@@ -132,11 +129,7 @@ def apply_to_casting_call_with_upload(
         try:
             if media_type == "video":
                 duration = probe_video_duration(raw_path)
-                if duration > settings.MAX_VIDEO_DURATION_SECONDS:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Videos must be {settings.MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is {int(duration)}s).",
-                    )
+                enforce_video_duration(duration, talent.tier)
                 compress_video(raw_path, compressed_path)
             else:
                 compress_audio(raw_path, compressed_path)
@@ -174,11 +167,7 @@ def upload_audition_recording(
     file.file.seek(0, os.SEEK_END)
     size = file.file.tell()
     file.file.seek(0)
-    if size > settings.MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File is too large (max {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)",
-        )
+    enforce_upload_size(size, talent.tier)
 
     raw_suffix = Path(file.filename or "").suffix or ".webm"
     with tempfile.TemporaryDirectory() as tmpdir:

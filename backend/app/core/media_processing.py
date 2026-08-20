@@ -1,6 +1,7 @@
 """Compresses uploaded video/audio via ffmpeg before it's stored, to keep Azure Blob storage
 and egress costs down. Requires the ffmpeg binary (installed in the backend Docker image).
 """
+import json
 import re
 import subprocess
 
@@ -64,7 +65,84 @@ def _probe_duration_by_decoding(path: str) -> float:
     return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
 
+# A source at or under these is already fine to serve as-is -- re-encoding it would burn a
+# minute of CPU to produce a file no smaller. Matches the transcode targets below.
+_REMUX_MAX_WIDTH = 1280
+_REMUX_MAX_BITRATE = 1_800_000
+
+
+def _stream_info(path: str) -> dict:
+    """Parsed ffprobe output: the first video stream, the first audio stream, and container
+    format. Returns {} if the probe fails for any reason -- callers treat that as "just
+    transcode it".
+
+    JSON output rather than the flat key=value form: ffprobe emits `codec_name` *before*
+    `codec_type`, so a line-by-line parse has no reliable way to tell which stream a field
+    belongs to and silently attributes the audio codec to the video stream.
+    """
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", path],
+            capture_output=True,
+            timeout=COMPRESS_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return {}
+    if result.returncode != 0:
+        return {}
+
+    try:
+        parsed = json.loads(result.stdout.decode(errors="replace"))
+    except ValueError:
+        return {}
+
+    streams = parsed.get("streams") or []
+    return {
+        "video": next((s for s in streams if s.get("codec_type") == "video"), None),
+        "audio": next((s for s in streams if s.get("codec_type") == "audio"), None),
+        "format": parsed.get("format") or {},
+    }
+
+
+def _remux_if_already_web_ready(input_path: str, output_path: str) -> bool:
+    """Stream-copies instead of re-encoding when the source is already H.264/AAC at our target
+    size. Returns True if it did.
+
+    A full transcode of a 30-second 1080p clip costs ~35s on the 0.5 vCPU the app runs with in
+    Azure -- the whole time spent inside the upload request, with the user watching a spinner.
+    Anything already conformant (notably the in-app recorder's own output, and most re-shared
+    clips) skips that entirely; remuxing is I/O-bound and finishes in about a second.
+    """
+    info = _stream_info(input_path)
+    video = info.get("video")
+    if not video or video.get("codec_name") != "h264":
+        return False
+    audio = info.get("audio")
+    # No audio track at all is fine; anything other than AAC would need re-encoding.
+    if audio is not None and audio.get("codec_name") != "aac":
+        return False
+    try:
+        if int(video.get("width") or 0) > _REMUX_MAX_WIDTH:
+            return False
+        # Stream bitrate is absent in some containers; the format-level figure is a fine stand-in.
+        bitrate = int(video.get("bit_rate") or info["format"].get("bit_rate") or 0)
+    except (TypeError, ValueError):
+        return False
+    if bitrate == 0 or bitrate > _REMUX_MAX_BITRATE:
+        return False
+
+    try:
+        _run_ffmpeg(["-i", input_path, "-c", "copy", "-movflags", "+faststart", output_path])
+    except MediaProcessingError:
+        # Not every conformant-looking stream remuxes cleanly into mp4 -- fall back rather than
+        # failing the upload.
+        return False
+    return True
+
+
 def compress_video(input_path: str, output_path: str) -> None:
+    if _remux_if_already_web_ready(input_path, output_path):
+        return
     _run_ffmpeg(
         [
             "-i", input_path,

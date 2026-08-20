@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, CastingCallRole, api } from "@/lib/api";
+import { ApiError, CastingCallRole, UploadProgress, api } from "@/lib/api";
+import UploadProgressBar from "@/components/UploadProgressBar";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 
 const MAX_RECORDING_SECONDS = 30;
@@ -31,6 +32,7 @@ export default function AudioAuditionRecorder({
   const [secondsLeft, setSecondsLeft] = useState(MAX_RECORDING_SECONDS);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [micLevel, setMicLevel] = useState(0);
@@ -174,14 +176,16 @@ export default function AudioAuditionRecorder({
     if (!recordedBlob) return;
     setUploading(true);
     setError(null);
+    setProgress(null);
     try {
-      const { url } = await api.uploadAuditionRecording(castingCallId, role.id, recordedBlob, token);
+      const { url } = await api.uploadAuditionRecording(castingCallId, role.id, recordedBlob, token, setProgress);
       setUploadedUrl(url);
       onSubmissionReady(url);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not submit your recording.");
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   }
 
@@ -254,6 +258,7 @@ export default function AudioAuditionRecorder({
             <button type="button" onClick={handleSubmit} disabled={uploading} className={btnPrimary}>
               {uploading ? "Submitting…" : uploadedUrl ? "Submitted" : "Use this recording"}
             </button>
+            <UploadProgressBar progress={progress} />
             <button type="button" onClick={reRecord} className={btnSecondary}>
               Re-record
             </button>

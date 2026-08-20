@@ -184,3 +184,139 @@ def test_upload_intro_video_rejects_over_30_seconds(client, talent_headers, tale
     resp = upload_intro_video(client, talent_headers, long_sample_video_bytes)
     assert resp.status_code == 400
     assert "30 seconds" in resp.json()["detail"]
+
+
+# --- Transcode fast path -------------------------------------------------------------------
+#
+# A full re-encode of a 30s 1080p clip costs ~35s on the 0.5 vCPU the app runs with in Azure,
+# spent inside the upload request. compress_video skips it when the source is already
+# H.264/AAC at our target size. These pin both branches of that decision.
+
+def _encode(tmp_path, name, *, size, bitrate, vcodec="libx264", acodec="aac"):
+    import subprocess
+
+    path = tmp_path / name
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", f"testsrc=duration=2:size={size}:rate=25",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+            "-shortest", "-pix_fmt", "yuv420p",
+            # Forced CBR: testsrc's flat colour bars compress so well that a plain -b:v target
+            # is ignored, and the "too fat to serve as-is" case would silently not be that.
+            "-c:v", vcodec, "-b:v", bitrate, "-minrate", bitrate, "-maxrate", bitrate,
+            "-bufsize", bitrate, "-c:a", acodec,
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return str(path)
+
+
+def test_web_ready_source_is_remuxed_not_re_encoded(tmp_path):
+    from app.core.media_processing import _remux_if_already_web_ready
+
+    source = _encode(tmp_path, "ready.mp4", size="1280x720", bitrate="1000k")
+    assert _remux_if_already_web_ready(source, str(tmp_path / "out.mp4")) is True
+    assert (tmp_path / "out.mp4").stat().st_size > 0
+
+
+def test_oversized_source_still_gets_transcoded(tmp_path):
+    from app.core.media_processing import _remux_if_already_web_ready
+
+    # Wider than the 1280px target, so serving it as-is would defeat the compression entirely.
+    source = _encode(tmp_path, "big.mp4", size="1920x1080", bitrate="1000k")
+    assert _remux_if_already_web_ready(source, str(tmp_path / "out.mp4")) is False
+
+
+def test_high_bitrate_source_still_gets_transcoded(tmp_path, monkeypatch):
+    # Stubbed probe rather than a real fat file: x264 won't inflate a synthetic source to a high
+    # bitrate no matter what rate control asks for, and the rule under test is the decision, not
+    # ffmpeg's rate control.
+    from app.core import media_processing
+
+    monkeypatch.setattr(
+        media_processing,
+        "_stream_info",
+        lambda path: {
+            "video": {"codec_name": "h264", "width": 1280, "bit_rate": "6000000"},
+            "audio": {"codec_name": "aac"},
+            "format": {},
+        },
+    )
+    assert media_processing._remux_if_already_web_ready("in.mp4", str(tmp_path / "out.mp4")) is False
+
+
+def test_non_h264_source_still_gets_transcoded(tmp_path, monkeypatch):
+    # HEVC is what modern iPhones record by default and most browsers won't play it.
+    from app.core import media_processing
+
+    monkeypatch.setattr(
+        media_processing,
+        "_stream_info",
+        lambda path: {
+            "video": {"codec_name": "hevc", "width": 1280, "bit_rate": "800000"},
+            "audio": {"codec_name": "aac"},
+            "format": {},
+        },
+    )
+    assert media_processing._remux_if_already_web_ready("in.mp4", str(tmp_path / "out.mp4")) is False
+
+
+def test_unprobeable_source_falls_back_to_transcoding(tmp_path, monkeypatch):
+    from app.core import media_processing
+
+    monkeypatch.setattr(media_processing, "_stream_info", lambda path: {})
+    assert media_processing._remux_if_already_web_ready("in.mp4", str(tmp_path / "out.mp4")) is False
+
+
+def test_compress_video_produces_output_either_way(tmp_path):
+    from app.core.media_processing import compress_video
+
+    for name, size in (("ready2.mp4", "1280x720"), ("big2.mp4", "1920x1080")):
+        source = _encode(tmp_path, name, size=size, bitrate="1000k")
+        out = tmp_path / f"out-{name}"
+        compress_video(source, str(out))
+        assert out.stat().st_size > 0
+
+
+# --- Per-tier upload limits ----------------------------------------------------------------
+
+def test_free_talent_video_is_capped_at_thirty_seconds(client, talent_headers, talent_profile, long_sample_video_bytes):
+    resp = client.post(
+        "/api/v1/talents/me/media/upload",
+        data={"media_type": "video", "title": "Long take"},
+        files={"file": ("sample.mp4", long_sample_video_bytes, "video/mp4")},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 400
+    assert "30 seconds" in resp.json()["detail"]
+    # Free users are told the upgrade actually buys them something.
+    assert "Premium" in resp.json()["detail"]
+
+
+def test_premium_talent_video_is_capped_at_two_minutes(client, talent_headers, talent_profile, long_sample_video_bytes):
+    assert client.post("/api/v1/talents/me/upgrade", headers=talent_headers).status_code == 200
+
+    # 35s: over the free cap, well inside Premium's.
+    resp = client.post(
+        "/api/v1/talents/me/media/upload",
+        data={"media_type": "video", "title": "Long take"},
+        files={"file": ("sample.mp4", long_sample_video_bytes, "video/mp4")},
+        headers=talent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+
+def test_tier_limit_helpers_agree_with_settings():
+    from app.core.config import settings
+    from app.core.upload_limits import max_upload_size_for, max_video_duration_for
+
+    assert max_video_duration_for("free") == settings.MAX_VIDEO_DURATION_SECONDS == 30
+    assert max_video_duration_for("premium") == settings.PREMIUM_MAX_VIDEO_DURATION_SECONDS == 120
+    assert max_upload_size_for("free") == settings.MAX_UPLOAD_SIZE_BYTES == 75 * 1024 * 1024
+    assert max_upload_size_for("premium") == settings.PREMIUM_MAX_UPLOAD_SIZE_BYTES == 150 * 1024 * 1024
+    # An unknown/None tier must fall to the free limits, never the premium ones.
+    assert max_video_duration_for(None) == settings.MAX_VIDEO_DURATION_SECONDS
+    assert max_upload_size_for("nonsense") == settings.MAX_UPLOAD_SIZE_BYTES

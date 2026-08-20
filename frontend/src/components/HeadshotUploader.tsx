@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Cropper, { Area, Point } from "react-easy-crop";
-import { ApiError, Media, api } from "@/lib/api";
+import { ApiError, Media, UploadProgress, api } from "@/lib/api";
+import UploadProgressBar from "@/components/UploadProgressBar";
 import { btnPrimary, btnSecondary, btnSmall } from "@/lib/ui";
 import { getCroppedImageBlob } from "@/lib/cropImage";
 
@@ -21,6 +22,7 @@ export default function HeadshotUploader({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -42,9 +44,10 @@ export default function HeadshotUploader({
     if (!imageSrc || !croppedAreaPixels) return;
     setSubmitting(true);
     setError(null);
+    setProgress(null);
     try {
       const blob = await getCroppedImageBlob(imageSrc, croppedAreaPixels);
-      const media = await api.uploadMyCoverPhoto(blob, token);
+      const media = await api.uploadMyCoverPhoto(blob, token, setProgress);
       onUploaded(media);
       URL.revokeObjectURL(imageSrc);
       setImageSrc(null);
@@ -52,6 +55,7 @@ export default function HeadshotUploader({
       setError(err instanceof ApiError ? err.message : "Could not upload your photo.");
     } finally {
       setSubmitting(false);
+      setProgress(null);
     }
   }
 
@@ -87,6 +91,7 @@ export default function HeadshotUploader({
                 {submitting ? "Uploading…" : "Save photo"}
               </button>
             </div>
+            <UploadProgressBar progress={progress} />
           </div>
         </div>
       )}

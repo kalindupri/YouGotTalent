@@ -82,12 +82,13 @@ def test_library_upload_rejects_document_type(client, talent_headers, talent_pro
     assert resp.status_code == 400
 
 
-def test_library_upload_rejects_video_over_30_seconds(client, talent_headers, talent_profile, long_sample_video_bytes):
+def test_library_upload_allows_video_past_the_free_tier_limit(client, talent_headers, talent_profile, long_sample_video_bytes):
+    # The library is Premium-only, so it gets the Premium duration cap (2 minutes). A 35s clip
+    # is over the 30s free limit but comfortably inside Premium's -- it must be accepted.
     assert client.post("/api/v1/talents/me/upgrade", headers=talent_headers).status_code == 200
 
     resp = upload_library_video(client, talent_headers, long_sample_video_bytes)
-    assert resp.status_code == 400
-    assert "30 seconds" in resp.json()["detail"]
+    assert resp.status_code == 201, resp.text
 
 
 def test_talent_lists_own_library_items_newest_first(client, talent_headers, talent_profile):

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_talent_profile
 from app.crud.calendar_entry import (
+    update_calendar_entry,
     create_calendar_entry,
     delete_calendar_entry,
     get_busy_dates,
@@ -16,7 +17,7 @@ from app.crud.calendar_entry import (
 from app.crud.talent_profile import get_talent_profile
 from app.db.session import get_db
 from app.models.talent_profile import TalentProfile
-from app.schemas.calendar_entry import BusyRange, CalendarEntryCreate, CalendarEntryRead, CalendarEvent
+from app.schemas.calendar_entry import BusyRange, CalendarEntryCreate, CalendarEntryRead, CalendarEntryUpdate, CalendarEvent
 
 router = APIRouter(tags=["calendar"])
 
@@ -56,6 +57,25 @@ def add_my_calendar_entry(
     talent: TalentProfile = Depends(get_current_talent_profile),
 ):
     return create_calendar_entry(db, talent.id, entry_in)
+
+
+@router.patch("/talents/me/calendar-entries/{entry_id}", response_model=CalendarEntryRead)
+def update_my_calendar_entry(
+    entry_id: uuid.UUID,
+    entry_in: CalendarEntryUpdate,
+    db: Session = Depends(get_db),
+    talent: TalentProfile = Depends(get_current_talent_profile),
+):
+    entry = get_calendar_entry(db, entry_id)
+    # 404 rather than 403 for someone else's entry, matching the delete route above.
+    if entry is None or entry.talent_id != talent.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar entry not found")
+
+    start = entry_in.start_date or entry.start_date
+    end = entry_in.end_date or entry.end_date
+    if end < start:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End date must be on or after the start date.")
+    return update_calendar_entry(db, entry, entry_in)
 
 
 @router.delete("/talents/me/calendar-entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)

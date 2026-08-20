@@ -14,6 +14,7 @@ import {
   Crown,
   Eye,
   Image as ImageIcon,
+  Pencil,
   PlayCircle,
   Plus,
   ShieldCheck,
@@ -67,6 +68,7 @@ import {
   categoryAttributeFields,
   categoryBadgeClass,
   categoryShowsIntroVideo,
+  canAddWritingSamples,
   coverPhotoUrl,
   creditProjectTypeIcon,
   creditProjectTypeLabel,
@@ -74,7 +76,9 @@ import {
   formatInstrument,
   formatTimeOfDay,
   getVideoDurationSeconds,
-  MAX_VIDEO_DURATION_SECONDS,
+  formatVideoDurationLimit,
+  maxVideoDurationFor,
+  videoTooLongMessage,
   INSTRUMENT_GROUPS,
   inputClass,
   invitationStatusTone,
@@ -101,6 +105,9 @@ import LibraryItemCard from "@/components/LibraryItemCard";
 import HeadshotUploader from "@/components/HeadshotUploader";
 import SubmissionPreview from "@/components/SubmissionPreview";
 import DashboardSidebar, { DashboardNavItem } from "@/components/dashboard/DashboardSidebar";
+import DateOfBirthInput from "@/components/DateOfBirthInput";
+import UploadProgressBar from "@/components/UploadProgressBar";
+import type { UploadProgress } from "@/lib/api";
 import GuardianConsentCard from "@/components/dashboard/GuardianConsentCard";
 
 function parseSkills(raw: string): string[] {
@@ -203,7 +210,9 @@ export default function TalentDashboard() {
             />
             <CreditsCard profile={profile} onUpdated={setProfile} token={token!} />
             <ReelsCard profile={profile} onUpdated={setProfile} token={token!} />
-            <WritingSamplesCard profile={profile} onUpdated={setProfile} token={token!} />
+            {canAddWritingSamples(profile) && (
+              <WritingSamplesCard profile={profile} onUpdated={setProfile} token={token!} />
+            )}
             <LibraryCard profile={profile} token={token!} />
           </>
         )}
@@ -391,6 +400,7 @@ function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p:
   const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState("");
   const [skillsInput, setSkillsInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -415,6 +425,7 @@ function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p:
           city: city || null,
           bio: bio || null,
           date_of_birth: dateOfBirth,
+          gender: gender || null,
           experience_years: null,
           skills: parseSkills(skillsInput),
         },
@@ -439,20 +450,21 @@ function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p:
           Display name
           <input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} />
         </label>
-        <label className={labelClass}>
+        <div className={labelClass}>
           Date of birth
-          <input
-            required
-            type="date"
-            max={new Date().toISOString().slice(0, 10)}
-            value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
-            className={inputClass}
-          />
+          <DateOfBirthInput required value={dateOfBirth} onChange={setDateOfBirth} />
           <span className="mt-1 block text-xs font-normal text-zinc-500">
             Never shown publicly — talent hunts only see your age. If you&apos;re under 18, a parent or
             guardian must hold this account.
           </span>
+        </div>
+        <label className={labelClass}>
+          Gender
+          <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
+            <option value="">Prefer not to say</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
         </label>
         <fieldset className="flex flex-col gap-1.5">
           <legend className={labelClass}>Categories — pick all that apply</legend>
@@ -718,18 +730,13 @@ function EditProfileForm({
         <textarea rows={3} value={bio} onChange={(e) => setBio(e.target.value)} className={inputClass} />
       </label>
       <div className="flex gap-3">
-        <label className={labelClass}>
+        <div className={labelClass}>
           Date of birth
-          <input
-            type="date"
-            value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
-            className={inputClass}
-          />
+          <DateOfBirthInput value={dateOfBirth} onChange={setDateOfBirth} />
           <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
             Optional — lets recruiters filter by age range.
           </span>
-        </label>
+        </div>
         <label className={labelClass}>
           Gender
           <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
@@ -983,6 +990,8 @@ function WorkCalendarCard({ token }: { token: string }) {
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // null while adding; an entry id while editing that entry. The same form serves both.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -1005,7 +1014,20 @@ function WorkCalendarCard({ token }: { token: string }) {
     return events.filter((e) => day >= e.start_at.slice(0, 10) && day <= e.end_at.slice(0, 10));
   }
 
+  function openFormForEntry(entry: CalendarEntry) {
+    setEditingId(entry.id);
+    setSelectedDay(entry.start_date);
+    setTitle(entry.title);
+    setStartDate(entry.start_date);
+    setEndDate(entry.end_date);
+    setNotes(entry.notes ?? "");
+    setIsPublic(entry.is_public);
+    setError(null);
+    setShowForm(true);
+  }
+
   function openFormForDay(day: string) {
+    setEditingId(null);
     setSelectedDay(day);
     setTitle("");
     setStartDate(day);
@@ -1016,25 +1038,38 @@ function WorkCalendarCard({ token }: { token: string }) {
     setShowForm(true);
   }
 
-  async function handleAddEntry(e: FormEvent) {
+  async function handleSubmitEntry(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+    const payload = { title, start_date: startDate, end_date: endDate, notes: notes || null, is_public: isPublic };
     try {
-      const entry = await api.addMyCalendarEntry(
-        { title, start_date: startDate, end_date: endDate, notes: notes || null, is_public: isPublic },
-        token
+      const entry = editingId
+        ? await api.updateMyCalendarEntry(editingId, payload, token)
+        : await api.addMyCalendarEntry(payload, token);
+      setEntries((prev) =>
+        (editingId ? prev.filter((x) => x.id !== entry.id) : prev)
+          .concat(entry)
+          .sort((a, b) => a.start_date.localeCompare(b.start_date))
       );
-      setEntries((prev) => [...prev, entry].sort((a, b) => a.start_date.localeCompare(b.start_date)));
+      const event = {
+        id: entry.id,
+        kind: "entry" as const,
+        title: entry.title,
+        start_at: entry.start_date,
+        end_at: entry.end_date,
+        status: "confirmed",
+      };
       setEvents((prev) =>
-        [
-          ...prev,
-          { id: entry.id, kind: "entry" as const, title: entry.title, start_at: entry.start_date, end_at: entry.end_date, status: "confirmed" },
-        ].sort((a, b) => a.start_at.localeCompare(b.start_at))
+        prev
+          .filter((x) => !(x.kind === "entry" && x.id === entry.id))
+          .concat(event)
+          .sort((a, b) => a.start_at.localeCompare(b.start_at))
       );
       setShowForm(false);
+      setEditingId(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not add this calendar entry.");
+      setError(err instanceof ApiError ? err.message : "Could not save this calendar entry.");
     } finally {
       setSubmitting(false);
     }
@@ -1106,8 +1141,10 @@ function WorkCalendarCard({ token }: { token: string }) {
       </div>
 
       {showForm && selectedDay && (
-        <form onSubmit={handleAddEntry} className="mt-4 flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Add calendar entry</p>
+        <form onSubmit={handleSubmitEntry} className="mt-4 flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            {editingId ? "Edit calendar entry" : "Add calendar entry"}
+          </p>
           <label className={labelClass}>
             Title
             <input
@@ -1139,9 +1176,9 @@ function WorkCalendarCard({ token }: { token: string }) {
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-2">
             <button type="submit" disabled={submitting} className={btnPrimary}>
-              {submitting ? "Adding…" : "Add entry"}
+              {submitting ? "Saving…" : editingId ? "Save changes" : "Add entry"}
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className={btnSecondary}>
+            <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className={btnSecondary}>
               Cancel
             </button>
           </div>
@@ -1162,9 +1199,18 @@ function WorkCalendarCard({ token }: { token: string }) {
                   {e.end_date !== e.start_date ? ` – ${e.end_date}` : ""}
                 </span>
               </span>
-              <button onClick={() => handleDeleteEntry(e.id)} className="text-zinc-400 hover:text-red-600" aria-label="Remove">
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <span className="flex items-center gap-3">
+                <button
+                  onClick={() => openFormForEntry(e)}
+                  className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                  aria-label={`Edit ${e.title}`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button onClick={() => handleDeleteEntry(e.id)} className="text-zinc-400 hover:text-red-600" aria-label="Remove">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </span>
             </li>
           ))}
         </ul>
@@ -1362,6 +1408,7 @@ function IntroVideoCard({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
 
   if (!categoryShowsIntroVideo(profile.category)) return null;
 
@@ -1372,8 +1419,8 @@ function IntroVideoCard({
     setError(null);
     try {
       const duration = await getVideoDurationSeconds(picked);
-      if (duration > MAX_VIDEO_DURATION_SECONDS) {
-        setError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+      if (duration > maxVideoDurationFor(profile.tier)) {
+        setError(videoTooLongMessage(duration, profile.tier));
         setFile(null);
         input.value = "";
         return;
@@ -1389,9 +1436,10 @@ function IntroVideoCard({
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+    setProgress(null);
     try {
       if (mode === "upload" && file) {
-        const updated = await api.uploadMyIntroVideo(file, token);
+        const updated = await api.uploadMyIntroVideo(file, token, setProgress);
         onUpdated({ ...updated, media: profile.media, credits: profile.credits, reels: profile.reels });
       } else {
         const updated = await api.updateMyTalentProfile({ intro_video_url: url.trim() || null }, token);
@@ -1403,6 +1451,7 @@ function IntroVideoCard({
       setError(err instanceof ApiError ? err.message : "Could not save your intro video.");
     } finally {
       setSubmitting(false);
+      setProgress(null);
     }
   }
 
@@ -1454,7 +1503,7 @@ function IntroVideoCard({
                 className={inputClass}
               />
               <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
-                We&apos;ll compress it automatically. Max {MAX_VIDEO_DURATION_SECONDS}s.
+                We&apos;ll compress it automatically. Max {formatVideoDurationLimit(maxVideoDurationFor(profile.tier))}.
               </span>
             </label>
           ) : (
@@ -1473,6 +1522,7 @@ function IntroVideoCard({
           <button type="submit" disabled={submitting} className={`w-fit ${btnSecondary}`}>
             {submitting ? "Saving…" : "Save intro video"}
           </button>
+          <UploadProgressBar progress={progress} />
         </form>
       )}
     </section>
@@ -2497,6 +2547,7 @@ function AddMediaForm({
   const [visibility, setVisibility] = useState<ContentVisibility>("public");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
 
   const isUpload = UPLOAD_MEDIA_TYPES.includes(mediaType);
   const videoCount = profile.media.filter((m) => m.media_type === "video").length;
@@ -2511,8 +2562,8 @@ function AddMediaForm({
     if (mediaType === "video") {
       try {
         const duration = await getVideoDurationSeconds(picked);
-        if (duration > MAX_VIDEO_DURATION_SECONDS) {
-          setError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+        if (duration > maxVideoDurationFor(profile.tier)) {
+          setError(videoTooLongMessage(duration, profile.tier));
           setFile(null);
           input.value = "";
           return;
@@ -2529,11 +2580,13 @@ function AddMediaForm({
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+    setProgress(null);
     try {
       const media = isUpload
         ? await api.uploadMyMedia(
             { file: file!, media_type: mediaType as "video" | "audio", title: title || undefined, visibility },
-            token
+            token,
+            setProgress
           )
         : await api.addMyMedia({ url, media_type: mediaType, title: title || undefined, visibility }, token);
       onAdded(media);
@@ -2544,6 +2597,7 @@ function AddMediaForm({
       setError(err instanceof ApiError ? err.message : "Could not add this audition.");
     } finally {
       setSubmitting(false);
+      setProgress(null);
     }
   }
 
@@ -2587,7 +2641,7 @@ function AddMediaForm({
           <p className="text-xs text-zinc-500">
             {videoCount}/{videoLimit} audition video{videoLimit === 1 ? "" : "s"} used
             {profile.tier !== "premium" && " — upgrade to Premium for more"}
-            {" · "}max {MAX_VIDEO_DURATION_SECONDS}s
+            {" · "}max {formatVideoDurationLimit(maxVideoDurationFor(profile.tier))}
           </p>
         )}
 
@@ -2633,8 +2687,9 @@ function AddMediaForm({
           disabled={submitting || videoLimitReached || (isUpload && !file)}
           className={`w-fit ${btnSecondary}`}
         >
-          {submitting ? (isUpload ? "Uploading & compressing…" : "Adding…") : videoLimitReached ? "Video limit reached" : "Add audition"}
+          {submitting ? (isUpload ? "Uploading…" : "Adding…") : videoLimitReached ? "Video limit reached" : "Add audition"}
         </button>
+        <UploadProgressBar progress={progress} />
       </form>
     </section>
   );
@@ -2658,6 +2713,7 @@ function LibraryCard({ profile, token }: { profile: MyTalentProfile; token: stri
   const [visibility, setVisibility] = useState<ContentVisibility>("public");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
 
   const isPremium = profile.tier === "premium";
   const label = libraryLabel(profile.category);
@@ -2675,8 +2731,8 @@ function LibraryCard({ profile, token }: { profile: MyTalentProfile; token: stri
     if (mediaType === "video") {
       try {
         const duration = await getVideoDurationSeconds(picked);
-        if (duration > MAX_VIDEO_DURATION_SECONDS) {
-          setError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+        if (duration > maxVideoDurationFor(profile.tier)) {
+          setError(videoTooLongMessage(duration, profile.tier));
           setFile(null);
           input.value = "";
           return;
@@ -2693,12 +2749,14 @@ function LibraryCard({ profile, token }: { profile: MyTalentProfile; token: stri
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+    setProgress(null);
     try {
       const item =
         mode === "upload"
           ? await api.uploadMyLibraryItem(
               { file: file!, media_type: mediaType, title, description: description || undefined, visibility },
-              token
+              token,
+              setProgress
             )
           : await api.addMyLibraryItem(
               { title, description: description || undefined, media_type: mediaType, url, visibility },
@@ -2713,6 +2771,7 @@ function LibraryCard({ profile, token }: { profile: MyTalentProfile; token: stri
       setError(err instanceof ApiError ? err.message : "Could not add this item.");
     } finally {
       setSubmitting(false);
+      setProgress(null);
     }
   }
 
@@ -2800,7 +2859,7 @@ function LibraryCard({ profile, token }: { profile: MyTalentProfile; token: stri
 
         {mode === "upload" ? (
           <label className={labelClass}>
-            File{mediaType === "video" ? ` (max ${MAX_VIDEO_DURATION_SECONDS}s)` : ""}
+            File{mediaType === "video" ? ` (max ${formatVideoDurationLimit(maxVideoDurationFor(profile.tier))})` : ""}
             <input
               required
               type="file"
@@ -2843,6 +2902,7 @@ function LibraryCard({ profile, token }: { profile: MyTalentProfile; token: stri
         <button type="submit" disabled={submitting || (mode === "upload" && !file)} className={`w-fit ${btnSecondary}`}>
           {submitting ? (mode === "upload" ? "Uploading…" : "Adding…") : `Add to ${label.toLowerCase()}`}
         </button>
+        <UploadProgressBar progress={progress} />
       </form>
     </section>
   );

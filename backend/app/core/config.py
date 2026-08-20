@@ -56,12 +56,17 @@ class Settings(BaseSettings):
     # Reels showcase (TikTok / Instagram Reels / Facebook Reels links) is Premium-only.
     PREMIUM_REEL_LIMIT: int = 10
 
-    # Raw (pre-compression) upload size cap, enforced before any ffmpeg work is done.
-    MAX_UPLOAD_SIZE_BYTES: int = 200 * 1024 * 1024
+    # Raw (pre-compression) upload size cap, enforced before any ffmpeg work is done. Bounds how
+    # much CPU one upload can burn transcoding; see core/upload_limits.py for why size and
+    # duration are separate dials.
+    MAX_UPLOAD_SIZE_BYTES: int = 75 * 1024 * 1024
+    PREMIUM_MAX_UPLOAD_SIZE_BYTES: int = 150 * 1024 * 1024
 
-    # Manually uploaded video files (not YouTube/Spotify links, which have no duration cap)
-    # are rejected past this length — keeps storage/egress bounded regardless of tier.
+    # Manually uploaded video files (not YouTube/Spotify links, which have no duration cap) are
+    # rejected past this length. This is the dial that controls recurring egress cost, since
+    # every view re-pays for the clip's full length.
     MAX_VIDEO_DURATION_SECONDS: int = 30
+    PREMIUM_MAX_VIDEO_DURATION_SECONDS: int = 120
 
     # Azure Blob Storage for uploaded video/audio auditions. If unset (e.g. local dev), uploads
     # fall back to local disk served by this app itself — see app/core/storage.py.

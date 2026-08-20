@@ -178,6 +178,23 @@ def talent_profile(client, talent_headers):
 
 
 @pytest.fixture()
+def writer_profile(client, talent_headers):
+    """Writing samples are gated to writing-led categories, so these tests need a writer."""
+    resp = client.post(
+        "/api/v1/talents/me",
+        json={
+            "display_name": "Fixture Writer",
+            "categories": ["script_writing"],
+            "city": "Colombo",
+            "date_of_birth": ADULT_DOB,
+        },
+        headers=talent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+@pytest.fixture()
 def recruiter_token(client, db_session):
     return register_and_verify(client, db_session, "recruiter_fixture@example.com", full_name="Fixture Recruiter", role="recruiter")
 

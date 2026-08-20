@@ -31,6 +31,7 @@ import {
   api,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import type { UploadProgress } from "@/lib/api";
 import BillingStatusPanel from "@/components/BillingStatusPanel";
 import PaymentHistoryList from "@/components/PaymentHistoryList";
 import {
@@ -851,6 +852,7 @@ interface RoleDraft {
   compensation: string;
   guideTrackUrl: string;
   uploadingGuide: boolean;
+  guideProgress: UploadProgress | null;
 }
 
 function emptyRole(): RoleDraft {
@@ -861,6 +863,7 @@ function emptyRole(): RoleDraft {
     compensation: "",
     guideTrackUrl: "",
     uploadingGuide: false,
+    guideProgress: null,
   };
 }
 
@@ -895,11 +898,13 @@ function PostCastingCallForm({
     updateRole(index, { uploadingGuide: true });
     setError(null);
     try {
-      const { url } = await api.uploadAuditionTrack(file, token);
-      updateRole(index, { guideTrackUrl: url, uploadingGuide: false });
+      const { url } = await api.uploadAuditionTrack(file, token, (p) =>
+        updateRole(index, { guideProgress: p })
+      );
+      updateRole(index, { guideTrackUrl: url, uploadingGuide: false, guideProgress: null });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not upload this track.");
-      updateRole(index, { uploadingGuide: false });
+      updateRole(index, { uploadingGuide: false, guideProgress: null });
     }
   }
 
@@ -1113,7 +1118,13 @@ function PostCastingCallForm({
                       onChange={(e) => e.target.files?.[0] && handleTrackUpload(i, e.target.files[0])}
                       className={inputClass}
                     />
-                    {role.uploadingGuide && <span className="text-xs text-zinc-500">Uploading…</span>}
+                    {role.uploadingGuide && (
+                      <span className="text-xs text-zinc-500">
+                        {role.guideProgress && role.guideProgress.phase === "uploading"
+                          ? `Uploading… ${role.guideProgress.percent}%`
+                          : "Processing…"}
+                      </span>
+                    )}
                     {role.guideTrackUrl && !role.uploadingGuide && <span className="text-xs text-emerald-600">Uploaded ✓</span>}
                   </label>
                 </div>

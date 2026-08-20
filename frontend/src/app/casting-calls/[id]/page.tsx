@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Check, Clapperboard, Paperclip, Star } from "lucide-react";
 import { ApiError, CastingCall, CastingCallRole, RecruiterProfile, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import UploadProgressBar from "@/components/UploadProgressBar";
+import type { UploadProgress } from "@/lib/api";
 import AudioAuditionRecorder from "@/components/AudioAuditionRecorder";
 import CategoryIcon from "@/components/CategoryIcon";
 import FollowRecruiterButton from "@/components/FollowRecruiterButton";
@@ -19,7 +21,9 @@ import {
   getVideoDurationSeconds,
   inputClass,
   labelClass,
-  MAX_VIDEO_DURATION_SECONDS,
+  formatVideoDurationLimit,
+  maxVideoDurationFor,
+  videoTooLongMessage,
   sectionClass,
   statusTone,
 } from "@/lib/ui";
@@ -49,6 +53,7 @@ function CastingCallDetailContent() {
   const [appliedRoleIds, setAppliedRoleIds] = useState<Set<string>>(new Set());
   const [justSubmittedRoleId, setJustSubmittedRoleId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [talentTier, setTalentTier] = useState<"free" | "premium" | null>(null);
 
   useEffect(() => {
@@ -89,8 +94,8 @@ function CastingCallDetailContent() {
     if (!picked.type.startsWith("audio/")) {
       try {
         const duration = await getVideoDurationSeconds(picked);
-        if (duration > MAX_VIDEO_DURATION_SECONDS) {
-          setApplyError(`Videos must be ${MAX_VIDEO_DURATION_SECONDS} seconds or shorter (this one is ${Math.round(duration)}s).`);
+        if (duration > maxVideoDurationFor(talentTier)) {
+          setApplyError(videoTooLongMessage(duration, talentTier));
           setSubmissionFile(null);
           input.value = "";
           return;
@@ -108,13 +113,15 @@ function CastingCallDetailContent() {
     if (!token || !selectedRoleId) return;
     setApplyError(null);
     setSubmitting(true);
+    setUploadProgress(null);
     try {
       if (submissionMode === "upload" && submissionFile) {
         const mediaType = submissionFile.type.startsWith("audio/") ? "audio" : "video";
         await api.applyToCastingCallWithUpload(
           params.id,
           { role_id: selectedRoleId, media_type: mediaType, file: submissionFile, message: message || undefined },
-          token
+          token,
+          setUploadProgress
         );
       } else {
         await api.applyToCastingCall(
@@ -129,6 +136,7 @@ function CastingCallDetailContent() {
       setApplyError(err instanceof ApiError ? err.message : "Could not submit your application.");
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
@@ -344,7 +352,7 @@ function CastingCallDetailContent() {
                       className={inputClass}
                     />
                     <span className="mt-1 block text-xs font-normal normal-case text-zinc-500">
-                      We&apos;ll compress it automatically. Video max {MAX_VIDEO_DURATION_SECONDS}s.
+                      We&apos;ll compress it automatically. Video max {formatVideoDurationLimit(maxVideoDurationFor(talentTier))}.
                     </span>
                   </label>
                 ) : (
@@ -375,6 +383,7 @@ function CastingCallDetailContent() {
             <button type="submit" disabled={submitting} className={`${btnPrimary} w-fit`}>
               {submitting ? "Submitting…" : "Apply"}
             </button>
+            <UploadProgressBar progress={uploadProgress} />
           </form>
         )}
       </div>

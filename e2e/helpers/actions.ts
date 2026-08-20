@@ -58,7 +58,11 @@ export async function createTalentProfile(
   await page.goto("/dashboard");
   await page.getByLabel("Display name").fill(opts.displayName);
   // Required: it decides whether guardian consent is needed and whether paid work is allowed.
-  await page.getByLabel("Date of birth").fill(opts.dateOfBirth ?? ADULT_DOB);
+  // Three dropdowns rather than a date input -- see components/DateOfBirthInput.tsx.
+  const [year, month, day] = (opts.dateOfBirth ?? ADULT_DOB).split("-").map(Number);
+  await page.getByLabel("Day", { exact: true }).selectOption(String(day));
+  await page.getByLabel("Month", { exact: true }).selectOption(String(month));
+  await page.getByLabel("Year", { exact: true }).selectOption(String(year));
   if (opts.category) {
     // Categories are a checkbox group (multi-category support), not a <select> — "acting"
     // defaults checked, so clear it before checking the requested one for a clean single-value state.

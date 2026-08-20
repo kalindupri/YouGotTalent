@@ -21,7 +21,17 @@ def upload_media_file(data: bytes, extension: str, content_type: str) -> str:
         service = BlobServiceClient.from_connection_string(settings.AZURE_STORAGE_CONNECTION_STRING)
         container = service.get_container_client(settings.AZURE_STORAGE_CONTAINER)
         blob = container.get_blob_client(blob_name)
-        blob.upload_blob(data, content_settings=ContentSettings(content_type=content_type))
+        # Blob names are a fresh uuid4 per upload and the contents never change afterwards, so
+        # these are safe to cache forever. Without this every replay of a popular profile's video
+        # re-egresses the whole file from Azure, which is the one cost here that scales with
+        # traffic rather than with signups.
+        blob.upload_blob(
+            data,
+            content_settings=ContentSettings(
+                content_type=content_type,
+                cache_control="public, max-age=31536000, immutable",
+            ),
+        )
         return blob.url
 
     LOCAL_MEDIA_DIR.mkdir(parents=True, exist_ok=True)

@@ -38,3 +38,22 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* Indeterminate sweep for UploadProgressBar's "processing" phase. There is no percentage to
+   show once the bytes are sent — the server is transcoding — so the bar moves instead of
+   filling, which is what distinguishes "still working" from "hung". */
+@keyframes upload-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [role="progressbar"] > * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

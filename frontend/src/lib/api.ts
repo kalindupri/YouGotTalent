@@ -867,6 +867,66 @@ export class ApiError extends Error {
   }
 }
 
+/** Progress reported while a file upload is in flight.
+ *
+ * `phase` matters as much as the percentage: once the bytes are all sent the request is still
+ * open, because the server compresses video with ffmpeg before responding. On a 30-second
+ * 1080p clip that can be another half-minute of apparent silence, which is exactly what makes
+ * an upload feel hung. Callers show "Processing" for that stretch rather than a stalled 100%.
+ */
+export type UploadProgress = { phase: "uploading" | "processing"; percent: number };
+
+/** Multipart POST with upload progress.
+ *
+ * XMLHttpRequest rather than fetch: fetch still has no way to observe request-body progress in
+ * any shipping browser (`ReadableStream` request bodies are Chromium-only and need duplex
+ * half). This is the one place in the client that isn't fetch, and only for that reason.
+ */
+function uploadForm<T>(
+  path: string,
+  form: FormData,
+  token: string,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_URL}${path}`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (!onProgress) return;
+      // Not every upload reports a total (chunked encoding); leave the bar indeterminate rather
+      // than inventing a number.
+      const percent = e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : 0;
+      onProgress({ phase: percent >= 100 ? "processing" : "uploading", percent });
+    };
+    xhr.upload.onload = () => onProgress?.({ phase: "processing", percent: 100 });
+
+    xhr.onload = () => {
+      let body: unknown = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        // ignore non-JSON bodies
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(body as T);
+        return;
+      }
+      const detail =
+        body && typeof body === "object" && typeof (body as { detail?: unknown }).detail === "string"
+          ? (body as { detail: string }).detail
+          : xhr.statusText;
+      reject(new ApiError(xhr.status, detail));
+    };
+    xhr.onerror = () => reject(new ApiError(0, "Upload failed — check your connection and try again."));
+    xhr.ontimeout = () => reject(new ApiError(0, "Upload timed out — try again."));
+    xhr.onabort = () => reject(new ApiError(0, "Upload canceled."));
+
+    xhr.send(form);
+  });
+}
+
 async function request<T>(path: string, options: RequestInit = {}, token?: string | null): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -983,57 +1043,26 @@ export const api = {
     request<MyTalentProfile>("/talents/me", { method: "POST", body: JSON.stringify(data) }, token),
   updateMyTalentProfile: (data: Partial<TalentProfileInput>, token: string) =>
     request<MyTalentProfile>("/talents/me", { method: "PATCH", body: JSON.stringify(data) }, token),
-  uploadMyIntroVideo: async (file: File, token: string): Promise<MyTalentProfile> => {
+  uploadMyIntroVideo: (file: File, token: string, onProgress?: (p: UploadProgress) => void): Promise<MyTalentProfile> => {
     const form = new FormData();
     form.set("file", file);
-
-    const res = await fetch(`${API_URL}/talents/me/intro-video`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        // ignore non-JSON error bodies
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return res.json();
+    return uploadForm<MyTalentProfile>("/talents/me/intro-video", form, token, onProgress);
   },
   addMyMedia: (
     data: { url: string; media_type: MediaType; title?: string; is_cover?: boolean; visibility?: ContentVisibility },
     token: string
   ) => request<Media>("/talents/me/media", { method: "POST", body: JSON.stringify(data) }, token),
-  uploadMyMedia: async (
+  uploadMyMedia: (
     data: { file: File; media_type: "video" | "audio"; title?: string; visibility?: ContentVisibility },
-    token: string
+    token: string,
+    onProgress?: (p: UploadProgress) => void
   ): Promise<Media> => {
     const form = new FormData();
     form.set("media_type", data.media_type);
     if (data.title) form.set("title", data.title);
     if (data.visibility) form.set("visibility", data.visibility);
     form.set("file", data.file);
-
-    const res = await fetch(`${API_URL}/talents/me/media/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        // ignore non-JSON error bodies
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return res.json();
+    return uploadForm<Media>("/talents/me/media/upload", form, token, onProgress);
   },
   listMyLibrary: (token: string) => request<LibraryItem[]>("/talents/me/library", {}, token),
   listTalentLibrary: (talentId: string, token?: string | null) => request<LibraryItem[]>(`/talents/${talentId}/library`, {}, token),
@@ -1041,9 +1070,10 @@ export const api = {
     data: { title: string; description?: string; media_type: string; url: string; visibility?: ContentVisibility },
     token: string
   ) => request<LibraryItem>("/talents/me/library", { method: "POST", body: JSON.stringify(data) }, token),
-  uploadMyLibraryItem: async (
+  uploadMyLibraryItem: (
     data: { file: File; media_type: "photo" | "video" | "audio"; title: string; description?: string; visibility?: ContentVisibility },
-    token: string
+    token: string,
+    onProgress?: (p: UploadProgress) => void
   ): Promise<LibraryItem> => {
     const form = new FormData();
     form.set("media_type", data.media_type);
@@ -1051,46 +1081,14 @@ export const api = {
     if (data.description) form.set("description", data.description);
     if (data.visibility) form.set("visibility", data.visibility);
     form.set("file", data.file);
-
-    const res = await fetch(`${API_URL}/talents/me/library/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        // ignore non-JSON error bodies
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return res.json();
+    return uploadForm<LibraryItem>("/talents/me/library/upload", form, token, onProgress);
   },
   deleteMyLibraryItem: (itemId: string, token: string) =>
     request<void>(`/talents/me/library/${itemId}`, { method: "DELETE" }, token),
-  uploadMyCoverPhoto: async (file: Blob, token: string): Promise<Media> => {
+  uploadMyCoverPhoto: (file: Blob, token: string, onProgress?: (p: UploadProgress) => void): Promise<Media> => {
     const form = new FormData();
     form.set("file", file, "headshot.jpg");
-
-    const res = await fetch(`${API_URL}/talents/me/cover-photo`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        // ignore non-JSON error bodies
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return res.json();
+    return uploadForm<Media>("/talents/me/cover-photo", form, token, onProgress);
   },
   updateMyMedia: (mediaId: string, data: MediaUpdateInput, token: string) =>
     request<Media>(`/talents/me/media/${mediaId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
@@ -1252,81 +1250,47 @@ export const api = {
       { method: "POST", body: JSON.stringify(data) },
       token
     ),
-  applyToCastingCallWithUpload: async (
+  applyToCastingCallWithUpload: (
     castingCallId: string,
     data: { role_id: string; media_type: "video" | "audio"; file: File; message?: string },
-    token: string
+    token: string,
+    onProgress?: (p: UploadProgress) => void
   ): Promise<Application> => {
     const form = new FormData();
     form.set("role_id", data.role_id);
     form.set("media_type", data.media_type);
     if (data.message) form.set("message", data.message);
     form.set("file", data.file);
-
-    const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/applications/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        // ignore non-JSON error bodies
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return res.json();
+    return uploadForm<Application>(
+      `/casting-calls/${castingCallId}/applications/upload`,
+      form,
+      token,
+      onProgress
+    );
   },
-  uploadAuditionTrack: async (file: File, token: string): Promise<{ url: string }> => {
+  uploadAuditionTrack: (file: File, token: string, onProgress?: (p: UploadProgress) => void): Promise<{ url: string }> => {
     const form = new FormData();
     form.set("file", file);
-    const res = await fetch(`${API_URL}/casting-calls/audio-tracks/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        // ignore non-JSON error bodies
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return res.json();
+    return uploadForm<{ url: string }>("/casting-calls/audio-tracks/upload", form, token, onProgress);
   },
-  uploadAuditionRecording: async (
+  uploadAuditionRecording: (
     castingCallId: string,
     roleId: string,
     file: Blob,
-    token: string
+    token: string,
+    onProgress?: (p: UploadProgress) => void
   ): Promise<{ url: string }> => {
     // Safari records to MP4/AAC rather than WebM -- name the upload to match what the browser
     // actually produced (file.type), not a hardcoded extension that wouldn't match on iOS.
     const ext = file.type.includes("mp4") ? "mp4" : file.type.includes("ogg") ? "ogg" : "webm";
     const form = new FormData();
     form.set("file", file, `recording.${ext}`);
-    const res = await fetch(`${API_URL}/casting-calls/${castingCallId}/roles/${roleId}/audition-upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (typeof body.detail === "string") detail = body.detail;
-      } catch {
-        // ignore non-JSON error bodies
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return res.json();
+    return uploadForm<{ url: string }>(
+      `/casting-calls/${castingCallId}/roles/${roleId}/audition-upload`,
+      form,
+      token,
+      onProgress
+    );
   },
   listApplicationsForCastingCall: (castingCallId: string, token: string) =>
     request<Application[]>(`/casting-calls/${castingCallId}/applications`, {}, token),
@@ -1366,6 +1330,8 @@ export const api = {
   listMyCalendarEntries: (token: string) => request<CalendarEntry[]>("/talents/me/calendar-entries", {}, token),
   addMyCalendarEntry: (data: CalendarEntryInput, token: string) =>
     request<CalendarEntry>("/talents/me/calendar-entries", { method: "POST", body: JSON.stringify(data) }, token),
+  updateMyCalendarEntry: (entryId: string, data: Partial<CalendarEntryInput>, token: string) =>
+    request<CalendarEntry>(`/talents/me/calendar-entries/${entryId}`, { method: "PATCH", body: JSON.stringify(data) }, token),
   deleteMyCalendarEntry: (entryId: string, token: string) =>
     request<void>(`/talents/me/calendar-entries/${entryId}`, { method: "DELETE" }, token),
 

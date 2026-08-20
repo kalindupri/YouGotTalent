@@ -47,3 +47,14 @@ class WritingSample(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     talent_profile: Mapped["TalentProfile"] = relationship("TalentProfile", back_populates="writing_samples")
+
+
+# Writing samples are for people who write: scriptwriters, and songwriters/lyricists (who sit
+# under `music` in TalentCategory -- there is no separate songwriting category). A talent with
+# any of these among their categories can add samples.
+WRITING_SAMPLE_CATEGORIES = ["script_writing", "music"]
+
+
+def can_add_writing_samples(profile) -> bool:
+    categories = set(profile.categories or [profile.category])
+    return bool(categories.intersection(WRITING_SAMPLE_CATEGORIES))
