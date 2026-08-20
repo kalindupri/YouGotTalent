@@ -16,7 +16,7 @@ from app.api.deps import (
 )
 from app.core.config import settings
 from app.core.content_visibility import is_visible_to
-from app.core.upload_limits import enforce_upload_size, enforce_video_duration
+from app.core.upload_limits import enforce_upload_size, enforce_video_duration, media_processing_http_error
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.private_storage import is_private_ref, private_ref, upload_private_file
 from app.core.security import create_document_token
@@ -307,11 +307,8 @@ def upload_my_media(
                 compress_video(raw_path, compressed_path)
             else:
                 compress_audio(raw_path, compressed_path)
-        except MediaProcessingError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not process this file — make sure it's a valid video/audio file.",
-            )
+        except MediaProcessingError as exc:
+            raise media_processing_http_error(exc, noun="file")
 
         compressed_bytes = Path(compressed_path).read_bytes()
 
@@ -351,11 +348,8 @@ def upload_my_cover_photo(
         compressed_path = os.path.join(tmpdir, "compressed.jpg")
         try:
             compress_photo(raw_path, compressed_path)
-        except MediaProcessingError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not process this file — make sure it's a valid image file.",
-            )
+        except MediaProcessingError as exc:
+            raise media_processing_http_error(exc, noun="file")
 
         compressed_bytes = Path(compressed_path).read_bytes()
 
@@ -418,11 +412,8 @@ def upload_my_intro_video(
             duration = probe_video_duration(raw_path)
             enforce_video_duration(duration, profile.tier)
             compress_video(raw_path, compressed_path)
-        except MediaProcessingError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not process this file — make sure it's a valid video file.",
-            )
+        except MediaProcessingError as exc:
+            raise media_processing_http_error(exc, noun="file")
 
         compressed_bytes = Path(compressed_path).read_bytes()
 

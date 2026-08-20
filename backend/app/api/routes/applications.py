@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_recruiter_profile, get_current_talent_profile
 from app.core.config import settings
 from app.core.email import send_email
-from app.core.upload_limits import enforce_upload_size, enforce_video_duration
+from app.core.upload_limits import enforce_upload_size, enforce_video_duration, media_processing_http_error
 from app.core.media_processing import (
     MediaProcessingError,
     compress_audio,
@@ -133,11 +133,8 @@ def apply_to_casting_call_with_upload(
                 compress_video(raw_path, compressed_path)
             else:
                 compress_audio(raw_path, compressed_path)
-        except MediaProcessingError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not process this file — make sure it's a valid video/audio file.",
-            )
+        except MediaProcessingError as exc:
+            raise media_processing_http_error(exc, noun="file")
 
         compressed_bytes = Path(compressed_path).read_bytes()
 
@@ -182,20 +179,14 @@ def upload_audition_recording(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Recordings must be {MAX_AUDITION_RECORDING_SECONDS} seconds or shorter (this one is {int(duration)}s).",
                 )
-        except MediaProcessingError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not process this recording — try recording again.",
-            )
+        except MediaProcessingError as exc:
+            raise media_processing_http_error(exc, noun="recording")
 
         compressed_path = os.path.join(tmpdir, "compressed.m4a")
         try:
             compress_audio(vocal_path, compressed_path)
-        except MediaProcessingError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not process this recording — try recording again.",
-            )
+        except MediaProcessingError as exc:
+            raise media_processing_http_error(exc, noun="recording")
 
         compressed_bytes = Path(compressed_path).read_bytes()
 

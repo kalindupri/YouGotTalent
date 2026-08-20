@@ -16,6 +16,7 @@ one job while a cap on count leaves it complete but bounded.
 from fastapi import HTTPException, status
 
 from app.core.config import settings
+from app.core.media_processing import MediaProcessingError, MediaProcessingTimeout
 
 PREMIUM_TIER = "premium"
 
@@ -60,3 +61,21 @@ def enforce_video_duration(duration: float, tier: str | None) -> None:
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"Videos must be {limit} seconds or shorter (this one is {int(duration)}s).{upgrade_hint}",
     )
+
+
+def media_processing_http_error(exc: MediaProcessingError, *, noun: str = "file") -> HTTPException:
+    """Turn an ffmpeg failure into the right 400 for the user.
+
+    A timeout is our resource limit, not their mistake -- telling someone their perfectly good
+    video is invalid when we simply ran out of CPU sends them off to re-export it for nothing.
+    The underlying ffmpeg stderr is already logged by media_processing; it is deliberately not
+    echoed to the client, since it leaks paths and tool internals.
+    """
+    if isinstance(exc, MediaProcessingTimeout):
+        detail = (
+            f"This {noun} took too long for us to process. Try a shorter clip, or export it at a "
+            "smaller size — 720p is plenty for an audition."
+        )
+    else:
+        detail = f"Could not process this {noun} — make sure it's a valid video/audio file."
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)

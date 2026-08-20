@@ -320,3 +320,61 @@ def test_tier_limit_helpers_agree_with_settings():
     # An unknown/None tier must fall to the free limits, never the premium ones.
     assert max_video_duration_for(None) == settings.MAX_VIDEO_DURATION_SECONDS
     assert max_upload_size_for("nonsense") == settings.MAX_UPLOAD_SIZE_BYTES
+
+
+# --- Diagnosing processing failures ---------------------------------------------------------
+#
+# Every upload route catches MediaProcessingError to build a user-facing message. Before these,
+# ffmpeg's stderr was discarded at that point, so a failing upload left nothing in the logs to
+# explain it -- the 400 was all anyone, user or operator, ever saw.
+
+def test_ffmpeg_stderr_is_logged_when_processing_fails(tmp_path, caplog):
+    import logging
+
+    from app.core.media_processing import MediaProcessingError, compress_video
+
+    bogus = tmp_path / "notavideo.mov"
+    bogus.write_bytes(b"\x00" * 4096)
+
+    with caplog.at_level(logging.WARNING, logger="app.core.media_processing"):
+        try:
+            compress_video(str(bogus), str(tmp_path / "out.mp4"))
+        except MediaProcessingError:
+            pass
+
+    logged = "\n".join(r.getMessage() for r in caplog.records)
+    assert "ffmpeg exited" in logged
+    # The actual reason has to survive, not just the fact that something failed.
+    assert "moov atom not found" in logged or "Invalid data" in logged
+
+
+def test_processing_timeout_is_not_reported_as_an_invalid_file():
+    from app.core.media_processing import MediaProcessingError, MediaProcessingTimeout
+    from app.core.upload_limits import media_processing_http_error
+
+    timeout = media_processing_http_error(MediaProcessingTimeout("x"), noun="file")
+    invalid = media_processing_http_error(MediaProcessingError("x"), noun="file")
+
+    # Running out of our own CPU budget must not tell someone their good video is broken.
+    assert "took too long" in timeout.detail
+    assert "valid" not in timeout.detail
+    assert "valid" in invalid.detail
+    assert timeout.status_code == invalid.status_code == 400
+
+
+def test_processing_timeout_scales_with_the_longest_clip_we_accept():
+    from app.core.config import settings
+    from app.core.media_processing import COMPRESS_TIMEOUT_SECONDS
+
+    # Derived, not hardcoded: raising a duration cap must never leave uploads timing out. The
+    # API runs on 0.5 vCPU, where a detailed 1080p source transcodes at roughly real time.
+    assert COMPRESS_TIMEOUT_SECONDS >= settings.PREMIUM_MAX_VIDEO_DURATION_SECONDS * 4
+
+
+def test_ffmpeg_stderr_is_never_echoed_to_the_client():
+    from app.core.media_processing import MediaProcessingError
+    from app.core.upload_limits import media_processing_http_error
+
+    exc = MediaProcessingError("/app/private_uploads/secret.mov: Invalid data at 0x7fff")
+    detail = media_processing_http_error(exc, noun="file").detail
+    assert "private_uploads" not in detail and "0x7fff" not in detail

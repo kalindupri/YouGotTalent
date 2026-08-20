@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_optional_current_user, get_current_talent_profile, get_optional_viewer_role
 from app.core.content_visibility import is_visible_to
 from app.core.talent_eligibility import require_engageable
-from app.core.upload_limits import enforce_upload_size, enforce_video_duration
+from app.core.upload_limits import enforce_upload_size, enforce_video_duration, media_processing_http_error
 from app.core.media_processing import MediaProcessingError, compress_audio, compress_photo, compress_video, probe_video_duration
 from app.core.storage import delete_media_file, upload_media_file
 from app.crud.library_item import create_library_item, delete_library_item, get_library_item, list_library_items
@@ -87,11 +87,8 @@ def upload_my_library_item(
                 compress_audio(raw_path, compressed_path)
             else:
                 compress_photo(raw_path, compressed_path)
-        except MediaProcessingError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not process this file — make sure it's a valid photo/video/audio file.",
-            )
+        except MediaProcessingError as exc:
+            raise media_processing_http_error(exc, noun="file")
 
         compressed_bytes = Path(compressed_path).read_bytes()
 

@@ -2,14 +2,31 @@
 and egress costs down. Requires the ffmpeg binary (installed in the backend Docker image).
 """
 import json
+import logging
 import re
 import subprocess
 
-COMPRESS_TIMEOUT_SECONDS = 180
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Derived from the longest clip we accept rather than hardcoded, so raising a duration cap can
+# never silently leave uploads timing out. The multiplier is deliberately generous: the API runs
+# on 0.5 vCPU in Azure, where a detailed 1080p source transcodes at roughly real time or worse,
+# and formats like ProRes cost more again to decode.
+COMPRESS_TIMEOUT_SECONDS = max(300, settings.PREMIUM_MAX_VIDEO_DURATION_SECONDS * 6)
 
 
 class MediaProcessingError(Exception):
     pass
+
+
+class MediaProcessingTimeout(MediaProcessingError):
+    """Ran out of time rather than hitting anything wrong with the file.
+
+    Kept distinct so the user isn't told their perfectly good video is invalid when what
+    actually happened is that our own CPU budget ran out.
+    """
 
 
 def probe_video_duration(path: str) -> float:
@@ -36,7 +53,7 @@ def probe_video_duration(path: str) -> float:
             timeout=COMPRESS_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
-        raise MediaProcessingError("Could not read this video's duration") from exc
+        raise MediaProcessingTimeout("Could not read this video's duration") from exc
 
     if result.returncode == 0:
         try:
@@ -55,7 +72,7 @@ def _probe_duration_by_decoding(path: str) -> float:
             timeout=COMPRESS_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
-        raise MediaProcessingError("Could not read this video's duration") from exc
+        raise MediaProcessingTimeout("Could not read this video's duration") from exc
 
     stderr = result.stderr.decode(errors="replace")
     matches = re.findall(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)", stderr)
@@ -135,7 +152,8 @@ def _remux_if_already_web_ready(input_path: str, output_path: str) -> bool:
         _run_ffmpeg(["-i", input_path, "-c", "copy", "-movflags", "+faststart", output_path])
     except MediaProcessingError:
         # Not every conformant-looking stream remuxes cleanly into mp4 -- fall back rather than
-        # failing the upload.
+        # failing the upload. _run_ffmpeg already logged the reason at warning level.
+        logger.info("remux fast path declined for %s; falling back to a full transcode", input_path)
         return False
     return True
 
@@ -186,7 +204,14 @@ def _run_ffmpeg(args: list[str]) -> None:
             timeout=COMPRESS_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
-        raise MediaProcessingError("Processing this file took too long") from exc
+        logger.warning("ffmpeg timed out after %ss: %s", COMPRESS_TIMEOUT_SECONDS, " ".join(args))
+        raise MediaProcessingTimeout("Processing this file took too long") from exc
 
     if result.returncode != 0:
-        raise MediaProcessingError(result.stderr.decode(errors="replace")[-2000:])
+        stderr = result.stderr.decode(errors="replace")[-2000:]
+        # Logged here rather than at the call sites, which catch MediaProcessingError to build a
+        # user-facing message and would otherwise discard the only explanation of what failed.
+        logger.warning(
+            "ffmpeg exited %s | args: %s | stderr: %s", result.returncode, " ".join(args), stderr
+        )
+        raise MediaProcessingError(stderr)
