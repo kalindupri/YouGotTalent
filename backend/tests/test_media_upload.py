@@ -378,3 +378,58 @@ def test_ffmpeg_stderr_is_never_echoed_to_the_client():
     exc = MediaProcessingError("/app/private_uploads/secret.mov: Invalid data at 0x7fff")
     detail = media_processing_http_error(exc, noun="file").detail
     assert "private_uploads" not in detail and "0x7fff" not in detail
+
+
+# --- Memory safety --------------------------------------------------------------------------
+#
+# A .mov upload died on UAT with "ffmpeg exited -9" -- SIGKILL, i.e. the OOM killer, with x264
+# reporting threads=6. ffmpeg sizes its pool from the *node's* cores (12) rather than the 0.5
+# vCPU the container is limited to, and it shares that container's 1GiB with uvicorn and, until
+# this was fixed, the whole uploaded file held in memory.
+
+def test_video_transcode_bounds_its_thread_pool(monkeypatch):
+    from app.core import media_processing
+    from app.core.config import settings
+
+    captured: list[list[str]] = []
+    monkeypatch.setattr(media_processing, "_run_ffmpeg", lambda args: captured.append(args))
+    # Force the slow path; the remux fast path doesn't encode and so isn't the memory risk.
+    monkeypatch.setattr(media_processing, "_remux_if_already_web_ready", lambda i, o: False)
+
+    media_processing.compress_video("in.mov", "out.mp4")
+
+    args = captured[0]
+    assert args.count("-threads") == 2, "decoder and encoder each need bounding"
+    assert all(args[i + 1] == str(settings.FFMPEG_THREADS) for i, a in enumerate(args) if a == "-threads")
+    assert "-filter_threads" in args, "the scale filter keeps its own pool"
+
+
+def test_audio_and_photo_transcodes_bound_their_thread_pools(monkeypatch):
+    from app.core import media_processing
+
+    captured: list[list[str]] = []
+    monkeypatch.setattr(media_processing, "_run_ffmpeg", lambda args: captured.append(args))
+
+    media_processing.compress_audio("in.mov", "out.m4a")
+    media_processing.compress_photo("in.jpg", "out.jpg")
+
+    for args in captured:
+        assert "-threads" in args
+
+
+def test_uploads_are_streamed_to_disk_not_read_into_memory():
+    """The upload routes must not materialise a whole file in RAM before ffmpeg runs.
+
+    Enforced by reading the source: a 150MB upload buffered whole is a large slice of a 1GiB
+    container, and it lands exactly when ffmpeg is about to need its own working set.
+    """
+    from pathlib import Path
+
+    routes = Path(__file__).resolve().parent.parent / "app" / "api" / "routes"
+    offenders = [
+        p.name
+        for p in routes.glob("*.py")
+        if "out.write(file.file.read())" in p.read_text(encoding="utf-8")
+        or "out.write(upload.file.read())" in p.read_text(encoding="utf-8")
+    ]
+    assert offenders == [], f"these routes still buffer the whole upload: {offenders}"

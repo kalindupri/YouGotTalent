@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import uuid
 from pathlib import Path
@@ -123,7 +124,9 @@ def apply_to_casting_call_with_upload(
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_path = os.path.join(tmpdir, f"raw{raw_suffix}")
         with open(raw_path, "wb") as out:
-            out.write(file.file.read())
+            # Copied in chunks rather than read() -- a 150MB upload held whole in RAM is a
+            # large slice of this container's 1GiB, right before ffmpeg needs its own.
+            shutil.copyfileobj(file.file, out, 1024 * 1024)
 
         compressed_path = os.path.join(tmpdir, f"compressed{out_suffix}")
         try:
@@ -170,7 +173,9 @@ def upload_audition_recording(
     with tempfile.TemporaryDirectory() as tmpdir:
         vocal_path = os.path.join(tmpdir, f"vocal{raw_suffix}")
         with open(vocal_path, "wb") as out:
-            out.write(file.file.read())
+            # Copied in chunks rather than read() -- a 150MB upload held whole in RAM is a
+            # large slice of this container's 1GiB, right before ffmpeg needs its own.
+            shutil.copyfileobj(file.file, out, 1024 * 1024)
 
         try:
             duration = probe_video_duration(vocal_path)

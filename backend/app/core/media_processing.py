@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 # and formats like ProRes cost more again to decode.
 COMPRESS_TIMEOUT_SECONDS = max(300, settings.PREMIUM_MAX_VIDEO_DURATION_SECONDS * 6)
 
+# Applied to decode and encode separately: -threads before -i bounds the decoder, -threads
+# before the output bounds the encoder. Both matter -- a 10-bit 4:2:2 source decodes into
+# ~8MB frames, so the decoder's buffers are as expensive as x264's.
+_THREADS = ["-threads", str(settings.FFMPEG_THREADS)]
+
 
 class MediaProcessingError(Exception):
     pass
@@ -67,7 +72,7 @@ def probe_video_duration(path: str) -> float:
 def _probe_duration_by_decoding(path: str) -> float:
     try:
         result = subprocess.run(
-            ["ffmpeg", "-i", path, "-f", "null", "-"],
+            ["ffmpeg", *_THREADS, "-i", path, "-f", "null", "-"],
             capture_output=True,
             timeout=COMPRESS_TIMEOUT_SECONDS,
         )
@@ -163,10 +168,14 @@ def compress_video(input_path: str, output_path: str) -> None:
         return
     _run_ffmpeg(
         [
+            *_THREADS,
             "-i", input_path,
             # Downscale anything wider than 1280px; never upscale. -2 keeps height even (required
             # by libx264's yuv420p).
             "-vf", "scale='min(1280,iw)':-2",
+            # Bounds the scale filter's own worker pool, which is separate from -threads.
+            "-filter_threads", str(settings.FFMPEG_THREADS),
+            *_THREADS,
             "-c:v", "libx264",
             "-preset", "veryfast",
             "-crf", "26",
@@ -181,15 +190,18 @@ def compress_video(input_path: str, output_path: str) -> None:
 
 
 def compress_audio(input_path: str, output_path: str) -> None:
-    _run_ffmpeg(["-i", input_path, "-vn", "-c:a", "aac", "-b:a", "128k", output_path])
+    _run_ffmpeg([*_THREADS, "-i", input_path, "-vn", *_THREADS, "-c:a", "aac", "-b:a", "128k", output_path])
 
 
 def compress_photo(input_path: str, output_path: str) -> None:
     _run_ffmpeg(
         [
+            *_THREADS,
             "-i", input_path,
             # Downscale anything wider than 1600px; never upscale.
             "-vf", "scale='min(1600,iw)':-1",
+            "-filter_threads", str(settings.FFMPEG_THREADS),
+            *_THREADS,
             "-q:v", "4",
             output_path,
         ]
@@ -209,6 +221,13 @@ def _run_ffmpeg(args: list[str]) -> None:
 
     if result.returncode != 0:
         stderr = result.stderr.decode(errors="replace")[-2000:]
+        if result.returncode < 0:
+            logger.error(
+                "ffmpeg was killed by signal %s (most likely the OOM killer -- check the "
+                "container memory limit against FFMPEG_THREADS): %s",
+                -result.returncode,
+                " ".join(args),
+            )
         # Logged here rather than at the call sites, which catch MediaProcessingError to build a
         # user-facing message and would otherwise discard the only explanation of what failed.
         logger.warning(

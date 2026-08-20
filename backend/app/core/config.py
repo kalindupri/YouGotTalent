@@ -68,6 +68,13 @@ class Settings(BaseSettings):
     MAX_VIDEO_DURATION_SECONDS: int = 30
     PREMIUM_MAX_VIDEO_DURATION_SECONDS: int = 120
 
+    # ffmpeg sizes its thread pool from the host's core count, which in a container is the
+    # *node's* cores (12 on our Azure nodes) and not the 0.5 vCPU we're actually limited to.
+    # Six x264 threads plus lookahead buffers overran the 1GiB memory cap and the kernel
+    # SIGKILLed ffmpeg mid-encode, surfacing as "could not process this file". Beyond a couple
+    # of threads there is nothing to gain on half a core anyway -- it only costs memory.
+    FFMPEG_THREADS: int = 2
+
     # Azure Blob Storage for uploaded video/audio auditions. If unset (e.g. local dev), uploads
     # fall back to local disk served by this app itself — see app/core/storage.py.
     AZURE_STORAGE_CONNECTION_STRING: str | None = None
