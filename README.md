@@ -37,6 +37,13 @@ You'll need these installed locally (none were found on this machine):
 
 ## Running with Docker (recommended)
 
+**This is the test environment.** There is no hosted UAT site any more — the Azure
+`test.yougottalent.lk` deployment was retired because its two container apps were roughly 95%
+of the Azure bill while duplicating what CI already proves: the UAT pipeline stands this same
+stack up on the GitHub runner and runs all 80 Playwright specs against it on every push to
+`uat`. Test changes here, and let the pipeline gate the merge to `main`.
+
+
 ```bash
 cp .env.example .env
 docker compose up --build
