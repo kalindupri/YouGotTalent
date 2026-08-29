@@ -1,7 +1,12 @@
 # Runs on every push to uat: backend unit tests + Playwright E2E, then (only if both pass)
-# deploys to UAT (rg-ygt-dev / test.yougottalent.lk), posts the change set + result to Discord,
-# and polls for a human "Approved" reply before fast-forward-merging uat into main — which in
-# turn triggers main-deploy.yml to push the same commit to production.
+# posts the change set to Discord and polls for a human "Approved" reply before
+# fast-forward-merging uat into main — which in turn triggers main-deploy.yml to push the same
+# commit to production.
+#
+# There is deliberately no hosted UAT deploy. The Azure UAT environment was retired in favour of
+# running the stack locally with `docker compose up` (see README): the two container apps were
+# ~95% of the Azure bill, and CI already exercises the same stack on the runner, so a second
+# hosted copy was paying to duplicate what the e2e job proves on every push.
 name: UAT Pipeline
 
 on:
@@ -14,11 +19,6 @@ permissions:
   packages: write
   id-token: write
   actions: write  # needed by merge-to-main's "Trigger production deploy" API dispatch call
-
-env:
-  RESOURCE_GROUP: rg-ygt-dev
-  BACKEND_APP_NAME: ygt-backend
-  FRONTEND_APP_NAME: ygt-frontend
 
 jobs:
   test:
@@ -93,68 +93,9 @@ jobs:
           path: e2e/report
           retention-days: 14
 
-  deploy-uat:
-    runs-on: ubuntu-latest
-    needs: e2e
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/ygt-backend:uat-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Update UAT backend
-        run: |
-          az containerapp update --name ${{ env.BACKEND_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ghcr.io/${{ github.repository_owner }}/ygt-backend:uat-${{ github.sha }}
-
-      - name: Get backend FQDN
-        id: backend
-        run: |
-          FQDN=$(az containerapp show --name ${{ env.BACKEND_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query properties.configuration.ingress.fqdn -o tsv)
-          echo "fqdn=$FQDN" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          # uat- prefix keeps this distinct from main-deploy.yml's tag for the same commit --
-          # they build the frontend with different NEXT_PUBLIC_API_URL values baked in, and a
-          # shared tag meant whichever workflow pushed last silently overwrote the other's
-          # image in the registry, breaking whichever environment pulled it next.
-          tags: ghcr.io/${{ github.repository_owner }}/ygt-frontend:uat-${{ github.sha }}
-          build-args: |
-            NEXT_PUBLIC_API_URL=https://${{ steps.backend.outputs.fqdn }}/api/v1
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Update UAT frontend
-        run: |
-          az containerapp update --name ${{ env.FRONTEND_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ghcr.io/${{ github.repository_owner }}/ygt-frontend:uat-${{ github.sha }}
-
   request-approval:
     runs-on: ubuntu-latest
-    needs: deploy-uat
+    needs: e2e
     outputs:
       approved: ${{ steps.approval.outputs.approved }}
     steps:
