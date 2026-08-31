@@ -1,21 +1,40 @@
-# Runs the marketing auto-poster pipeline on a timer: asks for a topic in Discord (rate-limited
-# to ~once/day inside the backend itself, see MARKETING_MIN_HOURS_BETWEEN_TOPICS), picks up a
-# human's reply and turns it into a branded draft, and checks Discord reactions to publish
-# approved drafts to Facebook. This app has no built-in cron, so an external scheduler has to
-# call these two endpoints — see backend/app/api/routes/marketing.py.
+# Marketing auto-poster: asks for a topic in Discord (rate-limited to ~once/day inside the
+# backend itself, see MARKETING_MIN_HOURS_BETWEEN_TOPICS), turns a human's reply into a branded
+# draft, and checks Discord reactions to publish approved drafts to Facebook. This app has no
+# built-in cron, so an external scheduler has to call the two endpoints in
+# backend/app/api/routes/marketing.py.
+#
+# THE SCHEDULE IS DELIBERATELY OFF.
+#
+# It used to run every 30 minutes against the UAT backend, which was the only environment ever
+# configured for this: MARKETING_CRON_SECRET and the Facebook credentials were set there and
+# nowhere else. Retiring the Azure UAT environment left this pointing at a host that no longer
+# resolves, so every run failed.
+#
+# To turn it back on, in this order:
+#   1. Set MARKETING_CRON_SECRET and the Facebook/Discord marketing vars on the target backend
+#      (production currently has DISCORD_BOT_TOKEN only, so a run against it would 401).
+#   2. Decide whether posts should actually go out publicly from that environment.
+#   3. Restore the `schedule:` trigger below.
+# Until then it is manual-only, and the target must be given explicitly -- there is no default,
+# so it cannot silently resume posting to the wrong place.
 name: Marketing Auto-Poster
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
+  # schedule:
+  #   - cron: '*/30 * * * *'
   workflow_dispatch:
-
-env:
-  BACKEND_URL: https://ygt-backend.icysmoke-0f0ee613.centralus.azurecontainerapps.io
+    inputs:
+      backend_url:
+        description: 'Backend base URL to drive (e.g. https://ygt-backend-prod.<region>.azurecontainerapps.io)'
+        required: true
+        type: string
 
 jobs:
   advance-pipeline:
     runs-on: ubuntu-latest
+    env:
+      BACKEND_URL: ${{ inputs.backend_url }}
     steps:
       - name: Advance marketing pipeline (ask topic / turn reply into draft)
         run: |
