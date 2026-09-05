@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { badgeClass, btnPrimary, btnSecondary, btnSmall, eyebrowClass, formatCategory, inputClass, invitationStatusTone, labelClass } from "@/lib/ui";
+import ApplicationTree from "@/components/dashboard/ApplicationTree";
 import SubmissionPreview from "@/components/SubmissionPreview";
 import SendOfferForm from "@/components/SendOfferForm";
 
@@ -39,6 +40,7 @@ export default function ManageCastingCallPage() {
   const { token } = useAuth();
   const [call, setCall] = useState<CastingCall | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [groupBy, setGroupBy] = useState<"status" | "role">("status");
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -162,7 +164,26 @@ export default function ManageCastingCallPage() {
         </div>
       ) : (
         <>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            {/* By role is the better view once a hunt has more than one part, but the status
+                board is what recruiters already know -- so it stays, and this switches. */}
+            <div className="flex gap-1 rounded-md border-2 border-zinc-200 p-1 dark:border-zinc-800">
+              {(["status", "role"] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGroupBy(g)}
+                  aria-pressed={groupBy === g}
+                  className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    groupBy === g
+                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  }`}
+                >
+                  {g === "status" ? "By status" : "By role"}
+                </button>
+              ))}
+            </div>
             <input
               placeholder="Search by talent name"
               value={search}
@@ -175,6 +196,13 @@ export default function ManageCastingCallPage() {
               {isPremium && <option value="match_score">Best match</option>}
             </select>
           </div>
+          {groupBy === "role" ? (
+            <ApplicationTree
+              roles={call?.roles ?? []}
+              applications={visibleApplications}
+              onOpen={() => setGroupBy("status")}
+            />
+          ) : (
           <div className="mt-4 grid grid-cols-1 gap-4 overflow-x-auto sm:grid-cols-2 lg:grid-cols-4">
             {COLUMNS.map((column) => {
               const columnApplications = visibleApplications.filter((a) => a.status === column.status);
@@ -209,6 +237,7 @@ export default function ManageCastingCallPage() {
               );
             })}
           </div>
+          )}
         </>
       )}
 

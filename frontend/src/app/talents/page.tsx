@@ -3,10 +3,10 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Save, ShieldCheck, Sparkles } from "lucide-react";
+import { PlayCircle, Save, ShieldCheck, Sparkles } from "lucide-react";
 import { ApiError, api, CastingCall, TALENT_CATEGORIES, TalentCategory, TalentProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import {
+import { badgeClass,
   btnSecondary,
   btnSmall,
   cardClass,
@@ -422,6 +422,25 @@ function TalentsPageContent() {
                     </span>
                   ))}
                   {t.city && <span className="text-xs text-zinc-500">{t.city}</span>}
+                  {t.age !== null && <span className="text-xs text-zinc-500">{t.age}</span>}
+                </div>
+                {/* Two signals that change what a recruiter can do next, and that currently only
+                    surface after opening the profile. An audition clip is the thing they came for;
+                    an under-18 means the contract routes to a guardian to countersign. Both are
+                    derived from what the public payload already carries -- a minor only appears in
+                    these results at all once their guardian consent has been approved, so showing
+                    the age is not leaking anything the listing did not already imply. */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {t.media.some((m) => m.media_type === "video") || t.intro_video_url ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                      <PlayCircle className="h-3.5 w-3.5" /> Has a clip
+                    </span>
+                  ) : (
+                    <span className="text-xs text-zinc-400">No clip yet</span>
+                  )}
+                  {t.age !== null && t.age < 18 && (
+                    <span className={badgeClass("info")}>Guardian-managed</span>
+                  )}
                 </div>
                 {t.skills && t.skills.length > 0 && (
                   <p className="mt-2 truncate text-xs text-zinc-500">{t.skills.slice(0, 3).join(" · ")}</p>

@@ -43,7 +43,12 @@ test("premium talent adds a reel and it appears on their public profile", async 
   await page.getByRole("link", { name: /Reels Premium Talent/ }).first().click();
   await expect(page.getByRole("heading", { name: "Reels", exact: true })).toBeVisible();
   await expect(page.getByText("On set today")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Watch on TikTok/ })).toBeVisible();
+  // TikTokEmbed shows a skeleton until the oEmbed lookup resolves, and that lookup is a real
+  // call to TikTok through the backend proxy -- measured here at anywhere from 2s to 13s. This
+  // URL is deliberately fake, so the assertion is on the fallback link that appears once the
+  // lookup FAILS; with the default 5s timeout the test was failing roughly half the time on
+  // TikTok being slow rather than on anything in the app.
+  await expect(page.getByRole("link", { name: /Watch on TikTok/ })).toBeVisible({ timeout: 20_000 });
 });
 
 test("a real TikTok reel plays in-app on the public profile instead of just linking out", async ({ page }) => {
