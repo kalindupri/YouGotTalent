@@ -24,7 +24,7 @@ export default function CommunityHubPage() {
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:40px_40px]" />
         <div className="relative mx-auto max-w-4xl px-6 py-16 text-center">
           <span className={eyebrowClass}>Community</span>
-          <h1 className="mt-4 font-heading text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
+          <h1 className="mt-4 font-heading text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
             Talk shop. Rate the work.
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-zinc-400">

@@ -10,7 +10,7 @@ export default function Footer() {
             YT
           </span>
           <div>
-            <p className="font-heading text-sm font-black uppercase tracking-tight text-white">YouGotTalent</p>
+            <p className="font-heading text-sm font-extrabold tracking-tight text-white">YouGotTalent</p>
             <p className="text-xs text-zinc-500">Every skill. One stage.</p>
           </div>
         </div>

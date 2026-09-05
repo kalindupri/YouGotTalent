@@ -57,7 +57,7 @@ export default function NewTitlePage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-14">
-      <h1 className="font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+      <h1 className="font-heading text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
         Add a title
       </h1>
       <p className="mt-2 text-zinc-500">Add a film, TV series, or song for the community to rate and critique.</p>

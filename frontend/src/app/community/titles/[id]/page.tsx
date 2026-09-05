@@ -172,7 +172,7 @@ export default function TitleDetailPage() {
           <div className="flex-1">
             <span className="text-xs font-bold uppercase tracking-widest text-rose-400">{WORK_TYPE_LABELS[title.work_type]}</span>
             <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
-              <h1 className="font-heading text-3xl font-black text-white sm:text-4xl">{title.name}</h1>
+              <h1 className="font-heading text-3xl font-extrabold text-white sm:text-4xl">{title.name}</h1>
               <div className="flex items-center gap-3">
                 {user && user.id === title.added_by_user_id && (
                   <>
@@ -221,7 +221,7 @@ export default function TitleDetailPage() {
                 <div>
                   {title.average_rating != null ? (
                     <>
-                      <p className="font-heading text-3xl font-black leading-none text-white">
+                      <p className="font-heading text-3xl font-extrabold leading-none text-white">
                         {title.average_rating.toFixed(1)}
                         <span className="text-base font-medium text-zinc-500">/5</span>
                       </p>

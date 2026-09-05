@@ -36,7 +36,7 @@ export default function MessagesInboxPage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-14">
       <span className={eyebrowClass}>Inbox</span>
-      <h1 className="mt-2 font-heading text-4xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+      <h1 className="mt-2 font-heading text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
         Messages
       </h1>
 

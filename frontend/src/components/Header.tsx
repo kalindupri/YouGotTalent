@@ -114,7 +114,7 @@ export default function Header() {
           <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-rose-600 text-sm font-black text-white">
             YT
           </span>
-          <span className="font-heading text-lg font-black uppercase tracking-tight text-white">
+          <span className="font-heading text-lg font-extrabold tracking-tight text-white">
             YouGotTalent
           </span>
         </Link>

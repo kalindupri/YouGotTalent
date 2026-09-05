@@ -36,7 +36,7 @@ export default function Home() {
           <span className={eyebrowClass}>
             <MapPin className="mr-1 inline h-3 w-3" /> Sri Lanka&apos;s talent marketplace
           </span>
-          <h1 className="mt-8 max-w-3xl font-heading text-5xl font-black uppercase leading-[1.05] tracking-tight text-white sm:text-6xl md:text-7xl">
+          <h1 className="mt-8 max-w-3xl font-heading text-5xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl md:text-7xl">
             Every skill.
             <br />
             <span className="text-rose-500">One stage.</span>
@@ -66,7 +66,7 @@ export default function Home() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-6 py-20">
-        <h2 className="text-center font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+        <h2 className="text-center font-heading text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
           Browse by category
         </h2>
         <p className="mt-2 text-center text-zinc-500">Whatever your craft, there&apos;s a home for it here.</p>
@@ -91,7 +91,7 @@ export default function Home() {
       {featured.length > 0 && (
         <section className="mx-auto w-full max-w-6xl px-6 pb-20">
           <div className="flex items-center justify-between">
-            <h2 className="font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+            <h2 className="font-heading text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
               Featured talent
             </h2>
             <Link href="/talents" className="text-sm font-bold uppercase tracking-wide text-rose-600 hover:underline">
@@ -130,7 +130,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div>
               <span className={eyebrowClass}>New</span>
-              <h2 className="mt-3 font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+              <h2 className="mt-3 font-heading text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
                 Rate &amp; critique
               </h2>
               <p className="mt-2 text-zinc-500">Sri Lanka's films, TV series, and songs — rated by the industry.</p>
@@ -165,7 +165,7 @@ export default function Home() {
 
       <section className="bg-zinc-950">
         <div className="mx-auto max-w-6xl px-6 py-20">
-          <h2 className="text-center font-heading text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
+          <h2 className="text-center font-heading text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
             How it works
           </h2>
           <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-3">
@@ -199,7 +199,7 @@ export default function Home() {
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex items-center gap-2 rounded-md border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-200">
-      <span className="font-heading text-lg font-black text-rose-500">{value}</span>
+      <span className="font-heading text-lg font-extrabold text-rose-500">{value}</span>
       {label}
     </div>
   );

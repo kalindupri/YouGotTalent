@@ -214,7 +214,7 @@ function TalentsPageContent() {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
-      <h1 className="font-heading text-4xl font-black uppercase tracking-tight text-zinc-900 sm:text-5xl dark:text-zinc-50">
+      <h1 className="font-heading text-4xl font-extrabold tracking-tight text-zinc-900 sm:text-5xl dark:text-zinc-50">
         Browse talent
       </h1>
       <p className="mt-2 text-zinc-500">

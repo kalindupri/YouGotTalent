@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
         <span className="flex h-10 w-10 items-center justify-center rounded-sm bg-rose-600 text-sm font-black text-white">
           YT
         </span>
-        <h1 className="mt-4 font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h1 className="mt-4 font-heading text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
           Check your email
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
       <span className="flex h-10 w-10 items-center justify-center rounded-sm bg-rose-600 text-sm font-black text-white">
         YT
       </span>
-      <h1 className="mt-4 font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+      <h1 className="mt-4 font-heading text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
         Forgot password
       </h1>
       <p className="mt-1 text-sm text-zinc-500">

@@ -22,7 +22,7 @@ export default function ComingSoonPage() {
       />
 
       <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-7">
-        <div className="font-heading flex items-center gap-2 text-lg font-black uppercase tracking-tight">
+        <div className="font-heading flex items-center gap-2 text-lg font-extrabold tracking-tight">
           <span className="flex h-8 w-8 items-center justify-center rounded bg-rose-600 text-sm">Y</span>
           YouGotTalent
         </div>
@@ -32,7 +32,7 @@ export default function ComingSoonPage() {
         <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-widest text-zinc-400">
           Sri Lanka&apos;s talent marketplace
         </span>
-        <h1 className="font-heading mt-7 text-5xl font-black uppercase leading-[1.02] tracking-tight sm:text-7xl">
+        <h1 className="font-heading mt-7 text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-7xl">
           Every skill.
           <br />
           <span className="text-rose-400">One stage.</span>

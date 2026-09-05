@@ -39,16 +39,16 @@ export function coverPhotoUrl(media: Media[]): string | undefined {
 }
 
 export const btnPrimary =
-  "inline-flex items-center justify-center gap-1.5 rounded-md bg-rose-600 px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-all hover:bg-rose-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-md bg-rose-600 px-6 py-3 text-[15px] font-bold text-white shadow-sm transition-all hover:bg-rose-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50";
 
 export const btnSecondary =
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border-2 border-zinc-900 bg-transparent px-6 py-3 text-sm font-bold uppercase tracking-wide text-zinc-900 transition-all hover:bg-zinc-900 hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-100 dark:hover:text-zinc-900";
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border-2 border-zinc-900 bg-transparent px-6 py-3 text-[15px] font-bold text-zinc-900 transition-all hover:bg-zinc-900 hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-100 dark:hover:text-zinc-900";
 
 export const btnSmall =
-  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md border border-zinc-300 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-zinc-700 transition-colors hover:border-rose-500 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-500 dark:hover:text-rose-400";
+  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md border border-zinc-300 px-3.5 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:border-rose-500 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-500 dark:hover:text-rose-400";
 
 export const btnSmallPrimary =
-  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md bg-rose-600 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const eyebrowClass =
   "inline-flex items-center rounded-sm bg-zinc-900 px-3 py-1 text-xs font-bold uppercase tracking-widest text-white dark:bg-zinc-100 dark:text-zinc-900";

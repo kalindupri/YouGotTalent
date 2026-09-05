@@ -160,7 +160,7 @@ export default function DiscussionDetailPage() {
         <Icon className="h-3.5 w-3.5" /> {meta.label}
       </span>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="font-heading text-3xl font-black text-zinc-900 sm:text-4xl dark:text-zinc-50">{thread.subject}</h1>
+        <h1 className="font-heading text-3xl font-extrabold text-zinc-900 sm:text-4xl dark:text-zinc-50">{thread.subject}</h1>
         <div className="flex items-center gap-3">
           {user && user.id === thread.author_user_id && (
             <>

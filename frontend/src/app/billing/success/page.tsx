@@ -23,7 +23,7 @@ export default function BillingSuccessPage() {
       {isActive ? (
         <>
           <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-          <h1 className="mt-4 font-heading text-2xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="mt-4 font-heading text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
             You&apos;re on Premium
           </h1>
           <p className="mt-2 text-sm text-zinc-500">Your subscription is active. Head back to your dashboard to see what&apos;s unlocked.</p>
@@ -31,7 +31,7 @@ export default function BillingSuccessPage() {
       ) : (
         <>
           <Clock className="h-12 w-12 text-amber-500" />
-          <h1 className="mt-4 font-heading text-2xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="mt-4 font-heading text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
             Confirming your payment
           </h1>
           <p className="mt-2 text-sm text-zinc-500">

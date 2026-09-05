@@ -106,6 +106,7 @@ import HeadshotUploader from "@/components/HeadshotUploader";
 import SubmissionPreview from "@/components/SubmissionPreview";
 import DashboardSidebar, { DashboardNavItem } from "@/components/dashboard/DashboardSidebar";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
+import CreateProfileWizard from "@/components/dashboard/CreateProfileWizard";
 import UploadProgressBar from "@/components/UploadProgressBar";
 import type { UploadProgress } from "@/lib/api";
 import GuardianConsentCard from "@/components/dashboard/GuardianConsentCard";
@@ -132,6 +133,7 @@ export default function TalentDashboard() {
   const [activeSection, setActiveSection] = useState<TalentSection>("profile");
   const [profile, setProfile] = useState<MyTalentProfile | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
@@ -169,14 +171,19 @@ export default function TalentDashboard() {
 
   if (loading) return <p className="text-sm text-zinc-500">Loading…</p>;
 
-  if (notFound || !profile) {
+  // `onboarding` keeps the wizard mounted after the profile row exists: guardian consent and
+  // the headshot both need a profile to attach to, so creation happens mid-flow rather than at
+  // the end, and without this the dashboard would replace the wizard at step 3.
+  if (notFound || !profile || onboarding) {
     return (
-      <CreateProfileForm
+      <CreateProfileWizard
         token={token!}
         onCreated={(p) => {
           setProfile(p);
           setNotFound(false);
+          setOnboarding(true);
         }}
+        onFinished={() => setOnboarding(false)}
       />
     );
   }
@@ -390,115 +397,6 @@ export default function TalentDashboard() {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function CreateProfileForm({ token, onCreated }: { token: string; onCreated: (p: MyTalentProfile) => void }) {
-  const [displayName, setDisplayName] = useState("");
-  const [categories, setCategories] = useState<TalentCategory[]>(["acting"]);
-  const [city, setCity] = useState("");
-  const [bio, setBio] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [gender, setGender] = useState("");
-  const [skillsInput, setSkillsInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  function toggleCategory(c: TalentCategory) {
-    setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (categories.length === 0) {
-      setError("Select at least one category.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const profile = await api.createMyTalentProfile(
-        {
-          display_name: displayName,
-          categories,
-          city: city || null,
-          bio: bio || null,
-          date_of_birth: dateOfBirth,
-          gender: gender || null,
-          experience_years: null,
-          skills: parseSkills(skillsInput),
-        },
-        token
-      );
-      onCreated(profile);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create your profile.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className={sectionClass}>
-      <h2 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50">Create your talent profile</h2>
-      <p className="mt-1 text-sm text-zinc-500">
-        This is what talent hunts will see when they search for talent like you.
-      </p>
-      <form onSubmit={handleSubmit} className="mt-5 flex max-w-md flex-col gap-4">
-        <label className={labelClass}>
-          Display name
-          <input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} />
-        </label>
-        <div className={labelClass}>
-          Date of birth
-          <DateOfBirthInput required value={dateOfBirth} onChange={setDateOfBirth} />
-          <span className="mt-1 block text-xs font-normal text-zinc-500">
-            Never shown publicly — talent hunts only see your age. If you&apos;re under 18, a parent or
-            guardian must hold this account.
-          </span>
-        </div>
-        <label className={labelClass}>
-          Gender
-          <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
-            <option value="">Prefer not to say</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
-        </label>
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className={labelClass}>Categories — pick all that apply</legend>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {TALENT_CATEGORIES.map((c) => (
-              <label key={c} className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <input type="checkbox" checked={categories.includes(c)} onChange={() => toggleCategory(c)} />
-                {formatCategory(c)}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <label className={labelClass}>
-          {skillsQuestion(categories[0] ?? "acting").label} (comma separated)
-          <input
-            value={skillsInput}
-            onChange={(e) => setSkillsInput(e.target.value)}
-            placeholder={skillsQuestion(categories[0] ?? "acting").placeholder}
-            className={inputClass}
-          />
-        </label>
-        <label className={labelClass}>
-          City
-          <input value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} />
-        </label>
-        <label className={labelClass}>
-          Bio
-          <textarea rows={3} value={bio} onChange={(e) => setBio(e.target.value)} className={inputClass} />
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={submitting} className={`w-fit ${btnPrimary}`}>
-          {submitting ? "Creating…" : "Create profile"}
-        </button>
-      </form>
     </div>
   );
 }

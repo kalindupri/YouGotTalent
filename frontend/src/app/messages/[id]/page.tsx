@@ -91,7 +91,7 @@ export default function ConversationThreadPage() {
       <Link href="/messages" className="text-sm font-semibold text-rose-600 hover:underline">
         ← All messages
       </Link>
-      <h1 className="mt-2 font-heading text-2xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+      <h1 className="mt-2 font-heading text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
         {conversation?.other_party_name ?? "Conversation"}
       </h1>
 

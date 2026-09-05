@@ -54,7 +54,7 @@ function NewDiscussionPageContent() {
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-14">
-      <h1 className="font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+      <h1 className="font-heading text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
         Start a discussion
       </h1>
 

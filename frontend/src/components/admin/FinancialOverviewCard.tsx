@@ -55,19 +55,19 @@ export default function FinancialOverviewCard() {
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="font-heading text-2xl font-black text-rose-600">{overview.premium_talents}</p>
+          <p className="font-heading text-2xl font-extrabold text-rose-600">{overview.premium_talents}</p>
           <p className="mt-1 text-xs text-zinc-500">Premium talents</p>
         </div>
         <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="font-heading text-2xl font-black text-zinc-500">{overview.free_talents}</p>
+          <p className="font-heading text-2xl font-extrabold text-zinc-500">{overview.free_talents}</p>
           <p className="mt-1 text-xs text-zinc-500">Free talents</p>
         </div>
         <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="font-heading text-2xl font-black text-rose-600">{overview.premium_recruiters}</p>
+          <p className="font-heading text-2xl font-extrabold text-rose-600">{overview.premium_recruiters}</p>
           <p className="mt-1 text-xs text-zinc-500">Premium recruiters</p>
         </div>
         <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="font-heading text-2xl font-black text-zinc-500">{overview.free_recruiters}</p>
+          <p className="font-heading text-2xl font-extrabold text-zinc-500">{overview.free_recruiters}</p>
           <p className="mt-1 text-xs text-zinc-500">Free recruiters</p>
         </div>
       </div>

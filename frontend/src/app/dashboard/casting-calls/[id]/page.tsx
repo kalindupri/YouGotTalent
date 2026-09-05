@@ -108,7 +108,7 @@ export default function ManageCastingCallPage() {
       </Link>
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="font-heading text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
             {call?.title ?? "Casting call"}
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">

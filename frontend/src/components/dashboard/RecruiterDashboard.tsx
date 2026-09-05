@@ -222,17 +222,17 @@ export default function RecruiterDashboard() {
                 </h2>
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                    <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">{analytics.total_views}</p>
+                    <p className="font-heading text-2xl font-extrabold text-zinc-900 dark:text-zinc-50">{analytics.total_views}</p>
                     <p className="mt-1 text-xs text-zinc-500">Total views</p>
                   </div>
                   <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                    <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">
+                    <p className="font-heading text-2xl font-extrabold text-zinc-900 dark:text-zinc-50">
                       {analytics.total_applications}
                     </p>
                     <p className="mt-1 text-xs text-zinc-500">Total applications</p>
                   </div>
                   <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                    <p className="font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">
+                    <p className="font-heading text-2xl font-extrabold text-zinc-900 dark:text-zinc-50">
                       {analytics.response_rate}%
                     </p>
                     <p className="mt-1 text-xs text-zinc-500">Response rate</p>

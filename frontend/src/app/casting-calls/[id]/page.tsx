@@ -177,7 +177,7 @@ function CastingCallDetailContent() {
         {user && <ReportButton targetType="casting_call" targetId={call.id} />}
       </div>
 
-      <h1 className="mt-3 font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+      <h1 className="mt-3 font-heading text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
         {call.title}
       </h1>
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -219,7 +219,7 @@ function CastingCallDetailContent() {
 
       {call.audition_brief && (
         <div className="mt-6 rounded-xl border-2 border-rose-200 bg-rose-50 p-5 dark:border-rose-900 dark:bg-rose-950/20">
-          <h2 className="flex items-center gap-2 font-heading text-lg font-black uppercase tracking-tight text-rose-900 dark:text-rose-200">
+          <h2 className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight text-rose-900 dark:text-rose-200">
             <Clapperboard className="h-4 w-4" /> What to perform
           </h2>
           <p className="mt-2 whitespace-pre-wrap text-sm text-rose-800 dark:text-rose-300">{call.audition_brief}</p>
@@ -238,7 +238,7 @@ function CastingCallDetailContent() {
 
       {call.roles.length > 1 && (
         <div className="mt-8">
-          <h2 className="font-heading text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h2 className="font-heading text-lg font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
             Roles in this project
           </h2>
           <div className="mt-3 flex flex-col gap-3">
@@ -261,7 +261,7 @@ function CastingCallDetailContent() {
 
       {call.shoot_details && (
         <div className="mt-8">
-          <h2 className="font-heading text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h2 className="font-heading text-lg font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
             Dates & Locations
           </h2>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{call.shoot_details}</p>

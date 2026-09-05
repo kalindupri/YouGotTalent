@@ -73,7 +73,7 @@ export default function PricingPage() {
           <span className={eyebrowClass}>
             <Sparkles className="mr-1 inline h-3 w-3" /> Simple, honest pricing
           </span>
-          <h1 className="mt-6 font-heading text-4xl font-black uppercase leading-tight tracking-tight text-white sm:text-5xl">
+          <h1 className="mt-6 font-heading text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl">
             Free to start. <span className="text-rose-500">Fair to grow.</span>
           </h1>
           <p className="mt-4 max-w-xl text-zinc-400">
@@ -171,11 +171,11 @@ function PricingColumn({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="font-heading text-xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-50">{title}</h2>
+      <h2 className="font-heading text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">{title}</h2>
 
       <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <p className="text-sm font-bold uppercase tracking-wide text-zinc-500">Free</p>
-        <p className="mt-1 font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">{freePrice}</p>
+        <p className="mt-1 font-heading text-2xl font-extrabold text-zinc-900 dark:text-zinc-50">{freePrice}</p>
         <ul className="mt-4 flex flex-col gap-2 text-sm text-zinc-600 dark:text-zinc-400">
           {freeFeatures.map((f) => (
             <li key={f} className="flex items-start gap-2">
@@ -194,7 +194,7 @@ function PricingColumn({
         <p className="flex items-center gap-1 text-sm font-bold uppercase tracking-wide text-rose-600">
           <Crown className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} /> Premium
         </p>
-        <p className="mt-1 font-heading text-2xl font-black text-zinc-900 dark:text-zinc-50">{premiumPrice}</p>
+        <p className="mt-1 font-heading text-2xl font-extrabold text-zinc-900 dark:text-zinc-50">{premiumPrice}</p>
         <ul className="mt-4 flex flex-col gap-2 text-sm text-zinc-600 dark:text-zinc-400">
           {premiumFeatures.map((f) => (
             <li key={f} className="flex items-start gap-2">

@@ -6,12 +6,12 @@ export default function TermsPage() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-14">
       <span className={eyebrowClass}>Legal</span>
-      <h1 className="mt-2 font-heading text-3xl font-black uppercase tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+      <h1 className="mt-2 font-heading text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
         Terms of Service &amp; Disclaimer
       </h1>
       <p className="mt-2 text-sm text-zinc-500">Last updated: 15 August 2026</p>
 
-      <div className="prose prose-zinc mt-8 max-w-none dark:prose-invert prose-headings:font-heading prose-headings:uppercase prose-headings:tracking-tight prose-a:text-rose-600">
+      <div className="prose prose-zinc mt-8 max-w-none dark:prose-invert prose-headings:font-heading prose-headings:prose-headings:tracking-tight prose-a:text-rose-600">
         <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <strong>Draft notice:</strong> these terms have not yet been reviewed by a lawyer and
           contain placeholder fields marked <code>[PLACEHOLDER]</code>. Fill those in and have

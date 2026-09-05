@@ -79,7 +79,7 @@ function TitlesPageContent() {
             <span className="inline-flex items-center gap-1 rounded-sm bg-amber-400 px-3 py-1 text-xs font-black uppercase tracking-widest text-zinc-900">
               <Star className="h-3 w-3 fill-current" /> Rate &amp; critique
             </span>
-            <h1 className="mt-4 font-heading text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
+            <h1 className="mt-4 font-heading text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
               Sri Lanka's screen &amp; sound
             </h1>
             <p className="mt-3 max-w-lg text-zinc-400">

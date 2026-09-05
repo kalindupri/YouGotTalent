@@ -50,7 +50,7 @@ function DiscussionsPageContent() {
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-14">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-4xl font-black uppercase tracking-tight text-zinc-900 sm:text-5xl dark:text-zinc-50">
+          <h1 className="font-heading text-4xl font-extrabold tracking-tight text-zinc-900 sm:text-5xl dark:text-zinc-50">
             Discussions
           </h1>
           <p className="mt-2 text-zinc-500">Talk films, songs, TV series, and the industry with talent and recruiters.</p>

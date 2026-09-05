@@ -37,7 +37,7 @@ export default function StatsOverview() {
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {tiles.map((t) => (
             <div key={t.label} className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-              <p className="font-heading text-2xl font-black text-rose-600">{t.value}</p>
+              <p className="font-heading text-2xl font-extrabold text-rose-600">{t.value}</p>
               <p className="mt-1 text-xs text-zinc-500">{t.label}</p>
             </div>
           ))}

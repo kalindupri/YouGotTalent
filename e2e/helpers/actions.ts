@@ -56,30 +56,51 @@ export async function createTalentProfile(
   opts: { displayName: string; category?: string; city?: string; bio?: string; dateOfBirth?: string }
 ) {
   await page.goto("/dashboard");
-  await page.getByLabel("Display name").fill(opts.displayName);
-  // Required: it decides whether guardian consent is needed and whether paid work is allowed.
-  // Three dropdowns rather than a date input -- see components/DateOfBirthInput.tsx.
-  const [year, month, day] = (opts.dateOfBirth ?? ADULT_DOB).split("-").map(Number);
-  await page.getByLabel("Day", { exact: true }).selectOption(String(day));
-  await page.getByLabel("Month", { exact: true }).selectOption(String(month));
-  await page.getByLabel("Year", { exact: true }).selectOption(String(year));
-  if (opts.category) {
-    // Categories are a checkbox group (multi-category support), not a <select> — "acting"
-    // defaults checked, so clear it before checking the requested one for a clean single-value state.
-    await page.getByRole("checkbox", { name: "Acting" }).uncheck();
-    await page.getByRole("checkbox", { name: categoryLabel(opts.category) }).check();
-  }
+
+  // Onboarding is a wizard now, not a single form -- see components/dashboard/CreateProfileWizard.tsx.
+  // Step 1: craft. Nothing is preselected, so a category must always be chosen.
+  await page.getByRole("button", { name: categoryLabel(opts.category ?? "acting"), exact: true }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Step 2: the basics.
+  await page.getByLabel("Stage name").fill(opts.displayName);
   if (opts.city) {
     await page.getByLabel("City").fill(opts.city);
   }
-  if (opts.bio) {
-    await page.getByLabel("Bio").fill(opts.bio);
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Step 3: the age question is asked out loud before the date, and decides whether the guardian
+  // steps appear at all. Specs that care pass their own dateOfBirth.
+  const dob = opts.dateOfBirth ?? ADULT_DOB;
+  const minor = new Date(dob) > new Date(Date.now() - 18 * 365.25 * 24 * 60 * 60 * 1000);
+  await page.getByRole("button", { name: minor ? /under 18/ : /18 or over/ }).click();
+
+  const [year, month, day] = dob.split("-").map(Number);
+  await page.getByLabel("Day", { exact: true }).selectOption(String(day));
+  await page.getByLabel("Month", { exact: true }).selectOption(String(month));
+  await page.getByLabel("Year", { exact: true }).selectOption(String(year));
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Guardian consent (minors only) is exercised by guardian-consent.spec.ts, which drives it
+  // properly with fixture documents; every other spec steps past it.
+  const skipGuardian = page.getByRole("button", { name: "I'll do this later" });
+  if (await skipGuardian.isVisible().catch(() => false)) {
+    await skipGuardian.click();
   }
-  await page.getByRole("button", { name: "Create profile" }).click();
-  // The dashboard's default sidebar tab is "Profile" — after creation the create-form is
-  // replaced by the profile summary, which is the reliable signal here (unlike "Membership",
-  // which now lives behind a different sidebar tab).
+
+  // Final step is the headshot. Uploading one means driving a crop dialog in every one of the
+  // 50 specs that build a profile, so they take the escape hatch; headshot upload has its own
+  // coverage in talent-dashboard.spec.ts.
+  await page.getByRole("button", { name: "I'll add a photo later" }).click();
+
   await expect(page.getByRole("heading", { name: opts.displayName })).toBeVisible();
+
+  if (opts.bio) {
+    // The wizard no longer asks for a bio -- it is set from the profile editor afterwards.
+    await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+    await page.getByLabel("Bio").fill(opts.bio);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+  }
 }
 
 export async function postCastingCall(
