@@ -152,6 +152,15 @@ export async function openDashboardSection(page: Page, navLabel: string) {
   await page.getByRole("button", { name: navLabel, exact: true }).click();
 }
 
+// /talents leads with one natural-language search box; craft, city and the rest of the filters
+// sit behind the Filters button. They still apply live once the panel is open. The button's
+// accessible name gains the active-filter count ("Filters 2"), hence the prefix match.
+export async function openTalentFilters(page: Page) {
+  const toggle = page.getByRole("button", { name: /^Filters/ });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(page.getByText("Craft", { exact: true })).toBeVisible();
+}
+
 export async function createRecruiterProfile(page: Page, opts: { companyName: string; industry?: string }) {
   await page.goto("/dashboard");
   await page.getByLabel("Company / agency name").fill(opts.companyName);

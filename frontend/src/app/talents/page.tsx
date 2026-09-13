@@ -3,10 +3,11 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { PlayCircle, Save, ShieldCheck, Sparkles } from "lucide-react";
+import { PlayCircle, Save, Search, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
 import { ApiError, api, CastingCall, TALENT_CATEGORIES, TalentCategory, TalentProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { badgeClass,
+  btnPrimary,
   btnSecondary,
   btnSmall,
   cardClass,
@@ -52,9 +53,26 @@ function TalentsPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // The count on the filter button. The page previously gave no indication at all of what was
+  // applied: Advanced filters closed and left no trace, so a stale age range silently narrowed
+  // every later search.
+  const activeFilterCount =
+    categories.length +
+    (city ? 1 : 0) +
+    (q ? 1 : 0) +
+    (gender ? 1 : 0) +
+    (ageMin || ageMax ? 1 : 0) +
+    (experienceMin || experienceMax ? 1 : 0) +
+    (verifiedOnly ? 1 : 0) +
+    instruments.length +
+    (minTiktokFollowers ? 1 : 0);
+
   const [smartQuery, setSmartQuery] = useState("");
   const [smartParsing, setSmartParsing] = useState(false);
-  const [detected, setDetected] = useState<string[] | null>(null);
+  // Chips are the filter UI now, not a receipt: each carries the reset that clears it, so
+  // removing one re-runs the search. Previously they were read-only text and the only way to
+  // undo a parse was to clear the box and start again.
+  const [detected, setDetected] = useState<{ label: string; clear: () => void }[] | null>(null);
 
   async function handleSmartSearch(e: FormEvent) {
     e.preventDefault();
@@ -62,38 +80,63 @@ function TalentsPageContent() {
     setSmartParsing(true);
     try {
       const parsed = await api.parseTalentSearchQuery(smartQuery);
-      const chips: string[] = [];
+      const chips: { label: string; clear: () => void }[] = [];
       if (parsed.categories?.length) {
         setCategories(parsed.categories as TalentCategory[]);
-        chips.push(...parsed.categories.map(formatCategory));
+        for (const c of parsed.categories) {
+          chips.push({
+            label: formatCategory(c),
+            clear: () => setCategories((prev) => prev.filter((x) => x !== c)),
+          });
+        }
       } else {
         setCategories([]);
       }
+      // City is a real filter rather than a keyword: the keyword search does not cover the city
+      // column, so before the parser learned place names "singer in Kandy" quietly missed
+      // everyone who lives in Kandy but does not say so in their bio.
+      setCity(parsed.city ?? "");
+      if (parsed.city) chips.push({ label: parsed.city, clear: () => setCity("") });
+      setVerifiedOnly(parsed.verified_only);
+      if (parsed.verified_only) chips.push({ label: "Verified", clear: () => setVerifiedOnly(false) });
       setGender(parsed.gender ?? "");
-      if (parsed.gender) chips.push(parsed.gender === "male" ? "Male" : "Female");
+      if (parsed.gender)
+        chips.push({ label: parsed.gender === "male" ? "Male" : "Female", clear: () => setGender("") });
       setAgeMin(parsed.age_min != null ? String(parsed.age_min) : "");
       setAgeMax(parsed.age_max != null ? String(parsed.age_max) : "");
       if (parsed.age_min != null || parsed.age_max != null) {
-        chips.push(
-          parsed.age_min != null && parsed.age_max != null
-            ? `${parsed.age_min}-${parsed.age_max} yrs`
-            : parsed.age_min != null
-              ? `Over ${parsed.age_min - 1}`
-              : `Under ${parsed.age_max! + 1}`
-        );
+        chips.push({
+          label:
+            parsed.age_min != null && parsed.age_max != null
+              ? `${parsed.age_min}-${parsed.age_max} yrs`
+              : parsed.age_min != null
+                ? `Over ${parsed.age_min - 1}`
+                : `Under ${parsed.age_max! + 1}`,
+          clear: () => {
+            setAgeMin("");
+            setAgeMax("");
+          },
+        });
       }
       setExperienceMin(parsed.experience_min != null ? String(parsed.experience_min) : "");
       setExperienceMax(parsed.experience_max != null ? String(parsed.experience_max) : "");
-      if (parsed.experience_min != null) chips.push(`${parsed.experience_min}+ yrs experience`);
-      if (parsed.experience_max === 0) chips.push("No experience required");
+      if (parsed.experience_min != null)
+        chips.push({ label: `${parsed.experience_min}+ yrs experience`, clear: () => setExperienceMin("") });
+      if (parsed.experience_max === 0)
+        chips.push({ label: "No experience required", clear: () => setExperienceMax("") });
       setInstruments(parsed.instruments ?? []);
-      if (parsed.instruments?.length) chips.push(...parsed.instruments.map(formatInstrument));
+      for (const i of parsed.instruments ?? []) {
+        chips.push({ label: formatInstrument(i), clear: () => setInstruments((prev) => prev.filter((x) => x !== i)) });
+      }
       setMinTiktokFollowers(parsed.min_tiktok_followers ?? undefined);
-      if (parsed.min_tiktok_followers) chips.push(`${(parsed.min_tiktok_followers / 1000).toFixed(0)}k+ TikTok followers`);
+      if (parsed.min_tiktok_followers)
+        chips.push({
+          label: `${(parsed.min_tiktok_followers / 1000).toFixed(0)}k+ TikTok followers`,
+          clear: () => setMinTiktokFollowers(undefined),
+        });
       setQ(parsed.keywords ?? "");
-      if (parsed.keywords) chips.push(`"${parsed.keywords}"`);
-      setDetected(chips.length > 0 ? chips : ["No specific filters detected — searching keywords only"]);
-      setShowAdvanced(true);
+      if (parsed.keywords) chips.push({ label: `"${parsed.keywords}"`, clear: () => setQ("") });
+      setDetected(chips);
     } catch {
       setDetected(null);
     } finally {
@@ -221,50 +264,105 @@ function TalentsPageContent() {
         {loading ? "Loading…" : `${talents.length} talent profile${talents.length === 1 ? "" : "s"}`}
       </p>
 
+      {/* One box. There used to be three — a natural-language box, a keyword box and a city box,
+          all styled identically with no labels, and at 375px the natural-language one was 134px
+          wide next to a 170px button, so its placeholder truncated to "Describe who y". The
+          parser handles craft, city, age, gender, experience and verification, so plain language
+          is the input and everything it cannot place falls through to the keyword search. */}
+      {/* The search row must not repeat the mistake it replaces: on a 375px screen a visible
+          "Search" button alongside squeezes the input back under ~170px and the placeholder
+          truncates again. So on phones the input takes the full row and Enter submits; the
+          button reappears once there is width for it. */}
       <form onSubmit={handleSmartSearch} className="mt-8 flex flex-wrap gap-2">
-        <input
-          placeholder={`Describe who you're looking for — e.g. "Actor wanted under 35 male with some experience"`}
-          value={smartQuery}
-          onChange={(e) => setSmartQuery(e.target.value)}
-          className={`${inputClass} max-w-lg flex-1`}
-        />
-        <button type="submit" disabled={smartParsing || !smartQuery.trim()} className={btnSecondary}>
-          <Sparkles className="h-4 w-4" /> {smartParsing ? "Thinking…" : "Smart search"}
+        <label className="relative min-w-0 flex-1 basis-full sm:basis-0">
+          <span className="sr-only">Search talent</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <input
+            placeholder="Try “singer in Kandy under 25”"
+            value={smartQuery}
+            onChange={(e) => setSmartQuery(e.target.value)}
+            className={`${inputClass} pl-10`}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          aria-expanded={showAdvanced}
+          className="relative flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-md border-2 border-zinc-200 px-4 text-sm font-semibold text-zinc-700 transition-colors hover:border-rose-300 sm:w-12 sm:px-0 dark:border-zinc-700 dark:text-zinc-300"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          <span className="sm:sr-only">Filters</span>
+          {activeFilterCount > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-extrabold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+        <button
+          type="submit"
+          disabled={smartParsing || !smartQuery.trim()}
+          className={`hidden sm:inline-flex ${btnPrimary}`}
+        >
+          {smartParsing ? "Searching…" : "Search"}
         </button>
       </form>
       {detected && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="font-semibold text-zinc-500">Detected:</span>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+          {detected.length === 0 && (
+            <span className="text-zinc-500">Searching everything — add a craft, city or age to narrow it down.</span>
+          )}
           {detected.map((d, i) => (
-            <span
+            <button
               key={i}
-              className="rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+              type="button"
+              onClick={() => {
+                d.clear();
+                setDetected((prev) => (prev ? prev.filter((_, j) => j !== i) : prev));
+              }}
+              className="inline-flex items-center gap-1 rounded-full bg-rose-50 py-1 pl-2.5 pr-1.5 font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:bg-rose-950 dark:text-rose-300"
             >
-              {d}
-            </span>
+              {d.label}
+              <X className="h-3 w-3" />
+              <span className="sr-only">Remove filter</span>
+            </button>
           ))}
+          {detected.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                for (const d of detected) d.clear();
+                setDetected(null);
+                setSmartQuery("");
+              }}
+              className="ml-1 font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              Clear all
+            </button>
+          )}
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-3">
-        <input
-          placeholder="Search by name, bio, or skill (e.g. 'screenplay', 'carnatic')"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className={`${inputClass} max-w-sm`}
-        />
-        <input
-          placeholder="Filter by city"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          className={`${inputClass} w-auto max-w-[10rem]`}
-        />
-        <button type="button" onClick={() => setShowAdvanced((v) => !v)} className={btnSmall}>
-          {showAdvanced ? "Hide" : "Advanced filters"}
-        </button>
-      </div>
+      {showAdvanced && (
+        <div className="mt-4 flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex flex-wrap gap-3">
+            <label className={`${labelClass} max-w-sm flex-1`}>
+              Name, bio or skill
+              <input
+                placeholder="e.g. screenplay, carnatic"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className={`${labelClass} w-40`}>
+              City
+              <input value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} />
+            </label>
+          </div>
 
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-bold uppercase tracking-wide text-zinc-400">Craft</span>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
         {TALENT_CATEGORIES.map((c) => (
           <label
             key={c}
@@ -278,13 +376,10 @@ function TalentsPageContent() {
             {formatCategory(c)}
           </label>
         ))}
+        </div>
       </div>
 
-      {showAdvanced && (
-        <form
-          onSubmit={handleSaveSearch}
-          className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-        >
+        <form onSubmit={handleSaveSearch} className="flex flex-wrap items-end gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <label className={labelClass}>
             Min. experience (years)
             <input
@@ -372,6 +467,13 @@ function TalentsPageContent() {
           )}
           {saveSearchMessage && <p className="w-full text-sm text-zinc-500">{saveSearchMessage}</p>}
         </form>
+
+          <div className="flex justify-end border-t border-zinc-200 pt-4 dark:border-zinc-800">
+            <button type="button" onClick={() => setShowAdvanced(false)} className={btnPrimary}>
+              {loading ? "Searching…" : `Show ${talents.length} result${talents.length === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </div>
       )}
 
       {error && <p className="mt-8 text-sm text-red-600">{error}</p>}
@@ -395,20 +497,25 @@ function TalentsPageContent() {
                 />
               </label>
             )}
+            {/* A row on phones, a tile from sm up. At 375px the 4:3 tile made one result fill
+                most of the screen, which is the wrong shape for a scanning task -- a row fits
+                four. The photo still gets its space on the profile itself. */}
             <Link
               href={`/talents/${t.id}`}
-              className="group block overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+              className="group flex overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-all hover:shadow-lg sm:block sm:hover:-translate-y-1 dark:border-zinc-800 dark:bg-zinc-900"
             >
-              <div className="aspect-[4/3] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+              <div className="h-28 w-28 shrink-0 overflow-hidden bg-zinc-100 sm:aspect-[4/3] sm:h-auto sm:w-full dark:bg-zinc-800">
                 <TalentAvatar
                   name={t.display_name}
                   coverUrl={coverPhotoUrl(t.media)}
-                  className="h-full w-full text-4xl transition-transform duration-300 group-hover:scale-105"
+                  className="h-full w-full text-2xl transition-transform duration-300 sm:text-4xl sm:group-hover:scale-105"
                 />
               </div>
-              <div className="p-4">
+              <div className="min-w-0 flex-1 p-3 sm:p-4">
                 <div className="flex items-center gap-1.5">
-                  <p className="font-heading text-lg font-bold text-zinc-900 dark:text-zinc-50">{t.display_name}</p>
+                  <p className="truncate font-heading text-base font-bold text-zinc-900 sm:text-lg dark:text-zinc-50">
+                    {t.display_name}
+                  </p>
                   {t.is_verified && (
                     <span className={verifiedBadgeClass}>
                       <ShieldCheck className="h-3 w-3" />

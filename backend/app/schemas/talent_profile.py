@@ -107,6 +107,10 @@ class ParsedTalentSearchQuery(BaseModel):
     experience_max: int | None = None
     min_tiktok_followers: int | None = None
     instruments: list[str] | None = None
+    # City is parsed rather than left to `keywords` because the keyword search does not cover
+    # the city column -- see CITIES in core/talent_search_parse.py.
+    city: str | None = None
+    verified_only: bool = False
     keywords: str | None = None
 
 

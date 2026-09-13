@@ -4,6 +4,7 @@ import {
   createTalentProfile,
   logout,
   openDashboardSection,
+  openTalentFilters,
   registerAndVerify,
   sectionByHeading,
 } from "../helpers/actions";
@@ -23,6 +24,7 @@ test("browse talents page filters by category", async ({ page }) => {
   await logout(page);
 
   await page.goto("/talents");
+  await openTalentFilters(page);
   // The category filter is a checkbox pill group (multi-category support), not a <select>.
   // The checkbox input is display:none (removed from the a11y tree) — the <label> is the
   // real clickable pill, same pattern as the existing instrument filter.

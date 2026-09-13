@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ADULT_DOB, createTalentProfile, logout, registerAndVerify } from "../helpers/actions";
+import { ADULT_DOB, createTalentProfile, logout, openTalentFilters, registerAndVerify } from "../helpers/actions";
 import { uniqueEmail } from "../helpers/db";
 
 const API_BASE = "http://localhost:8000/api/v1";
@@ -22,10 +22,11 @@ test.describe("talent search — filter combinations", () => {
     await logout(page);
 
     await page.goto("/talents");
+    await openTalentFilters(page);
     // The pill's checkbox input is display:none (removed from the a11y tree entirely) — the
     // <label> is the real clickable surface, same pattern as the existing instrument filter.
     await page.locator("label").filter({ hasText: "Photography" }).click();
-    await page.getByPlaceholder("Filter by city").fill("Kandy");
+    await page.getByLabel("City", { exact: true }).fill("Kandy");
 
     await expect(page.getByText("Search Match Kandy")).toBeVisible();
     await expect(page.getByText("Search WrongCity Colombo")).not.toBeVisible();
@@ -34,7 +35,8 @@ test.describe("talent search — filter combinations", () => {
 
   test("a filter combination matching nothing shows the empty state, not an error", async ({ page }) => {
     await page.goto("/talents");
-    await page.getByPlaceholder("Filter by city").fill(`NoSuchCity${Date.now()}`);
+    await openTalentFilters(page);
+    await page.getByLabel("City", { exact: true }).fill(`NoSuchCity${Date.now()}`);
     await expect(page.getByText("No talent profiles match your search yet.")).toBeVisible();
   });
 

@@ -274,6 +274,10 @@ export interface ParsedTalentSearchQuery {
   experience_max: number | null;
   min_tiktok_followers: number | null;
   instruments: string[] | null;
+  /** Parsed from a place name in the query. Kept separate from `keywords` because the keyword
+   *  search does not cover the city column — see CITIES in backend/app/core/talent_search_parse.py. */
+  city: string | null;
+  verified_only: boolean;
   keywords: string | null;
 }
 

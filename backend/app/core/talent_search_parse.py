@@ -59,6 +59,26 @@ GENDER_SYNONYMS: dict[str, str] = {
     "lady": "female", "ladies": "female",
 }
 
+# Cities are matched from a list rather than left to the keyword search, because `q` does NOT
+# search the city column -- keyword search covers name, skills, category, bio, instruments and
+# attributes only (see crud/talent_profile.py). Before this, "singer in Kandy" put Kandy in
+# `keywords` and so matched only talent who happened to name Kandy in their bio, not talent who
+# actually live there.
+#
+# District capitals and larger towns. Longer names are matched first so "Nuwara Eliya" is not
+# read as "Eliya". Deliberately not exhaustive: an unrecognised place still falls through to the
+# keyword search, which is the previous behaviour rather than a regression.
+CITIES: list[str] = [
+    "Sri Jayawardenepura Kotte", "Dehiwala Mount Lavinia", "Mount Lavinia", "Nuwara Eliya",
+    "Sri Jayawardenepura", "Point Pedro", "Battaramulla", "Maharagama", "Nawalapitiya",
+    "Anuradhapura", "Polonnaruwa", "Trincomalee", "Kurunegala", "Batticaloa", "Monaragala",
+    "Mullaitivu", "Kilinochchi", "Hambantota", "Hikkaduwa", "Nugegoda", "Moratuwa", "Homagama",
+    "Kelaniya", "Ratnapura", "Panadura", "Negombo", "Kalutara", "Vavuniya", "Dambulla",
+    "Kalmunai", "Sigiriya", "Weligama", "Beruwala", "Gampola", "Gampaha", "Bentota", "Wattala",
+    "Kegalle", "Badulla", "Puttalam", "Trinco", "Ja-Ela", "Chilaw", "Jaffna", "Colombo",
+    "Matale", "Matara", "Mannar", "Ampara", "Kotte", "Kandy", "Galle", "Ella",
+]
+
 # Words consumed by structured matching, plus generic filler -- whatever's left forms the
 # residual keyword search.
 STOPWORDS = {
@@ -88,6 +108,8 @@ def parse_talent_search_query(raw_query: str) -> dict:
         "experience_max": None,
         "min_tiktok_followers": None,
         "instruments": [],
+        "city": None,
+        "verified_only": False,
         "keywords": "",
     }
 
@@ -110,6 +132,12 @@ def parse_talent_search_query(raw_query: str) -> dict:
         text, m = _extract_first(text, r"\b(\d{1,2})\s*(?:-|to)\s*(\d{1,2})\s*years?\b")
         if m:
             result["age_min"], result["age_max"] = int(m.group(1)), int(m.group(2))
+        else:
+            # A bare "18-24" with no trailing unit. Bounded to plausible ages so a fragment of a
+            # phone number or a year cannot be read as an age range.
+            text, m = _extract_first(text, r"\b(\d{1,2})\s*(?:-|to)\s*(\d{1,2})\b")
+            if m and 5 <= int(m.group(1)) < int(m.group(2)) <= 99:
+                result["age_min"], result["age_max"] = int(m.group(1)), int(m.group(2))
     text, m = _extract_first(text, r"\b(?:under|below|younger than)\s+(\d{1,2})\b")
     if m:
         result["age_max"] = int(m.group(1)) - 1
@@ -120,6 +148,18 @@ def parse_talent_search_query(raw_query: str) -> dict:
     if m:
         age = int(m.group(1))
         result["age_min"], result["age_max"] = age, age
+
+    # --- City and verification -------------------------------------------------------------
+    # Longest-first so multi-word names win over their fragments.
+    for name in sorted(CITIES, key=len, reverse=True):
+        text, m = _extract_first(text, r"\b" + re.escape(name).replace(r"\ ", r"\s+") + r"\b")
+        if m:
+            result["city"] = name
+            break
+
+    text, m = _extract_first(text, r"\bverified\b")
+    if m:
+        result["verified_only"] = True
 
     # --- Fuzzy age words (approximate cutoffs, only applied if no numeric age was already found) ---
     if result["age_min"] is None and result["age_max"] is None:
