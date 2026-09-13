@@ -78,11 +78,19 @@ jobs:
           UAT_DATABASE_URL: ${{ secrets.UAT_DATABASE_URL }}
           UAT_SECRET_KEY: ${{ secrets.UAT_SECRET_KEY }}
           GHCR_USERNAME: ${{ github.repository_owner }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # NOT secrets.GITHUB_TOKEN. The ygt-* packages are private, and Azure stores this
+          # credential to pull images on every scale-up from zero -- GITHUB_TOKEN expires when this
+          # job ends, so the first cold start after provisioning would fail to pull. This must be
+          # a long-lived personal access token with read:packages, as production uses.
+          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "$UAT_DATABASE_URL" ]; then
             echo "::error::UAT_DATABASE_URL is not set. Reset the Postgres admin password and add the connection URL as a repository secret."
+            exit 1
+          fi
+          if [ -z "$GHCR_TOKEN" ]; then
+            echo "::error::GHCR_PULL_TOKEN is not set. Add a GitHub personal access token with read:packages as a repository secret."
             exit 1
           fi
           STORAGE_CONN=$(az storage account show-connection-string -n ygtdevstorage4821 -g "$RESOURCE_GROUP" --query connectionString -o tsv)
@@ -129,6 +137,13 @@ jobs:
           fi
 
           FRONTEND_FQDN=$(az containerapp show -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
+
+          # Re-applied on every run, not just at creation, so rotating the token is "update the
+          # secret, re-run provision".
+          for app in "$BACKEND_APP" "$FRONTEND_APP"; do
+            az containerapp registry set -n "$app" -g "$RESOURCE_GROUP" \
+              --server ghcr.io --username "$GHCR_USERNAME" --password "$GHCR_TOKEN" >/dev/null
+          done
 
           # DNS is created here rather than kept permanently, and deliberately AFTER the app
           # exists. A CNAME pointing at a deleted Container App hostname is a subdomain-takeover
