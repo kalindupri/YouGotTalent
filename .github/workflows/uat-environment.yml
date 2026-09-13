@@ -33,7 +33,9 @@ name: UAT Environment
 on:
   push:
     branches: [uat]
-    paths: ['.github/uat-switch']
+    # The workflow itself too, so a change to UAT's configuration re-applies whatever the
+    # switch currently says.
+    paths: ['.github/uat-switch', '.github/workflows/uat-environment.yml']
   workflow_dispatch:
     inputs:
       action:
@@ -125,6 +127,16 @@ jobs:
           STORAGE_CONN=$(az storage account show-connection-string -n ygtdevstorage4821 -g "$RESOURCE_GROUP" --query connectionString -o tsv)
           COMMS_CONN=$(az communication list-key --name ygt-comms -g "$RESOURCE_GROUP" --query primaryConnectionString -o tsv)
           SECRET_KEY="${UAT_SECRET_KEY:-$(openssl rand -base64 48 | tr -d '\n')}"
+
+          # The environment too. Azure suspended the original ygt-env after it sat empty, and a
+          # suspended environment does not error -- `containerapp create` just hangs in it. The
+          # subscription allows only 2 environments per region (production holds the other), so
+          # the recovery is delete-and-recreate under the same name, and this does the recreate.
+          if ! az containerapp env show -n "$CONTAINER_ENV" -g "$RESOURCE_GROUP" >/dev/null 2>&1; then
+            echo "Creating environment $CONTAINER_ENV"
+            # No log shipping: a Log Analytics workspace bills per GB ingested.
+            az containerapp env create -n "$CONTAINER_ENV" -g "$RESOURCE_GROUP" -l centralus --logs-destination none >/dev/null
+          fi
 
           # Guardian-consent documents (birth certificates) go here, never in the public
           # talent-media container, so it must not be publicly readable.
