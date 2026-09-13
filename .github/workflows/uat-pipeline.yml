@@ -12,6 +12,9 @@ name: UAT Pipeline
 on:
   push:
     branches: [uat]
+    # Flipping the UAT switch is not a code change: don't re-run the suite or ask for a
+    # production approval over it. (Ignored only when that file is the ONLY change.)
+    paths-ignore: ['.github/uat-switch']
   workflow_dispatch:
 
 permissions:

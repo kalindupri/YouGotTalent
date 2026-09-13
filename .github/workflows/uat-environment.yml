@@ -17,12 +17,23 @@
 #   status     report what is running, and say nothing else
 #   destroy    delete the apps entirely. The config survives here, so this is recoverable.
 #
+# TWO WAYS TO FLIP IT.
+#   1. Actions -> UAT Environment -> Run workflow. GitHub only offers this button once the
+#      workflow is on main.
+#   2. Edit .github/uat-switch on the uat branch (the GitHub web editor is fine) so it contains
+#      one of the words above, and commit. Works from uat alone, before anything reaches main --
+#      and the UAT Pipeline ignores a commit that touches only that file, so flipping the switch
+#      does not re-run the test suite or ask for a production approval.
+#
 # NOTE ON THE DATABASE. Azure automatically restarts a stopped PostgreSQL Flexible Server after
 # 7 days. `down` is therefore not permanent for the database -- re-run it, or accept the cost of
 # a B1ms burstable instance. The container apps have no such behaviour and stay down.
 name: UAT Environment
 
 on:
+  push:
+    branches: [uat]
+    paths: ['.github/uat-switch']
   workflow_dispatch:
     inputs:
       action:
@@ -49,6 +60,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve action
+        id: act
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            action="${{ inputs.action }}"
+          else
+            action=$(tr -d '[:space:]' < .github/uat-switch)
+          fi
+          case "$action" in
+            status|up|down|provision|destroy) ;;
+            *) echo "::error::.github/uat-switch must contain one of: status up down provision destroy (got '$action')"; exit 1 ;;
+          esac
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+          echo "Action: **$action**" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -57,6 +83,9 @@ jobs:
 
       - name: Status
         run: |
+          # containerapp and communication are CLI extensions; without this the runner stops at an
+          # install prompt nobody can answer.
+          az config set extension.use_dynamic_install=yes_without_prompt 2>/dev/null
           echo "### UAT status" >> "$GITHUB_STEP_SUMMARY"
           for app in "$BACKEND_APP" "$FRONTEND_APP"; do
             state=$(az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query properties.runningStatus -o tsv 2>/dev/null || echo "not provisioned")
@@ -69,7 +98,7 @@ jobs:
       # Only the pieces that do not exist. Re-running is safe and is the intended way to apply a
       # change to the environment variables below.
       - name: Provision
-        if: inputs.action == 'provision'
+        if: steps.act.outputs.action == 'provision'
         env:
           # Secrets. Set these once in the repository's Actions secrets. UAT_DATABASE_URL is the
           # only one without a workable default -- the database password is not recoverable from
@@ -96,6 +125,10 @@ jobs:
           STORAGE_CONN=$(az storage account show-connection-string -n ygtdevstorage4821 -g "$RESOURCE_GROUP" --query connectionString -o tsv)
           COMMS_CONN=$(az communication list-key --name ygt-comms -g "$RESOURCE_GROUP" --query primaryConnectionString -o tsv)
           SECRET_KEY="${UAT_SECRET_KEY:-$(openssl rand -base64 48 | tr -d '\n')}"
+
+          # Guardian-consent documents (birth certificates) go here, never in the public
+          # talent-media container, so it must not be publicly readable.
+          az storage container create --name identity-documents --connection-string "$STORAGE_CONN" --public-access off >/dev/null
 
           if ! az containerapp show -n "$BACKEND_APP" -g "$RESOURCE_GROUP" >/dev/null 2>&1; then
             echo "Creating $BACKEND_APP"
@@ -156,7 +189,7 @@ jobs:
           # Azure will not issue the certificate until the records resolve.
           echo "Waiting for DNS to propagate before binding the certificate..."
           for i in $(seq 1 20); do
-            if host "$UAT_HOST" >/dev/null 2>&1; then break; fi
+            if getent hosts "$UAT_HOST" >/dev/null 2>&1; then break; fi
             sleep 15
           done
           az containerapp hostname add -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" --hostname "$UAT_HOST" 2>/dev/null || echo "hostname already added"
@@ -170,7 +203,7 @@ jobs:
 
       # --- the switch -------------------------------------------------------------------------
       - name: Up
-        if: inputs.action == 'up'
+        if: steps.act.outputs.action == 'up'
         run: |
           az postgres flexible-server start -n "$PG_SERVER" -g "$RESOURCE_GROUP" 2>/dev/null || echo "database already running"
           for app in "$BACKEND_APP" "$FRONTEND_APP"; do
@@ -179,7 +212,7 @@ jobs:
           echo "UAT is up: https://$UAT_HOST" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Down
-        if: inputs.action == 'down'
+        if: steps.act.outputs.action == 'down'
         run: |
           for app in "$BACKEND_APP" "$FRONTEND_APP"; do
             az containerapp stop -n "$app" -g "$RESOURCE_GROUP" || echo "::warning::could not stop $app"
@@ -190,7 +223,7 @@ jobs:
           echo "Azure restarts a stopped PostgreSQL Flexible Server after 7 days -- re-run \`down\` if UAT stays unused." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Destroy
-        if: inputs.action == 'destroy'
+        if: steps.act.outputs.action == 'destroy'
         run: |
           for app in "$BACKEND_APP" "$FRONTEND_APP"; do
             az containerapp delete -n "$app" -g "$RESOURCE_GROUP" --yes || true
