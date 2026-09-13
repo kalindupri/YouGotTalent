@@ -16,6 +16,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # Catches every email the app sends locally and shows it in a web UI at http://localhost:8025.
+  # Without this, core/email.py finds no mail provider and logs the message instead of sending
+  # it, so registration "works" but the verification code only ever appears in `docker logs` --
+  # which looks exactly like registration being broken.
+  #
+  # Nothing leaves the machine: Mailpit accepts the SMTP conversation and keeps the message.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # web UI
+      - "1025:1025"   # SMTP
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -23,6 +36,11 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg2://ygt:ygt@db:5432/ygt
+      # Point the app's SMTP path at Mailpit. Mailpit takes no credentials and no TLS, which is
+      # why SMTP_USER/PASSWORD are absent and TLS is off -- see _send_via_smtp in core/email.py.
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USE_TLS: "false"
     ports:
       - "8000:8000"
     depends_on:
