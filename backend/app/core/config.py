@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     # decides whether a URL is "ours" by looking for the container name in it.
     AZURE_PRIVATE_CONTAINER: str = "identity-documents"
 
+    # PIN-guarded partner documents at /docs/* (app/api/routes/partner_docs.py). Empty means the
+    # whole feature is a 404 -- the default, and production's setting. Set DOCS_PIN only as an
+    # environment variable on the Container App: the repository is public.
+    DOCS_PIN: str = ""
+    DOCS_CONTAINER: str = "partner-docs"
+
     # ID scans are photos or PDFs, not video -- a far smaller cap than MAX_UPLOAD_SIZE_BYTES.
     MAX_DOCUMENT_SIZE_BYTES: int = 10 * 1024 * 1024
 

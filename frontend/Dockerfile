@@ -5,6 +5,10 @@ WORKDIR /app
 # NEXT_PUBLIC_* vars are baked into the bundle at build time, not settable at runtime
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Where next.config.ts proxies /docs/* on the server side. Defaults to NEXT_PUBLIC_API_URL; only
+# docker compose sets it, because there "localhost:8000" means the frontend container itself.
+ARG INTERNAL_API_URL
+ENV INTERNAL_API_URL=$INTERNAL_API_URL
 
 COPY package*.json ./
 RUN npm ci

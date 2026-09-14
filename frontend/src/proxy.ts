@@ -7,7 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 // Maintenance takes priority over coming-soon if both are ever left on at once.
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/maintenance") || pathname.startsWith("/coming-soon")) {
+  // /docs is PIN-guarded by the backend and 404s wherever no PIN is set, so the site gates have
+  // nothing to add -- and a partner deck should stay reachable while the site says "coming soon".
+  if (pathname.startsWith("/maintenance") || pathname.startsWith("/coming-soon") || pathname.startsWith("/docs/")) {
     return NextResponse.next();
   }
 

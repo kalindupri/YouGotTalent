@@ -41,6 +41,9 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_USE_TLS: "false"
+      # Unset by default, so /docs/* is a 404 locally too. To try the partner deck locally:
+      #   DOCS_PIN=<pin> docker compose up -d backend   (files go in backend/private_docs/)
+      DOCS_PIN: ${DOCS_PIN:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -57,6 +60,8 @@ services:
       # API call silently becomes a relative fetch against the frontend's own origin and 404s.
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+        # Server-side only: the /docs proxy runs inside this container, where localhost is itself.
+        INTERNAL_API_URL: http://backend:8000/api/v1
     restart: unless-stopped
     ports:
       - "3001:3000"

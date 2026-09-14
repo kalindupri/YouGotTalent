@@ -17,6 +17,9 @@ backend/media_uploads/
 # Local fallback for identity documents (guardian ID, birth certificates). Unlike
 # media_uploads/ this is never served by the app -- see app/core/private_storage.py.
 backend/private_uploads/
+# Partner documents (the BDM deck) are served PIN-guarded from blob storage; never commit them --
+# this repository is public.
+backend/private_docs/
 
 # Node / Next.js
 frontend/node_modules/

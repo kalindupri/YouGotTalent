@@ -24,6 +24,7 @@ from app.api.routes import (
     library,
     marketing,
     notifications,
+    partner_docs,
     recruiters,
     reels,
     reports,
@@ -80,6 +81,7 @@ app.include_router(reels.router, prefix=settings.API_V1_PREFIX)
 app.include_router(support_chat.router, prefix=settings.API_V1_PREFIX)
 app.include_router(guardian_consent.router, prefix=settings.API_V1_PREFIX)
 app.include_router(documents.router, prefix=settings.API_V1_PREFIX)
+app.include_router(partner_docs.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")

@@ -108,6 +108,8 @@ jobs:
           # the resulting URL here.
           UAT_DATABASE_URL: ${{ secrets.UAT_DATABASE_URL }}
           UAT_SECRET_KEY: ${{ secrets.UAT_SECRET_KEY }}
+          # Optional. The PIN for /docs/*; without it the partner docs are a 404 on UAT too.
+          UAT_DOCS_PIN: ${{ secrets.UAT_DOCS_PIN }}
           GHCR_USERNAME: ${{ github.repository_owner }}
           # NOT secrets.GITHUB_TOKEN. The ygt-* packages are private, and Azure stores this
           # credential to pull images on every scale-up from zero -- GITHUB_TOKEN expires when this
@@ -141,6 +143,9 @@ jobs:
           # Guardian-consent documents (birth certificates) go here, never in the public
           # talent-media container, so it must not be publicly readable.
           az storage container create --name identity-documents --connection-string "$STORAGE_CONN" --public-access off >/dev/null
+          # Partner documents served PIN-guarded at /docs/* (backend/app/api/routes/partner_docs.py).
+          # Private for the same reason. The files themselves are uploaded by hand, never from git.
+          az storage container create --name partner-docs --connection-string "$STORAGE_CONN" --public-access off >/dev/null
 
           if ! az containerapp show -n "$BACKEND_APP" -g "$RESOURCE_GROUP" >/dev/null 2>&1; then
             echo "Creating $BACKEND_APP"
@@ -170,6 +175,11 @@ jobs:
               "FRONTEND_URL=https://$UAT_HOST" \
               "BACKEND_PUBLIC_URL=https://$BACKEND_FQDN" \
               "CORS_ORIGINS=[\"https://$UAT_HOST\",\"https://$BACKEND_FQDN\"]"
+
+          if [ -n "$UAT_DOCS_PIN" ]; then
+            az containerapp secret set -n "$BACKEND_APP" -g "$RESOURCE_GROUP" --secrets "docs-pin=$UAT_DOCS_PIN" >/dev/null
+            az containerapp update -n "$BACKEND_APP" -g "$RESOURCE_GROUP" --set-env-vars "DOCS_PIN=secretref:docs-pin" >/dev/null
+          fi
 
           if ! az containerapp show -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" >/dev/null 2>&1; then
             echo "Creating $FRONTEND_APP"
